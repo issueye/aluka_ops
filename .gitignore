@@ -1,0 +1,52 @@
+# ===== Build artifacts =====
+# Go
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Frontend
+/web/node_modules/
+# 注意:web/dist 由 go:embed 引用,必须存在以保证后端可编译。
+# 因此 dist 的占位 index.html 纳入版本控制;构建产物覆盖时不影响。
+# 如需彻底忽略构建产物,可在 CI 中单独处理。
+
+# ===== Runtime data =====
+/data/
+!/data/.gitkeep
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# ===== Logs =====
+*.log
+/logs/
+
+# ===== IDE / Editor =====
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ===== ZCode 本地缓存 =====
+.zcode/
+
+# ===== Local env / secrets =====
+.env
+.env.local
+*.local
+
+# ===== OS =====
+[Tt]humbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
