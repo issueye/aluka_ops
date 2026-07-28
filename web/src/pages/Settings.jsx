@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { healthApi, authApi, api } from "@/lib/api";
+import { healthApi, authApi, systemApi, api } from "@/lib/api";
 import {
   Card,
   CardContent,
@@ -9,11 +9,29 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
+function formatBytes(n) {
+  if (n == null || n === 0) return "0 B";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let v = Number(n);
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
+}
+
 export function Settings() {
   const { data: health } = useQuery({
     queryKey: ["health"],
     queryFn: healthApi.check,
     staleTime: 10000,
+  });
+  const { data: host } = useQuery({
+    queryKey: ["system-host"],
+    queryFn: systemApi.host,
+    refetchInterval: 10000,
+    staleTime: 2000,
   });
   const { data: authStatus } = useQuery({
     queryKey: ["auth-status"],
@@ -34,13 +52,17 @@ export function Settings() {
       <Card>
         <CardHeader>
           <CardTitle>系统信息</CardTitle>
-          <CardDescription>当前后端运行状态</CardDescription>
+          <CardDescription>当前后端运行状态（主机资源每 10 秒刷新）</CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
           <Info label="应用" value={health?.app || "-"} />
           <Info label="版本" value={health?.version || "-"} />
           <Info label="运行模式" value={health?.mode || agentStatus?.mode || "-"} />
-          <Info label="主机" value={health?.host || agentStatus?.host || "-"} />
+          <Info label="主机" value={host?.hostname || health?.host || agentStatus?.host || "-"} />
+          <Info label="系统" value={host ? `${host.platform || host.os || ""} ${host.platform_version || ""}`.trim() : "-"} />
+          <Info label="CPU" value={host ? `${(host.cpu_used_pct ?? 0).toFixed(1)}% · ${host.num_cpu || "?"} 核` : "-"} />
+          <Info label="内存" value={host ? `${formatBytes(host.mem_used)} / ${formatBytes(host.mem_total)} (${(host.mem_used_pct ?? 0).toFixed(1)}%)` : "-"} />
+          <Info label="磁盘" value={host?.disks?.[0] ? `${host.disks[0].path} ${(host.disks[0].used_pct ?? 0).toFixed(1)}%` : "-"} />
           <Info label="数据库" value={health?.db || "-"} />
           <Info label="时间" value={health?.timestamp || "-"} />
         </CardContent>

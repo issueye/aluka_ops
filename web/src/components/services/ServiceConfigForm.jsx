@@ -48,6 +48,7 @@ export function ServiceConfigForm({ service, config }) {
     args: "",
     jvm_args: "",
     env_vars: "",
+    work_dir: "",
     port: 0,
     auto_restart: false,
     max_restarts: 3,
@@ -59,28 +60,34 @@ export function ServiceConfigForm({ service, config }) {
   });
 
   useEffect(() => {
-    if (!config) return;
-    const hc = parseHC(config.health_check);
+    if (!config && !service) return;
+    const hc = parseHC(config?.health_check);
     setForm({
-      command: config.command || "",
-      args: config.args || "",
-      jvm_args: config.jvm_args || "",
-      env_vars: config.env_vars || "",
-      port: config.port || 0,
-      auto_restart: !!config.auto_restart,
-      max_restarts: config.max_restarts ?? 3,
-      shutdown_timeout: config.shutdown_timeout || 30,
+      command: config?.command || "",
+      args: config?.args || "",
+      jvm_args: config?.jvm_args || "",
+      env_vars: config?.env_vars || "",
+      work_dir: service?.work_dir || "",
+      port: config?.port || 0,
+      auto_restart: !!config?.auto_restart,
+      max_restarts: config?.max_restarts ?? 3,
+      shutdown_timeout: config?.shutdown_timeout || 30,
       hc_type: hc.type,
       hc_target: hc.target,
       hc_interval: hc.interval_sec,
       hc_timeout: hc.timeout_sec,
     });
-  }, [config]);
+  }, [config, service]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const mut = useMutation({
-    mutationFn: (body) => serviceApi.updateConfig(service.id, body),
+    mutationFn: async ({ svcPatch, cfgBody }) => {
+      if (svcPatch) {
+        await serviceApi.update(service.id, svcPatch);
+      }
+      return serviceApi.updateConfig(service.id, cfgBody);
+    },
     onSuccess: () => {
       toast.success("配置已保存");
       queryClient.invalidateQueries({ queryKey: ["service", service.id] });
@@ -101,10 +108,12 @@ export function ServiceConfigForm({ service, config }) {
     // 运行中只提交可改字段(含健康检查)
     if (running) {
       mut.mutate({
-        auto_restart: form.auto_restart,
-        max_restarts: Number(form.max_restarts) || 0,
-        shutdown_timeout: Number(form.shutdown_timeout) || 30,
-        health_check,
+        cfgBody: {
+          auto_restart: form.auto_restart,
+          max_restarts: Number(form.max_restarts) || 0,
+          shutdown_timeout: Number(form.shutdown_timeout) || 30,
+          health_check,
+        },
       });
       return;
     }
@@ -122,16 +131,25 @@ export function ServiceConfigForm({ service, config }) {
         return;
       }
     }
+    const workDir = (form.work_dir || "").trim();
+    const svcPatch =
+      workDir !== (service?.work_dir || "")
+        ? { work_dir: workDir }
+        : null;
+
     mut.mutate({
-      command: form.command,
-      args: form.args,
-      jvm_args: form.jvm_args,
-      env_vars: env,
-      port: Number(form.port) || 0,
-      auto_restart: form.auto_restart,
-      max_restarts: Number(form.max_restarts) || 0,
-      shutdown_timeout: Number(form.shutdown_timeout) || 30,
-      health_check,
+      svcPatch,
+      cfgBody: {
+        command: form.command,
+        args: form.args,
+        jvm_args: form.jvm_args,
+        env_vars: env,
+        port: Number(form.port) || 0,
+        auto_restart: form.auto_restart,
+        max_restarts: Number(form.max_restarts) || 0,
+        shutdown_timeout: Number(form.shutdown_timeout) || 30,
+        health_check,
+      },
     });
   };
 
@@ -169,6 +187,20 @@ export function ServiceConfigForm({ service, config }) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="cfg-workdir">工作目录</Label>
+              <Input
+                id="cfg-workdir"
+                value={form.work_dir}
+                onChange={(e) => set("work_dir", e.target.value)}
+                disabled={running || mut.isPending}
+                className="font-mono text-sm"
+                placeholder="如 D:\services\outside-prescription（瘦 jar 必填应用根目录）"
+              />
+              <p className="text-[11px] text-muted-foreground">
+                进程 cwd。含 lib/resources 的 Spring Boot 瘦 jar / 启动脚本必须指向应用根目录。
+              </p>
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="cfg-command">启动命令</Label>
               <Input
                 id="cfg-command"
@@ -176,7 +208,13 @@ export function ServiceConfigForm({ service, config }) {
                 onChange={(e) => set("command", e.target.value)}
                 disabled={running || mut.isPending}
                 className="font-mono text-sm"
-                placeholder="可执行文件路径或命令"
+                placeholder={
+                  service.type === "jar"
+                    ? "outside-prescription.jar"
+                    : service.type === "bat"
+                      ? "startup.bat"
+                      : "可执行文件路径或命令"
+                }
               />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
@@ -187,7 +225,7 @@ export function ServiceConfigForm({ service, config }) {
                 onChange={(e) => set("args", e.target.value)}
                 disabled={running || mut.isPending}
                 className="font-mono text-sm"
-                placeholder="空格分隔"
+                placeholder='如 -h 0.0.0.0 -p 6380（引号会自动去掉）'
               />
             </div>
             {service.type === "jar" && (
@@ -199,8 +237,11 @@ export function ServiceConfigForm({ service, config }) {
                   onChange={(e) => set("jvm_args", e.target.value)}
                   disabled={running || mut.isPending}
                   className="font-mono text-sm"
-                  placeholder="-Xms512m -Xmx1g"
+                  placeholder="-Dfile.encoding=UTF-8 -Dloader.path=resources,lib -Xms1024m -Xmx1024m"
                 />
+                <p className="text-[11px] text-muted-foreground">
+                  瘦 jar 务必带 -Dloader.path=resources,lib，否则会出现 ClassNotFoundException。
+                </p>
               </div>
             )}
             <div className="space-y-1.5">

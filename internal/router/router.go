@@ -7,6 +7,7 @@ package router
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -18,6 +19,7 @@ import (
 	"aluka_ops/internal/pkg/artifact"
 	"aluka_ops/internal/pkg/auth"
 	"aluka_ops/internal/pkg/healthcheck"
+	"aluka_ops/internal/pkg/hostinfo"
 	"aluka_ops/internal/pkg/logstream"
 	"aluka_ops/internal/pkg/process"
 	"aluka_ops/internal/repository"
@@ -77,21 +79,30 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	ctrlAgentsCtl := controller.NewControllerAgentsController(cfg, ctrlReg)
 
 	healthCtl := controller.NewHealthController(db, cfg)
-	// 鉴权:ALUKA_PASSWORD 非空时启用
-	authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
-	authCtl := controller.NewAuthController(authStore)
+		// 本机主机信息采集(缓存 3s,供仪表盘定时拉取)
+		hostCollector := hostinfo.NewCollector(3 * time.Second)
+		systemCtl := controller.NewSystemController(hostCollector)
+		// 鉴权:ALUKA_PASSWORD 非空时启用
+		authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
+		authCtl := controller.NewAuthController(authStore)
 
-	// ===== API =====
-	api := r.Group("/api")
-	// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
-	api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
-	// 写操作审计(成功后落库)
-	api.Use(middleware.AuditWrite(auditSvc))
-	{
-		api.GET("/health", healthCtl.Health)
+		// ===== API =====
+		api := r.Group("/api")
+		// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
+		api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
+		// 写操作审计(成功后落库)
+		api.Use(middleware.AuditWrite(auditSvc))
+		{
+			api.GET("/health", healthCtl.Health)
 
-		// 认证
-		authG := api.Group("/auth")
+			// 本机系统信息(CPU/内存/磁盘),前端定时拉取
+			sys := api.Group("/system")
+			{
+				sys.GET("/host", systemCtl.Host)
+			}
+
+			// 认证
+			authG := api.Group("/auth")
 		{
 			authG.GET("/status", authCtl.Status)
 			authG.POST("/login", authCtl.Login)

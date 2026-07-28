@@ -949,7 +949,10 @@ func (s *ServiceService) buildStartOptions(svc *model.Service, cfg *model.Servic
 
 	switch svc.Type {
 	case model.ServiceTypeJar:
-		// java -jar <command> <args>;command 用作 jar 路径
+		// 正确顺序: java [jvmArgs] -jar <jar路径> [appArgs]
+		if svc.RuntimeID == nil {
+			return nil, fmt.Errorf("jar 服务未绑定运行环境: %w", ErrRuntimeRequired)
+		}
 		rt, err := s.repo.GetRuntime(*svc.RuntimeID)
 		if err != nil || rt.InstallPath == "" {
 			return nil, fmt.Errorf("jar 服务未配置有效的运行环境: %w", ErrRuntimeRequired)
@@ -959,8 +962,22 @@ func (s *ServiceService) buildStartOptions(svc *model.Service, cfg *model.Servic
 			javaExe = filepath.Join(rt.InstallPath, "bin", "java")
 		}
 		name = javaExe
-		jvmArgs := splitArgs(cfg.JVMArgs)
-		args = append([]string{"-jar"}, append(jvmArgs, append([]string{cfg.Command}, splitArgs(cfg.Args)...)...)...)
+		jarPath := strings.TrimSpace(cfg.Command)
+		if jarPath == "" {
+			return nil, fmt.Errorf("jar 服务未配置启动命令(jar 路径)")
+		}
+		// 相对路径时优先相对 install_dir,其次 work_dir
+		if !filepath.IsAbs(jarPath) {
+			base := svc.InstallDir
+			if base == "" {
+				base = svc.WorkDir
+			}
+			if base != "" {
+				jarPath = filepath.Join(base, jarPath)
+			}
+		}
+		args = append(splitArgs(cfg.JVMArgs), "-jar", jarPath)
+		args = append(args, splitArgs(cfg.Args)...)
 		// 注入 runtime 环境变量
 		cfg.EnvVars = mergeRuntimeEnv(cfg.EnvVars, rt)
 
@@ -969,16 +986,26 @@ func (s *ServiceService) buildStartOptions(svc *model.Service, cfg *model.Servic
 		args = splitArgs(cfg.Args)
 
 	case model.ServiceTypeBat:
+		// /c 后整段作为一条命令;工作目录须指向脚本所在目录(如 D:\services\outside-prescription)
 		name = "cmd.exe"
-		args = []string{"/c", cfg.Command + " " + cfg.Args}
+		line := strings.TrimSpace(cfg.Command)
+		if strings.TrimSpace(cfg.Args) != "" {
+			line = line + " " + strings.TrimSpace(cfg.Args)
+		}
+		args = []string{"/c", line}
 
 	case model.ServiceTypeSh:
 		name = "bash"
-		args = []string{"-c", cfg.Command + " " + cfg.Args}
+		line := strings.TrimSpace(cfg.Command)
+		if strings.TrimSpace(cfg.Args) != "" {
+			line = line + " " + strings.TrimSpace(cfg.Args)
+		}
+		args = []string{"-c", line}
 
 	case model.ServiceTypePs1:
 		name = "powershell.exe"
-		args = []string{"-ExecutionPolicy", "Bypass", "-Command", cfg.Command + " " + cfg.Args}
+		args = []string{"-ExecutionPolicy", "Bypass", "-File", strings.TrimSpace(cfg.Command)}
+		args = append(args, splitArgs(cfg.Args)...)
 
 	default:
 		return nil, fmt.Errorf("不支持的服务类型: %s", svc.Type)
@@ -989,12 +1016,18 @@ func (s *ServiceService) buildStartOptions(svc *model.Service, cfg *model.Servic
 		timeout = 10
 	}
 
+	// 工作目录:优先 work_dir,空则回退 install_dir(方便相对路径与外部配置文件)
+	workDir := strings.TrimSpace(svc.WorkDir)
+	if workDir == "" {
+		workDir = strings.TrimSpace(svc.InstallDir)
+	}
+
 	return &process.StartOptions{
 		ServiceID:       svc.ID,
 		LogFile:         logPath,
 		Name:            name,
 		Args:            args,
-		Dir:             svc.WorkDir,
+		Dir:             workDir,
 		Env:             buildEnv(cfg.EnvVars),
 		ShutdownTimeout: timeout,
 	}, nil
@@ -1127,21 +1160,40 @@ func (s *ServiceService) NotifyLogPath(serviceID uint) {
 
 // ===== 环境变量工具 =====
 
-// buildEnv 把 JSON 字符串(envVars)解析为 "K=V" 切片;解析失败则忽略。
-// 不含父进程环境时返回空(由 exec 继承)。
+// buildEnv 在父进程环境基础上叠加 JSON 环境变量。
 // 注意:此处 cfg.EnvVars 可能已被 mergeRuntimeEnv 改写。
+// 必须继承 PATH 等系统变量,否则 bat/sh 里直接调 java 会失败。
 func buildEnv(envVarsJSON string) []string {
 	envVarsJSON = strings.TrimSpace(envVarsJSON)
 	if envVarsJSON == "" {
-		return nil
+		return nil // nil → exec 完全继承父环境
 	}
 	var m map[string]string
-	if err := json.Unmarshal([]byte(envVarsJSON), &m); err != nil {
+	if err := json.Unmarshal([]byte(envVarsJSON), &m); err != nil || len(m) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(m))
+	// 以父环境为底,同名 key 覆盖(Windows 环境变量名不区分大小写,简单覆盖即可)
+	base := os.Environ()
+	out := make([]string, 0, len(base)+len(m))
+	// 先记下要覆盖的 key(小写),过滤父环境中的同名项
+	override := map[string]string{}
 	for k, v := range m {
-		out = append(out, k+"="+v)
+		override[strings.ToLower(k)] = k + "=" + v
+	}
+	for _, e := range base {
+		eq := strings.IndexByte(e, '=')
+		if eq <= 0 {
+			out = append(out, e)
+			continue
+		}
+		key := strings.ToLower(e[:eq])
+		if _, ok := override[key]; ok {
+			continue // 跳过,后面追加覆盖值
+		}
+		out = append(out, e)
+	}
+	for _, kv := range override {
+		out = append(out, kv)
 	}
 	return out
 }
@@ -1170,13 +1222,60 @@ func mergeRuntimeEnv(envVarsJSON string, rt *model.Runtime) string {
 	return string(b)
 }
 
-// splitArgs 简单按空白切分(不含引号语义,M2 够用)。
+// splitArgs 按空白切分命令行参数,支持双引号/单引号包裹(引号本身不进入参数)。
+// 例: -h "0.0.0.0" -p 6380  →  ["-h", "0.0.0.0", "-p", "6380"]
+// 反斜杠仅用于转义引号自身: \"  → "
 func splitArgs(s string) []string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return nil
 	}
-	return strings.Fields(s)
+	var (
+		out    []string
+		cur    strings.Builder
+		quote  rune // 0=无引号, '"' 或 '\''
+		escape bool
+	)
+	flush := func() {
+		if cur.Len() == 0 {
+			return
+		}
+		out = append(out, cur.String())
+		cur.Reset()
+	}
+	for _, r := range s {
+		if escape {
+			cur.WriteRune(r)
+			escape = false
+			continue
+		}
+		if r == '\\' && quote != '\'' {
+			// 双引号或无引号时 \ 作为转义
+			escape = true
+			continue
+		}
+		if quote != 0 {
+			if r == quote {
+				quote = 0
+				continue
+			}
+			cur.WriteRune(r)
+			continue
+		}
+		switch r {
+		case '"', '\'':
+			quote = r
+		case ' ', '\t', '\n', '\r':
+			flush()
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	if escape {
+		cur.WriteByte('\\')
+	}
+	flush()
+	return out
 }
 
 // fileExists 判断文件存在。

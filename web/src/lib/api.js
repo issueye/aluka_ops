@@ -84,6 +84,11 @@ export const healthApi = {
   check: () => api.get("/api/health"),
 };
 
+// 本机系统信息(CPU/内存/磁盘),仪表盘定时拉取
+export const systemApi = {
+  host: () => api.get("/api/system/host"),
+};
+
 // 认证
 export const authApi = {
   status: () => api.get("/api/auth/status"),

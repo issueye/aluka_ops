@@ -215,7 +215,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                   id="s-jvm"
                   value={form.jvm_args}
                   onChange={(e) => set("jvm_args", e.target.value)}
-                  placeholder="如:-Xms512m -Xmx2g"
+                  placeholder="-Dloader.path=resources,lib -Xms1024m -Xmx1024m"
                 />
               </div>
             )}
@@ -228,7 +228,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                 id="s-workdir"
                 value={form.work_dir}
                 onChange={(e) => set("work_dir", e.target.value)}
-                placeholder="可选,留空继承"
+                placeholder="应用根目录,如 D:\services\app"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
