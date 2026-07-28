@@ -47,7 +47,7 @@ export function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex h-full min-h-0 items-center justify-center overflow-auto bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-3 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary">

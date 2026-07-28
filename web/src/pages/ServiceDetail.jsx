@@ -76,26 +76,28 @@ export function ServiceDetail() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto w-full max-w-6xl space-y-4 pb-2">
       {/* 头部 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="shrink-0">
             <Link to="/services"><ArrowLeft className="h-4 w-4" /></Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold">{svc.name}</h2>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="truncate text-lg font-semibold">{svc.name}</h2>
               <ServiceStatusBadge status={svc.status} />
             </div>
-            <p className="font-mono text-xs text-muted-foreground">{svc.code}</p>
+            <p className="truncate font-mono text-xs text-muted-foreground">{svc.code}</p>
           </div>
         </div>
-        <ServiceActions service={svc} />
+        <div className="shrink-0">
+          <ServiceActions service={svc} />
+        </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:w-auto">
           <TabsTrigger value="overview"><Activity className="mr-1.5 h-3.5 w-3.5" />概览</TabsTrigger>
           <TabsTrigger value="config"><FileText className="mr-1.5 h-3.5 w-3.5" />配置</TabsTrigger>
           <TabsTrigger value="version"><Package className="mr-1.5 h-3.5 w-3.5" />版本</TabsTrigger>

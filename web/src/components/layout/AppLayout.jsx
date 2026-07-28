@@ -35,11 +35,12 @@ export function AppLayout() {
   const meta = resolveMeta(pathname);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    // h-full + min-h-0：避免 flex 子项默认 min-height:auto 把高度撑破视口，产生双滚动条
+    <div className="flex h-full min-h-0 w-full overflow-hidden">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar title={meta.title} description={meta.desc} />
-        <main className="flex-1 overflow-auto bg-background p-6">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background p-6">
           <Outlet />
         </main>
       </div>

@@ -53,13 +53,37 @@
   * {
     @apply border-border;
   }
+  /* 单一视口：禁止 html/body 产生页面级滚动条，内容只在布局内滚动 */
+  html,
+  body,
+  #root {
+    height: 100%;
+    max-height: 100%;
+  }
+  html,
+  body {
+    overflow: hidden;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
-  /* 滚动条 */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+  #root {
+    overflow: hidden;
+  }
+  /* 滚动条（仅出现在 overflow 容器内，不溢出视口） */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
 }

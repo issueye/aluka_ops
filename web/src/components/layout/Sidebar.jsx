@@ -33,9 +33,9 @@ const navItems = [
 
 export function Sidebar() {
   return (
-    <aside className="flex h-screen w-60 flex-col border-r bg-card/40">
+    <aside className="flex h-full w-60 shrink-0 flex-col border-r bg-card/40">
       {/* Logo */}
-      <div className="flex h-14 items-center gap-2 border-b px-5">
+      <div className="flex h-14 shrink-0 items-center gap-2 border-b px-5">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <Activity className="h-5 w-5 text-primary-foreground" />
         </div>
@@ -45,8 +45,8 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* 导航 */}
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      {/* 导航（项过多时仅侧栏内滚动，不与主内容抢滚动条） */}
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -68,7 +68,7 @@ export function Sidebar() {
       </nav>
 
       {/* 版本 */}
-      <div className="border-t p-3 text-[11px] text-muted-foreground">
+      <div className="shrink-0 border-t p-3 text-[11px] text-muted-foreground">
         <div>v0.2.0 · 服务治理 / 网关</div>
         <div className="mt-0.5">© Aluka Ops</div>
       </div>

@@ -47,7 +47,7 @@ export function AuthGate({ children }) {
 
   if (state.loading) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full min-h-0 items-center justify-center text-sm text-muted-foreground">
         加载中...
       </div>
     );

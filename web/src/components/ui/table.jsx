@@ -1,8 +1,9 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+// 仅横向溢出时出现滚动条；纵向交给页面主区域滚动，避免表格+页面双滚动条
 const Table = React.forwardRef(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+  <div className="relative w-full overflow-x-auto overflow-y-visible">
     <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
   </div>
 ));
