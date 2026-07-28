@@ -89,6 +89,71 @@ export const systemApi = {
   host: () => api.get("/api/system/host"),
 };
 
+// 文件管理(仅 data 目录)
+export const filesApi = {
+  list: (path = "") =>
+    api.get(`/api/files?path=${encodeURIComponent(path || "")}`),
+  stat: (path) => api.get(`/api/files/stat?path=${encodeURIComponent(path)}`),
+  read: (path) => api.get(`/api/files/read?path=${encodeURIComponent(path)}`),
+  mkdir: (body) => api.post("/api/files/mkdir", body),
+  write: (body) => api.put("/api/files/write", body),
+  rename: (body) => api.put("/api/files/rename", body),
+  remove: (path, recursive = false) =>
+    api.del(
+      `/api/files?path=${encodeURIComponent(path)}&recursive=${recursive ? "1" : "0"}`
+    ),
+  downloadUrl: (path) =>
+    `/api/files/download?path=${encodeURIComponent(path)}`,
+  upload: async (parentPath, file, name) => {
+    const fd = new FormData();
+    fd.append("path", parentPath || "");
+    fd.append("file", file);
+    if (name) fd.append("name", name);
+    return request("/api/files/upload", { method: "POST", body: fd });
+  },
+};
+
+// 网关:代理端口 + APP + 端口反代
+export const gatewayApi = {
+  status: () => api.get("/api/gateway/status"),
+  reload: () => api.post("/api/gateway/reload"),
+  // 代理端口
+  listPorts: () => api.get("/api/gateway/ports"),
+  getPort: (id) => api.get(`/api/gateway/ports/${id}`),
+  createPort: (data) => api.post("/api/gateway/ports", data),
+  updatePort: (id, data) => api.put(`/api/gateway/ports/${id}`, data),
+  removePort: (id, force = false) =>
+    api.del(`/api/gateway/ports/${id}?force=${force ? "1" : "0"}`),
+  // APP(静态前端)
+  listApps: () => api.get("/api/gateway/apps"),
+  getApp: (id) => api.get(`/api/gateway/apps/${id}`),
+  createApp: (data) => api.post("/api/gateway/apps", data),
+  updateApp: (id, data) => api.put(`/api/gateway/apps/${id}`, data),
+  removeApp: (id) => api.del(`/api/gateway/apps/${id}`),
+  // 反代(挂在端口下)
+  listProxies: (portId) =>
+    api.get(
+      portId
+        ? `/api/gateway/proxies?port_id=${portId}`
+        : "/api/gateway/proxies"
+    ),
+  getProxy: (id) => api.get(`/api/gateway/proxies/${id}`),
+  createProxy: (data) => api.post("/api/gateway/proxies", data),
+  updateProxy: (id, data) => api.put(`/api/gateway/proxies/${id}`, data),
+  removeProxy: (id) => api.del(`/api/gateway/proxies/${id}`),
+  // 路由脚本(挂在端口下)
+  listScripts: (portId) =>
+    api.get(
+      portId
+        ? `/api/gateway/scripts?port_id=${portId}`
+        : "/api/gateway/scripts"
+    ),
+  getScript: (id) => api.get(`/api/gateway/scripts/${id}`),
+  createScript: (data) => api.post("/api/gateway/scripts", data),
+  updateScript: (id, data) => api.put(`/api/gateway/scripts/${id}`, data),
+  removeScript: (id) => api.del(`/api/gateway/scripts/${id}`),
+};
+
 // 认证
 export const authApi = {
   status: () => api.get("/api/auth/status"),

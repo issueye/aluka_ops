@@ -18,6 +18,8 @@ import (
 	"aluka_ops/internal/pkg/agent"
 	"aluka_ops/internal/pkg/artifact"
 	"aluka_ops/internal/pkg/auth"
+	"aluka_ops/internal/pkg/files"
+	"aluka_ops/internal/pkg/gateway"
 	"aluka_ops/internal/pkg/healthcheck"
 	"aluka_ops/internal/pkg/hostinfo"
 	"aluka_ops/internal/pkg/logstream"
@@ -82,6 +84,28 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 		// 本机主机信息采集(缓存 3s,供仪表盘定时拉取)
 		hostCollector := hostinfo.NewCollector(3 * time.Second)
 		systemCtl := controller.NewSystemController(hostCollector)
+		// 文件管理:仅允许 data 目录内操作
+		fileStore, err := files.NewStore(cfg.DataDir)
+		if err != nil {
+			panic("初始化文件管理根目录失败: " + err.Error())
+		}
+		fileCtl := controller.NewFileController(fileStore)
+		// 网关:代理端口 + APP(静态) + 端口反代
+		gwMgr := gateway.NewManager(cfg.DataDir)
+		portRepo := repository.NewGatewayPortRepository(db)
+		appRepo := repository.NewAppRepository(db)
+		proxyRepo := repository.NewPortProxyRepository(db)
+		scriptRepo := repository.NewPortScriptRepository(db)
+		gatewayRepo := repository.NewGatewayRepository(db)
+		appGwSvc := service.NewAppGatewayService(portRepo, appRepo, proxyRepo, scriptRepo, gwMgr, cfg.DataDir)
+		appGwSvc.SetLegacyRepo(gatewayRepo)
+		gatewaySvc := service.NewGatewayService(gatewayRepo, gwMgr)
+		gatewaySvc.SetReload(appGwSvc.Reload)
+		if err := appGwSvc.Reload(); err != nil {
+			_ = err
+		}
+		appCtl := controller.NewAppController(appGwSvc)
+		gatewayCtl := controller.NewGatewayController(gatewaySvc)
 		// 鉴权:ALUKA_PASSWORD 非空时启用
 		authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
 		authCtl := controller.NewAuthController(authStore)
@@ -99,6 +123,67 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			sys := api.Group("/system")
 			{
 				sys.GET("/host", systemCtl.Host)
+			}
+
+			// 文件管理(限定 data 目录)
+			fg := api.Group("/files")
+			{
+				fg.GET("", fileCtl.List)
+				fg.GET("/", fileCtl.List)
+				fg.GET("/stat", fileCtl.Stat)
+				fg.GET("/read", fileCtl.Read)
+				fg.GET("/download", fileCtl.Download)
+				fg.POST("/mkdir", fileCtl.Mkdir)
+				fg.POST("/upload", fileCtl.Upload)
+				fg.PUT("/write", fileCtl.Write)
+				fg.PUT("/rename", fileCtl.Rename)
+				fg.DELETE("", fileCtl.Delete)
+			}
+
+			// 代理端口 / APP / 端口反代
+			gw := api.Group("/gateway")
+			{
+				gw.GET("/status", appCtl.Status)
+				gw.POST("/reload", appCtl.Reload)
+
+				// 代理端口
+				gw.GET("/ports", appCtl.ListPorts)
+				gw.GET("/ports/", appCtl.ListPorts)
+				gw.POST("/ports", appCtl.CreatePort)
+				gw.GET("/ports/:id", appCtl.GetPort)
+				gw.PUT("/ports/:id", appCtl.UpdatePort)
+				gw.DELETE("/ports/:id", appCtl.DeletePort)
+
+				// APP(静态前端)
+				gw.GET("/apps", appCtl.ListApps)
+				gw.GET("/apps/", appCtl.ListApps)
+				gw.POST("/apps", appCtl.CreateApp)
+				gw.GET("/apps/:id", appCtl.GetApp)
+				gw.PUT("/apps/:id", appCtl.UpdateApp)
+				gw.DELETE("/apps/:id", appCtl.DeleteApp)
+
+				// 反代规则(挂在端口下)
+				gw.GET("/proxies", appCtl.ListProxies)
+				gw.GET("/proxies/", appCtl.ListProxies)
+				gw.POST("/proxies", appCtl.CreateProxy)
+				gw.GET("/proxies/:id", appCtl.GetProxy)
+				gw.PUT("/proxies/:id", appCtl.UpdateProxy)
+				gw.DELETE("/proxies/:id", appCtl.DeleteProxy)
+
+				// 路由脚本(挂在端口下,优先于 APP/反代)
+				gw.GET("/scripts", appCtl.ListScripts)
+				gw.GET("/scripts/", appCtl.ListScripts)
+				gw.POST("/scripts", appCtl.CreateScript)
+				gw.GET("/scripts/:id", appCtl.GetScript)
+				gw.PUT("/scripts/:id", appCtl.UpdateScript)
+				gw.DELETE("/scripts/:id", appCtl.DeleteScript)
+
+				// 旧扁平 rules(兼容,可选)
+				gw.GET("/rules", gatewayCtl.List)
+				gw.POST("/rules", gatewayCtl.Create)
+				gw.GET("/rules/:id", gatewayCtl.Get)
+				gw.PUT("/rules/:id", gatewayCtl.Update)
+				gw.DELETE("/rules/:id", gatewayCtl.Delete)
 			}
 
 			// 认证
@@ -220,13 +305,16 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			}
 		}
 
-		// ===== 静态前端(embed) =====
+	// ===== 静态前端(embed) =====
 		registerStatic(r)
 
 		// Agent 心跳上报
 		hb := agent.NewHeartbeatLoop(cfg, agentSvc)
 		hb.Start()
-		stop := func() { hb.Stop() }
+		stop := func() {
+			hb.Stop()
+			gwMgr.Close()
+		}
 
 		return r, stop
 	}

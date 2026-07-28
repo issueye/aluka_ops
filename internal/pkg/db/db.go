@@ -51,16 +51,21 @@ func Open(dbPath string) (*gorm.DB, error) {
 // allModels 返回需要迁移的全部模型。集中一处,后续仅在此追加新模型。
 func allModels() []any {
 	return []any{
-		&model.Node{},
-		&model.Runtime{},
-		&model.Service{},
-		&model.ServiceConfig{},
-		&model.Artifact{},
-		&model.Template{},
-		&model.Operation{},
-		&model.AuditLog{},
-		&model.Setting{},
-	}
+			&model.Node{},
+			&model.Runtime{},
+			&model.Service{},
+			&model.ServiceConfig{},
+			&model.Artifact{},
+			&model.Template{},
+			&model.Operation{},
+			&model.AuditLog{},
+			&model.Setting{},
+			&model.GatewayRule{}, // 旧扁平规则表,保留兼容
+			&model.GatewayPort{},
+			&model.App{},
+			&model.PortProxyRule{},
+			&model.PortRouteScript{},
+		}
 }
 
 func autoMigrate(gormDB *gorm.DB) error {

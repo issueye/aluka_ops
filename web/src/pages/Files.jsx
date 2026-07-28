@@ -1,0 +1,614 @@
+import { useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import {
+  Folder,
+  File,
+  Upload,
+  FolderPlus,
+  FilePlus,
+  RefreshCw,
+  Download,
+  Pencil,
+  Trash2,
+  ChevronRight,
+  Home,
+  Save,
+  X,
+  ArrowUp,
+} from "lucide-react";
+import { filesApi } from "@/lib/api";
+import { withAuthQuery } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { formatTime } from "@/lib/utils";
+
+function formatBytes(n) {
+  if (n == null) return "—";
+  if (n < 1024) return `${n} B`;
+  const u = ["KB", "MB", "GB", "TB"];
+  let v = n;
+  let i = -1;
+  do {
+    v /= 1024;
+    i++;
+  } while (v >= 1024 && i < u.length - 1);
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
+}
+
+function joinPath(parent, name) {
+  if (!parent) return name;
+  return `${parent}/${name}`;
+}
+
+export function Files() {
+  const qc = useQueryClient();
+  const fileInputRef = useRef(null);
+  const [path, setPath] = useState("");
+  const [selected, setSelected] = useState(null);
+
+  // dialogs
+  const [mkdirOpen, setMkdirOpen] = useState(false);
+  const [mkdirName, setMkdirName] = useState("");
+  const [newFileOpen, setNewFileOpen] = useState(false);
+  const [newFileName, setNewFileName] = useState("");
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameName, setRenameName] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorPath, setEditorPath] = useState("");
+  const [editorContent, setEditorContent] = useState("");
+  const [editorLoading, setEditorLoading] = useState(false);
+
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ["files", path],
+    queryFn: () => filesApi.list(path),
+  });
+
+  const crumbs = useMemo(() => {
+    if (!path) return [];
+    const parts = path.split("/").filter(Boolean);
+    const acc = [];
+    let cur = "";
+    for (const p of parts) {
+      cur = cur ? `${cur}/${p}` : p;
+      acc.push({ name: p, path: cur });
+    }
+    return acc;
+  }, [path]);
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["files", path] });
+
+  const mkdirMut = useMutation({
+    mutationFn: (name) => filesApi.mkdir({ path, name, parents: true }),
+    onSuccess: () => {
+      toast.success("目录已创建");
+      setMkdirOpen(false);
+      setMkdirName("");
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const newFileMut = useMutation({
+    mutationFn: (name) =>
+      filesApi.write({ path: joinPath(path, name), content: "" }),
+    onSuccess: (_, name) => {
+      toast.success("文件已创建");
+      setNewFileOpen(false);
+      setNewFileName("");
+      invalidate();
+      openEditor(joinPath(path, name));
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const renameMut = useMutation({
+    mutationFn: ({ from, new_name }) => filesApi.rename({ path: from, new_name }),
+    onSuccess: () => {
+      toast.success("已重命名");
+      setRenameOpen(false);
+      setSelected(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: ({ p, recursive }) => filesApi.remove(p, recursive),
+    onSuccess: () => {
+      toast.success("已删除");
+      setDeleteOpen(false);
+      setSelected(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const writeMut = useMutation({
+    mutationFn: ({ p, content }) => filesApi.write({ path: p, content }),
+    onSuccess: () => {
+      toast.success("已保存");
+      setEditorOpen(false);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const uploadMut = useMutation({
+    mutationFn: (file) => filesApi.upload(path, file),
+    onSuccess: (ent) => {
+      toast.success(`已上传: ${ent?.name || "文件"}`);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const go = (p) => {
+    setPath(p || "");
+    setSelected(null);
+  };
+
+  const openEditor = async (p) => {
+    setEditorLoading(true);
+    setEditorPath(p);
+    setEditorOpen(true);
+    try {
+      const res = await filesApi.read(p);
+      setEditorContent(res?.content ?? "");
+    } catch (e) {
+      toast.error(e.message || "无法打开");
+      setEditorOpen(false);
+    } finally {
+      setEditorLoading(false);
+    }
+  };
+
+  const onRowDoubleClick = (ent) => {
+    if (ent.is_dir) go(ent.path);
+    else openEditor(ent.path);
+  };
+
+  const onDownload = (ent) => {
+    if (ent.is_dir) return;
+    const url = withAuthQuery(filesApi.downloadUrl(ent.path));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = ent.name;
+    a.click();
+  };
+
+  const onPickUpload = (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) uploadMut.mutate(f);
+  };
+
+  const entries = data?.entries || [];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">文件管理</CardTitle>
+              <CardDescription>
+                仅可管理数据目录内文件
+                {data?.root ? (
+                  <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+                    ({data.root})
+                  </span>
+                ) : null}
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isFetching}
+              >
+                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                刷新
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMkdirName("");
+                  setMkdirOpen(true);
+                }}
+              >
+                <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                新建目录
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setNewFileName("");
+                  setNewFileOpen(true);
+                }}
+              >
+                <FilePlus className="mr-1.5 h-3.5 w-3.5" />
+                新建文件
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadMut.isPending}
+              >
+                <Upload className="mr-1.5 h-3.5 w-3.5" />
+                上传
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={onPickUpload}
+              />
+            </div>
+          </div>
+
+          {/* 面包屑 */}
+          <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">
+            <button
+              type="button"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              onClick={() => go("")}
+            >
+              <Home className="h-3.5 w-3.5" />
+              data
+            </button>
+            {crumbs.map((c) => (
+              <span key={c.path} className="inline-flex items-center gap-1">
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <button
+                  type="button"
+                  className="rounded px-1.5 py-0.5 font-mono text-xs hover:bg-accent"
+                  onClick={() => go(c.path)}
+                >
+                  {c.name}
+                </button>
+              </span>
+            ))}
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {path !== "" && (
+            <div className="mb-2">
+              <Button variant="ghost" size="sm" onClick={() => go(data?.parent ?? "")}>
+                <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
+                上级目录
+              </Button>
+            </div>
+          )}
+
+          {isError && (
+            <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-400">
+              {error?.message || "加载失败"}
+            </div>
+          )}
+
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[45%]">名称</TableHead>
+                  <TableHead className="w-[12%]">大小</TableHead>
+                  <TableHead className="w-[22%]">修改时间</TableHead>
+                  <TableHead className="w-[21%] text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-muted-foreground">
+                      加载中…
+                    </TableCell>
+                  </TableRow>
+                ) : entries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-muted-foreground">
+                      空目录
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  entries.map((ent) => (
+                    <TableRow
+                      key={ent.path}
+                      className={
+                        selected?.path === ent.path
+                          ? "bg-primary/5"
+                          : "cursor-pointer"
+                      }
+                      onClick={() => setSelected(ent)}
+                      onDoubleClick={() => onRowDoubleClick(ent)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {ent.is_dir ? (
+                            <Folder className="h-4 w-4 shrink-0 text-amber-400" />
+                          ) : (
+                            <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="font-mono text-sm">{ent.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {ent.is_dir ? "—" : formatBytes(ent.size)}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {formatTime(ent.mod_time)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {!ent.is_dir && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="编辑"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditor(ent.path);
+                                }}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="下载"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDownload(ent);
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="重命名"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelected(ent);
+                              setRenameName(ent.name);
+                              setRenameOpen(true);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5 opacity-50" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-400 hover:text-red-300"
+                            title="删除"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelected(ent);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            双击目录进入；双击文件打开文本编辑。删除非空目录会递归删除。
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* 新建目录 */}
+      <Dialog open={mkdirOpen} onOpenChange={setMkdirOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新建目录</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>目录名</Label>
+            <Input
+              value={mkdirName}
+              onChange={(e) => setMkdirName(e.target.value)}
+              placeholder="logs 或 nested/dir"
+              className="font-mono"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && mkdirName.trim()) {
+                  mkdirMut.mutate(mkdirName.trim());
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMkdirOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={!mkdirName.trim() || mkdirMut.isPending}
+              onClick={() => mkdirMut.mutate(mkdirName.trim())}
+            >
+              创建
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 新建文件 */}
+      <Dialog open={newFileOpen} onOpenChange={setNewFileOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>新建文件</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>文件名</Label>
+            <Input
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              placeholder="readme.txt"
+              className="font-mono"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newFileName.trim()) {
+                  newFileMut.mutate(newFileName.trim());
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewFileOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={!newFileName.trim() || newFileMut.isPending}
+              onClick={() => newFileMut.mutate(newFileName.trim())}
+            >
+              创建并编辑
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 重命名 */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>新名称</Label>
+            <Input
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              className="font-mono"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRenameOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={!renameName.trim() || !selected || renameMut.isPending}
+              onClick={() =>
+                renameMut.mutate({ from: selected.path, new_name: renameName.trim() })
+              }
+            >
+              确定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除确认 */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将删除{" "}
+              <span className="font-mono text-foreground">{selected?.path}</span>
+              {selected?.is_dir ? "（目录将递归删除）" : ""}。此操作不可恢复。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() =>
+                deleteMut.mutate({
+                  p: selected.path,
+                  recursive: !!selected?.is_dir,
+                })
+              }
+            >
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 文本编辑器 */}
+      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center justify-between gap-2 pr-6">
+              <span className="truncate font-mono text-sm">{editorPath}</span>
+            </DialogTitle>
+          </DialogHeader>
+          {editorLoading ? (
+            <p className="text-sm text-muted-foreground">加载中…</p>
+          ) : (
+            <Textarea
+              value={editorContent}
+              onChange={(e) => setEditorContent(e.target.value)}
+              className="min-h-[360px] font-mono text-xs"
+              spellCheck={false}
+            />
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditorOpen(false)}>
+              <X className="mr-1.5 h-3.5 w-3.5" />
+              关闭
+            </Button>
+            <Button
+              disabled={editorLoading || writeMut.isPending}
+              onClick={() =>
+                writeMut.mutate({ p: editorPath, content: editorContent })
+              }
+            >
+              <Save className="mr-1.5 h-3.5 w-3.5" />
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
