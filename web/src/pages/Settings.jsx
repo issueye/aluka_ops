@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { healthApi, authApi, systemApi, api } from "@/lib/api";
+import { formatBytes } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -8,18 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageShell } from "@/components/ued";
 
-function formatBytes(n) {
-  if (n == null || n === 0) return "0 B";
-  const u = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let v = Number(n);
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
-}
 
 export function Settings() {
   const { data: health } = useQuery({
@@ -48,7 +39,7 @@ export function Settings() {
   const hb = agentStatus?.heartbeat || {};
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader>
           <CardTitle>系统信息</CardTitle>
@@ -158,7 +149,7 @@ export function Settings() {
           </ul>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
 

@@ -6,7 +6,7 @@ import { authApi } from "@/lib/api";
 import { setToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   Card,
   CardContent,
@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { FormField } from "@/components/ued";
 
 export function Login() {
   const navigate = useNavigate();
@@ -47,6 +48,7 @@ export function Login() {
   };
 
   return (
+    <TooltipProvider>
     <div className="flex h-full min-h-0 items-center justify-center overflow-auto bg-background p-4">
       <Card className="w-full max-w-sm">
         <CardHeader className="space-y-3 text-center">
@@ -58,8 +60,7 @@ export function Login() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="password">密码</Label>
+            <FormField label="密码" htmlFor="password">
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -73,7 +74,7 @@ export function Login() {
                   disabled={loading}
                 />
               </div>
-            </div>
+            </FormField>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "登录中..." : "登录"}
             </Button>
@@ -81,5 +82,6 @@ export function Login() {
         </CardContent>
       </Card>
     </div>
+    </TooltipProvider>
   );
 }

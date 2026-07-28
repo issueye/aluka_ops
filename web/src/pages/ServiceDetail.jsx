@@ -27,6 +27,7 @@ import { LogViewer } from "@/components/services/LogViewer";
 import { ServiceConsole } from "@/components/services/ServiceConsole";
 import { ArtifactList } from "@/components/services/ArtifactList";
 import { formatTime } from "@/lib/utils";
+import { PageShell, MetaField } from "@/components/ued";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -66,17 +67,17 @@ export function ServiceDetail() {
 
   if (!svc) {
     return (
-      <div className="space-y-4">
+      <PageShell>
         <Button variant="ghost" size="sm" asChild>
           <Link to="/services"><ArrowLeft /> 返回列表</Link>
         </Button>
         <Card><CardContent className="p-6 text-muted-foreground">服务不存在或已删除。</CardContent></Card>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 pb-2">
+    <PageShell className="mx-auto w-full max-w-6xl pb-2">
       {/* 头部 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -222,16 +223,11 @@ export function ServiceDetail() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageShell>
   );
 }
 
 // Field 键值展示。
 function Field({ label, value, mono }) {
-  return (
-    <div className="space-y-0.5">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={mono ? "font-mono text-sm break-all" : "text-sm break-all"}>{value}</div>
-    </div>
-  );
+  return <MetaField label={label} value={value} mono={mono} />;
 }

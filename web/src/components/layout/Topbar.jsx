@@ -4,11 +4,10 @@ import { LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { healthApi, authApi } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { IconTooltip, StatusBadge } from "@/components/ued";
 
-// 顶栏:页面标题 + 主题 + 后端健康状态 + 退出登录。
 export function Topbar({ title, description }) {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
@@ -24,10 +23,10 @@ export function Topbar({ title, description }) {
   });
 
   const status = isLoading
-    ? { text: "检测中", variant: "secondary" }
+    ? { text: "检测中", tone: "secondary" }
     : isError
-    ? { text: "后端离线", variant: "danger" }
-    : { text: `在线 · ${data?.mode || ""}`, variant: "success" };
+      ? { text: "后端离线", tone: "danger" }
+      : { text: `在线 · ${data?.mode || ""}`, tone: "success" };
 
   const handleLogout = async () => {
     try {
@@ -55,15 +54,19 @@ export function Topbar({ title, description }) {
           </span>
         )}
         <ThemeToggle />
-        <Badge variant={status.variant} className="gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {status.text}
-        </Badge>
+        <StatusBadge tone={status.tone} label={status.text} />
         {authStatus?.auth_enabled && getToken() && (
-          <Button variant="ghost" size="sm" onClick={handleLogout} title="退出登录">
-            <LogOut className="h-4 w-4" />
-            退出
-          </Button>
+          <IconTooltip label="退出登录">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              aria-label="退出登录"
+            >
+              <LogOut className="h-4 w-4" />
+              退出
+            </Button>
+          </IconTooltip>
         )}
       </div>
     </header>

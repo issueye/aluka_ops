@@ -3,6 +3,7 @@ import { Eraser, Pause, Play, Wifi, WifiOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { withAuthQuery } from "@/lib/auth";
+import { IconTooltip } from "@/components/ued";
 
 // 缓冲上限:超过则丢弃头部,防止长时间运行导致内存膨胀。
 const MAX_LINES = 5000;
@@ -166,21 +167,27 @@ export function LogViewer({ serviceId, active }) {
           </Badge>
           <span className="text-xs text-muted-foreground">{lines.length} 行</span>
           {meta?.file && (
-            <span className="max-w-[300px] truncate font-mono text-xs text-muted-foreground" title={meta.path}>
+            <span className="max-w-[300px] truncate font-mono text-xs text-muted-foreground" >
               {meta.file}
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={togglePause} title={paused ? "继续" : "暂停"}>
-            {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleClear} title="清屏">
-            <Eraser className="h-3.5 w-3.5" />
-          </Button>
-          <Button size="sm" variant="ghost" onClick={handleDownload} title="下载日志">
-            <Download className="h-3.5 w-3.5" />
-          </Button>
+          <IconTooltip label={paused ? "继续" : "暂停"}>
+            <Button size="sm" variant="ghost" onClick={togglePause} aria-label={paused ? "继续" : "暂停"}>
+              {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+            </Button>
+          </IconTooltip>
+          <IconTooltip label="清屏">
+            <Button size="sm" variant="ghost" onClick={handleClear} aria-label="清屏">
+              <Eraser className="h-3.5 w-3.5" />
+            </Button>
+          </IconTooltip>
+          <IconTooltip label="下载日志">
+            <Button size="sm" variant="ghost" onClick={handleDownload} aria-label="下载日志">
+              <Download className="h-3.5 w-3.5" />
+            </Button>
+          </IconTooltip>
           {(status === "closed" || status === "reconnecting") && (
             <Button size="sm" variant="outline" onClick={handleReconnect}>
               重连

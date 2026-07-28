@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ServiceStatusBadge } from "@/components/services/ServiceStatusBadge";
-import { formatTime } from "@/lib/utils";
+import { formatTime, formatBytes, formatUptime } from "@/lib/utils";
+import { InlineAlert, PageShell, UsageBar } from "@/components/ued";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -41,51 +42,6 @@ const OP_TYPE_LABEL = {
   uninstall: "卸载",
 };
 
-function formatBytes(n) {
-  if (n == null || n === 0) return "0 B";
-  const u = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let v = Number(n);
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i++;
-  }
-  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
-}
-
-function formatUptime(sec) {
-  if (!sec) return "—";
-  const d = Math.floor(sec / 86400);
-  const h = Math.floor((sec % 86400) / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  if (d > 0) return `${d}天 ${h}小时`;
-  if (h > 0) return `${h}小时 ${m}分`;
-  return `${m} 分钟`;
-}
-
-function usageColor(pct) {
-  if (pct >= 90) return "bg-red-500";
-  if (pct >= 75) return "bg-amber-500";
-  return "bg-emerald-500";
-}
-
-function UsageBar({ pct, label }) {
-  const p = Math.min(100, Math.max(0, Number(pct) || 0));
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-mono tabular-nums">{p.toFixed(1)}%</span>
-      </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${usageColor(p)}`}
-          style={{ width: `${p}%` }}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function Dashboard() {
   const { data, isLoading, isError } = useQuery({
@@ -120,7 +76,7 @@ export function Dashboard() {
       icon: CheckCircle2,
       to: "/services",
       enabled: true,
-      accent: "text-emerald-400",
+      accent: "text-success",
     },
     {
       label: "异常服务",
@@ -129,7 +85,7 @@ export function Dashboard() {
       icon: AlertTriangle,
       to: "/services",
       enabled: true,
-      accent: "text-red-400",
+      accent: "text-destructive",
     },
     {
       label: "运行环境",
@@ -145,11 +101,11 @@ export function Dashboard() {
   const recent = data?.recent_operations || [];
 
   return (
-    <div className="space-y-6">
+    <PageShell className="space-y-6">
       {isError && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-400">
+        <InlineAlert variant="error">
           仪表盘数据加载失败,请确认后端已启动。
-        </div>
+        </InlineAlert>
       )}
 
       {/* 本机服务器信息(定时拉取) */}
@@ -300,7 +256,7 @@ export function Dashboard() {
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-sm">
-                <AlertTriangle className="h-4 w-4 text-red-400" /> 异常服务
+                <AlertTriangle className="h-4 w-4 text-destructive" /> 异常服务
               </CardTitle>
               <CardDescription>状态为 crashed 的服务</CardDescription>
             </div>
@@ -313,7 +269,7 @@ export function Dashboard() {
               <p className="text-sm text-muted-foreground">加载中…</p>
             ) : abnormal.length === 0 ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
                 暂无异常服务
               </div>
             ) : (
@@ -397,6 +353,6 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </PageShell>
   );
 }

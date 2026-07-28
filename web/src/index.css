@@ -20,6 +20,15 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    --success: 160 84% 30%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 152 76% 94%;
+    --warning: 38 92% 40%;
+    --warning-foreground: 0 0% 100%;
+    --warning-muted: 48 96% 93%;
+    --danger: 0 84.2% 60.2%;
+    --danger-foreground: 210 40% 98%;
+    --danger-muted: 0 86% 97%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 199 89% 48%;
@@ -43,6 +52,15 @@
     --accent-foreground: 210 40% 96%;
     --destructive: 0 62.8% 50%;
     --destructive-foreground: 210 40% 98%;
+    --success: 160 70% 40%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 160 40% 14%;
+    --warning: 38 90% 48%;
+    --warning-foreground: 0 0% 10%;
+    --warning-muted: 38 40% 14%;
+    --danger: 0 62.8% 50%;
+    --danger-foreground: 210 40% 98%;
+    --danger-muted: 0 40% 14%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 22%;
     --ring: 199 89% 48%;
@@ -53,7 +71,6 @@
   * {
     @apply border-border;
   }
-  /* 单一视口：禁止 html/body 产生页面级滚动条，内容只在布局内滚动 */
   html,
   body,
   #root {
@@ -71,7 +88,6 @@
   #root {
     overflow: hidden;
   }
-  /* 滚动条（仅出现在 overflow 容器内，不溢出视口） */
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

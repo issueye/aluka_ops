@@ -59,6 +59,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageShell } from "@/components/ued";
 
 const EMPTY = {
   port: 18090,
@@ -138,7 +139,7 @@ export function Sites() {
   };
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -242,7 +243,7 @@ export function Sites() {
                         <TableCell className="font-mono">
                           :{s.port}
                           {s.enabled && listening.has(s.port) && (
-                            <span className="ml-1 text-[10px] text-emerald-400">LISTEN</span>
+                            <span className="ml-1 text-[10px] text-success">LISTEN</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -271,7 +272,7 @@ export function Sites() {
                               </Badge>
                             )}
                             {s.ip_blacklist?.trim() && (
-                              <Badge variant="outline" className="text-[10px] text-red-400">
+                              <Badge variant="outline" className="text-[10px] text-destructive">
                                 黑名单
                               </Badge>
                             )}
@@ -279,7 +280,7 @@ export function Sites() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild title="进入站点">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild aria-label="进入站点">
                               <Link to={`/sites/${s.id}`}>
                                 <ChevronRight className="h-3.5 w-3.5" />
                               </Link>
@@ -288,7 +289,7 @@ export function Sites() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
-                              title="打开"
+                              aria-label="打开"
                               asChild
                             >
                               <a
@@ -317,7 +318,7 @@ export function Sites() {
                               {s.enabled ? (
                                 <PowerOff className="h-3.5 w-3.5" />
                               ) : (
-                                <Power className="h-3.5 w-3.5 text-emerald-400" />
+                                <Power className="h-3.5 w-3.5 text-success" />
                               )}
                             </Button>
                             <Button
@@ -331,7 +332,7 @@ export function Sites() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-red-400"
+                              className="h-8 w-8 text-destructive"
                               onClick={() => setDeleting(s)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -469,7 +470,7 @@ export function Sites() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => delMut.mutate({ id: deleting.id, force: true })}
             >
               删除
@@ -477,6 +478,6 @@ export function Sites() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }

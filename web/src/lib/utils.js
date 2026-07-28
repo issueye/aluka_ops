@@ -18,9 +18,32 @@ export function formatTime(iso) {
   }
 }
 
+/** 字节格式化 */
+export function formatBytes(n) {
+  if (n == null || n === 0) return "0 B";
+  const u = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let v = Number(n);
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
+}
+
+/** 运行时长 */
+export function formatUptime(sec) {
+  if (!sec) return "—";
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}天 ${h}小时`;
+  if (h > 0) return `${h}小时 ${m}分`;
+  return `${m} 分钟`;
+}
+
 /**
  * 站点访问 URL:使用当前浏览器 hostname,避免写死 127.0.0.1。
- * 网关站点默认 http(独立端口无 TLS 时)。
  * @param {number|string} port 站点端口
  * @param {string} [pathPrefix="/"] 路径前缀
  */

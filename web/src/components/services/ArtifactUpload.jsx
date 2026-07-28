@@ -5,7 +5,6 @@ import { UploadCloud, FileArchive } from "lucide-react";
 import { artifactApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -15,6 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormField, FileDropzone } from "@/components/ued";
+import { formatBytes } from "@/lib/utils";
 
 // ArtifactUpload 上传制品对话框。
 export function ArtifactUpload({ open, onOpenChange, serviceId }) {
@@ -58,13 +59,6 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
     });
   };
 
-  const fmtSize = (n) => {
-    if (!n) return "";
-    if (n < 1024) return `${n} B`;
-    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-    return `${(n / 1024 / 1024).toFixed(2)} MB`;
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -76,48 +70,40 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="a-version">版本号 *</Label>
+          <FormField label="版本号" htmlFor="a-version" required error={errors.version}>
             <Input
               id="a-version"
               value={version}
               onChange={(e) => setVersion(e.target.value)}
               placeholder="如:1.0.0"
             />
-            {errors.version && <p className="text-xs text-red-400">{errors.version}</p>}
-          </div>
+          </FormField>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="a-file">制品文件 *</Label>
-            <label
-              htmlFor="a-file"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-4 py-6 text-sm transition-colors hover:border-primary hover:bg-muted/50"
+          <FormField label="制品文件" required error={errors.file}>
+            <FileDropzone
+              accept=".jar,.exe,.bat,.ps1,.zip,application/zip"
+              onFiles={(files) => setFile(files[0] || null)}
+              hint="点击或拖拽选择制品文件"
             >
               {file ? (
                 <>
-                  <FileArchive className="h-7 w-7 text-primary" />
-                  <span className="font-medium">{file.name}</span>
-                  <span className="text-xs text-muted-foreground">{fmtSize(file.size)}</span>
+                  <FileArchive className="mb-2 h-7 w-7 text-primary" />
+                  <span className="text-sm font-medium">{file.name}</span>
+                  <span className="mt-1 text-xs text-muted-foreground">
+                    {formatBytes(file.size)}
+                  </span>
                 </>
               ) : (
                 <>
-                  <UploadCloud className="h-7 w-7 text-muted-foreground" />
-                  <span className="text-muted-foreground">点击选择文件</span>
-                  <span className="text-xs text-muted-foreground/70">jar / exe / zip</span>
+                  <UploadCloud className="mb-2 h-7 w-7 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">点击或拖拽选择文件</p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">jar / exe / zip</p>
                 </>
               )}
-            </label>
-            <Input
-              id="a-file"
-              type="file"
-              className="hidden"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-            {errors.file && <p className="text-xs text-red-400">{errors.file}</p>}
-          </div>
+            </FileDropzone>
+          </FormField>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="a-desc">描述</Label>
+          <FormField label="描述" htmlFor="a-desc">
             <Textarea
               id="a-desc"
               rows={2}
@@ -125,7 +111,7 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="可选,如:修复登录问题"
             />
-          </div>
+          </FormField>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={uploadMut.isPending}>

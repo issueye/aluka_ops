@@ -59,6 +59,7 @@ import {
 } from "@/components/ui/select";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import { PageShell } from "@/components/ued";
 
 const DEFAULT_CONFIG = `{
   "command": "{{jar_path}}",
@@ -218,7 +219,7 @@ export function Templates() {
   };
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div className="space-y-1.5">
@@ -240,7 +241,7 @@ export function Templates() {
         </CardHeader>
         <CardContent className="p-0">
           {isError ? (
-            <div className="m-6 rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
+            <div className="m-6 rounded-md border border-danger/30 bg-danger-muted p-4 text-sm text-destructive">
               加载失败,请确认后端已启动。
             </div>
           ) : (
@@ -311,7 +312,7 @@ export function Templates() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="text-red-400"
+                            className="text-destructive"
                             onClick={() => setDeleting(t)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -524,6 +525,6 @@ export function Templates() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }

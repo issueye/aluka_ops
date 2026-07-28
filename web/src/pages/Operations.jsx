@@ -1,17 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { History, RefreshCw } from "lucide-react";
+import { History } from "lucide-react";
 import { operationApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -20,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationBar } from "@/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -30,6 +21,14 @@ import {
 } from "@/components/ui/select";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import {
+  PageShell,
+  DataTableCard,
+  TableStateRow,
+  InlineAlert,
+  RefreshButton,
+  CodeText,
+} from "@/components/ued";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -75,19 +74,13 @@ export function Operations() {
   const pg = usePagination(operations, 10);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-4 w-4" /> 操作记录
-            </CardTitle>
-            <CardDescription>
-              全部服务的 install / start / stop / restart / upgrade / uninstall 历史。共{" "}
-              {operations.length} 条(最多 100)。
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
+    <PageShell>
+      <DataTableCard
+        icon={History}
+        title="操作记录"
+        description={`全部服务的 install / start / stop / restart / upgrade / uninstall 历史。共 ${operations.length} 条(最多 100)。`}
+        filters={
+          <>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="类型" />
@@ -112,102 +105,84 @@ export function Operations() {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={isFetching ? "animate-spin" : ""} /> 刷新
-            </Button>
+          </>
+        }
+        actions={<RefreshButton onClick={() => refetch()} loading={isFetching} />}
+        pagination={
+          !isLoading && operations.length > 0
+            ? {
+                page: pg.page,
+                totalPages: pg.totalPages,
+                total: pg.total,
+                from: pg.from,
+                to: pg.to,
+                pageSize: pg.pageSize,
+                setPage: pg.setPage,
+              }
+            : null
+        }
+      >
+        {isError ? (
+          <div className="m-6">
+            <InlineAlert variant="error">加载失败,请确认后端服务已启动。</InlineAlert>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isError ? (
-            <div className="m-6 rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
-              加载失败,请确认后端服务已启动。
-            </div>
-          ) : (
-            <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[60px]">#</TableHead>
-                  <TableHead className="w-[100px]">类型</TableHead>
-                  <TableHead className="w-[90px]">状态</TableHead>
-                  <TableHead>服务</TableHead>
-                  <TableHead>详情</TableHead>
-                  <TableHead className="w-[160px]">时间</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      加载中...
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[60px]">#</TableHead>
+                <TableHead className="w-[100px]">类型</TableHead>
+                <TableHead className="w-[90px]">状态</TableHead>
+                <TableHead>服务</TableHead>
+                <TableHead>详情</TableHead>
+                <TableHead className="w-[160px]">时间</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableStateRow colSpan={6}>加载中...</TableStateRow>
+              ) : operations.length === 0 ? (
+                <TableStateRow colSpan={6}>暂无操作记录。</TableStateRow>
+              ) : (
+                pg.pageItems.map((op) => (
+                  <TableRow key={op.id}>
+                    <TableCell className="text-muted-foreground">{op.id}</TableCell>
+                    <TableCell className="font-medium uppercase">{op.type}</TableCell>
+                    <TableCell>
+                      <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
+                        {op.status}
+                      </Badge>
                     </TableCell>
-                  </TableRow>
-                ) : operations.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                      暂无操作记录。
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pg.pageItems.map((op) => (
-                    <TableRow key={op.id}>
-                      <TableCell className="text-muted-foreground">{op.id}</TableCell>
-                      <TableCell className="font-medium uppercase">{op.type}</TableCell>
-                      <TableCell>
-                        <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
-                          {op.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {op.service_id ? (
-                          <Link
-                            to={`/services/${op.service_id}`}
-                            className="hover:text-primary hover:underline"
-                          >
-                            <div className="text-sm font-medium">
-                              {op.service_name || `服务 #${op.service_id}`}
-                            </div>
-                            {op.service_code && (
-                              <div className="font-mono text-xs text-muted-foreground">
-                                {op.service_code}
-                              </div>
-                            )}
-                          </Link>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[360px]">
-                        <div
-                          className="truncate text-xs text-muted-foreground"
-                          title={op.error_msg || op.output_log || op.detail || ""}
+                    <TableCell>
+                      {op.service_id ? (
+                        <Link
+                          to={`/services/${op.service_id}`}
+                          className="hover:text-primary hover:underline"
                         >
-                          {op.error_msg || op.output_log || op.detail || "—"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {formatTime(op.started_at || op.created_at)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-              {!isLoading && operations.length > 0 && (
-                <PaginationBar
-                  page={pg.page}
-                  totalPages={pg.totalPages}
-                  total={pg.total}
-                  from={pg.from}
-                  to={pg.to}
-                  pageSize={pg.pageSize}
-                  onPageChange={pg.setPage}
-                />
+                          <div className="text-sm font-medium">
+                            {op.service_name || `服务 #${op.service_id}`}
+                          </div>
+                          {op.service_code && <CodeText>{op.service_code}</CodeText>}
+                        </Link>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="max-w-[360px]">
+                      <div className="truncate text-xs text-muted-foreground">
+                        {op.error_msg || op.output_log || op.detail || "—"}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatTime(op.started_at || op.created_at)}
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            </TableBody>
+          </Table>
+        )}
+      </DataTableCard>
+    </PageShell>
   );
 }
