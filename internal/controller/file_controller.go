@@ -131,7 +131,13 @@ func (h *FileController) Write(c *gin.Context) {
 	OK(c, ent)
 }
 
-// Upload POST /api/files/upload  multipart: path(父目录), file
+// Upload POST /api/files/upload
+// multipart:
+//   - path: 父目录(相对 data)
+//   - file: 文件内容
+//   - name: 可选,相对父目录的目标路径(可含子目录,如 app/index.html);优先于 file 文件名
+//
+// 文件夹上传:前端对每个文件带 name=webkitRelativePath 多次调用本接口。
 func (h *FileController) Upload(c *gin.Context) {
 	parent := c.PostForm("path")
 	fh, err := c.FormFile("file")
@@ -139,16 +145,20 @@ func (h *FileController) Upload(c *gin.Context) {
 		Fail(c, 400, CodeErrBad, "缺少 file 字段")
 		return
 	}
-	name := filepath.Base(fh.Filename)
-	if name == "" || name == "." || name == ".." {
-		Fail(c, 400, CodeErrBad, "非法文件名")
-		return
-	}
-	// 可选覆盖名
+
+	// 目标相对路径:优先 name(可多层),否则用上传文件名(单层)
+	var rel string
 	if n := strings.TrimSpace(c.PostForm("name")); n != "" {
-		name = filepath.Base(n)
+		rel = files.JoinRelPath(parent, n)
+	} else {
+		name := filepath.Base(fh.Filename)
+		if name == "" || name == "." || name == ".." {
+			Fail(c, 400, CodeErrBad, "非法文件名")
+			return
+		}
+		// Filename 偶发带目录(部分浏览器),统一只取 base
+		rel = files.JoinRel(parent, name)
 	}
-	rel := files.JoinRel(parent, name)
 	if rel == "" {
 		Fail(c, 400, CodeErrBad, "非法路径")
 		return

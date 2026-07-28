@@ -457,7 +457,7 @@ func (s *Store) Remove(rel string, recursive bool) error {
 	return os.Remove(abs)
 }
 
-// JoinRel 拼接相对路径。
+// JoinRel 拼接相对路径(name 仅单层文件名,不含 /)。
 func JoinRel(parent, name string) string {
 	name = strings.TrimSpace(name)
 	name = strings.ReplaceAll(name, "\\", "/")
@@ -470,4 +470,38 @@ func JoinRel(parent, name string) string {
 		return name
 	}
 	return parent + "/" + name
+}
+
+// JoinRelPath 拼接父目录与相对路径(可含多层,如 folder/a.txt)。
+// 会拒绝 .. 与空段;用于文件夹上传保留目录结构。
+func JoinRelPath(parent, rel string) string {
+	rel = strings.TrimSpace(rel)
+	rel = strings.ReplaceAll(rel, "\\", "/")
+	rel = strings.Trim(rel, "/")
+	if rel == "" {
+		return ""
+	}
+	parts := strings.Split(rel, "/")
+	clean := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" || p == "." {
+			continue
+		}
+		if p == ".." {
+			return ""
+		}
+		if strings.ContainsAny(p, `<>:"|?*`) {
+			return ""
+		}
+		clean = append(clean, p)
+	}
+	if len(clean) == 0 {
+		return ""
+	}
+	child := strings.Join(clean, "/")
+	parent = strings.Trim(strings.ReplaceAll(parent, "\\", "/"), "/")
+	if parent == "" || parent == "." {
+		return child
+	}
+	return parent + "/" + child
 }

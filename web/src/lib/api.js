@@ -104,12 +104,27 @@ export const filesApi = {
     ),
   downloadUrl: (path) =>
     `/api/files/download?path=${encodeURIComponent(path)}`,
+  // name 可为多层相对路径(文件夹上传时传 webkitRelativePath)
   upload: async (parentPath, file, name) => {
     const fd = new FormData();
     fd.append("path", parentPath || "");
     fd.append("file", file);
     if (name) fd.append("name", name);
     return request("/api/files/upload", { method: "POST", body: fd });
+  },
+  // 批量上传(串行);items: [{file, name?}]
+  uploadMany: async (parentPath, items, onProgress) => {
+    const results = [];
+    const total = items.length;
+    for (let i = 0; i < total; i++) {
+      const it = items[i];
+      const name = it.name || it.file?.name;
+      // eslint-disable-next-line no-await-in-loop
+      const ent = await filesApi.upload(parentPath, it.file, name);
+      results.push(ent);
+      if (onProgress) onProgress(i + 1, total, ent);
+    }
+    return results;
   },
 };
 

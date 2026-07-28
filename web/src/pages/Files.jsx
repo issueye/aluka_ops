@@ -78,8 +78,10 @@ function joinPath(parent, name) {
 export function Files() {
   const qc = useQueryClient();
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
   const [path, setPath] = useState("");
   const [selected, setSelected] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(null); // {done,total,current}
 
   // dialogs
   const [mkdirOpen, setMkdirOpen] = useState(false);
@@ -170,12 +172,26 @@ export function Files() {
   });
 
   const uploadMut = useMutation({
-    mutationFn: (file) => filesApi.upload(path, file),
-    onSuccess: (ent) => {
-      toast.success(`已上传: ${ent?.name || "文件"}`);
+    mutationFn: async ({ items }) => {
+      setUploadProgress({ done: 0, total: items.length, current: "" });
+      return filesApi.uploadMany(path, items, (done, total, ent) => {
+        setUploadProgress({
+          done,
+          total,
+          current: ent?.path || ent?.name || "",
+        });
+      });
+    },
+    onSuccess: (list) => {
+      const n = list?.length || 0;
+      toast.success(n <= 1 ? `已上传: ${list?.[0]?.name || "文件"}` : `已上传 ${n} 个文件`);
+      setUploadProgress(null);
       invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => {
+      setUploadProgress(null);
+      toast.error(e.message);
+    },
   });
 
   const go = (p) => {
@@ -213,11 +229,17 @@ export function Files() {
   };
 
   const onPickUpload = (e) => {
-    const f = e.target.files?.[0];
+    const list = Array.from(e.target.files || []);
     e.target.value = "";
-    if (f) uploadMut.mutate(f);
+    if (!list.length) return;
+    const items = list.map((file) => ({
+      file,
+      name: file.webkitRelativePath || file.name,
+    }));
+    uploadMut.mutate({ items });
   };
 
+  const uploading = uploadMut.isPending;
   const entries = data?.entries || [];
 
   return (
@@ -269,21 +291,64 @@ export function Files() {
                 新建文件
               </Button>
               <Button
+                variant="outline"
                 size="sm"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={uploadMut.isPending}
+                disabled={uploading}
               >
                 <Upload className="mr-1.5 h-3.5 w-3.5" />
-                上传
+                上传文件
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => folderInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
+                上传文件夹
               </Button>
               <input
                 ref={fileInputRef}
                 type="file"
                 className="hidden"
+                multiple
+                onChange={onPickUpload}
+              />
+              <input
+                ref={folderInputRef}
+                type="file"
+                className="hidden"
+                // 浏览器文件夹选择(Chrome/Edge/Safari)
+                webkitdirectory=""
+                directory=""
+                multiple
                 onChange={onPickUpload}
               />
             </div>
           </div>
+
+          {uploadProgress && (
+            <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+              上传中 {uploadProgress.done}/{uploadProgress.total}
+              {uploadProgress.current ? (
+                <span className="ml-2 font-mono text-muted-foreground">
+                  {uploadProgress.current}
+                </span>
+              ) : null}
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: `${
+                      uploadProgress.total
+                        ? Math.round((uploadProgress.done / uploadProgress.total) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* 面包屑 */}
           <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">

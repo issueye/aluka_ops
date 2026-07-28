@@ -42,6 +42,25 @@ func TestResolveBlocksTraversal(t *testing.T) {
 	}
 }
 
+func TestJoinRelPath(t *testing.T) {
+	cases := []struct {
+		parent, rel, want string
+	}{
+		{"", "a/b.txt", "a/b.txt"},
+		{"apps", "web/index.html", "apps/web/index.html"},
+		{"apps", "web\\index.html", "apps/web/index.html"},
+		{"", "../x", ""},
+		{"", "a/../b", ""},
+		{"", "", ""},
+	}
+	for _, c := range cases {
+		got := JoinRelPath(c.parent, c.rel)
+		if got != c.want {
+			t.Errorf("JoinRelPath(%q,%q)=%q want %q", c.parent, c.rel, got, c.want)
+		}
+	}
+}
+
 func TestCRUD(t *testing.T) {
 	root := t.TempDir()
 	s, err := NewStore(root)
