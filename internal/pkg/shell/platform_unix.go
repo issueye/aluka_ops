@@ -2,14 +2,4 @@
 
 package shell
 
-import (
-	"os/exec"
-	"syscall"
-)
-
-func setShellSysProcAttr(cmd *exec.Cmd) {
-	if cmd.SysProcAttr == nil {
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-	cmd.SysProcAttr.Setpgid = true
-}
+// Unix 平台专用逻辑在 pty_unix.go;本文件保留包可编译占位。

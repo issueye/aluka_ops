@@ -32,18 +32,19 @@ import {
 } from "@/components/ui/select";
 
 /**
- * 服务器级 Web 控制台(非服务进程控制台)。
- * Windows 默认 PowerShell;行缓冲 + WebSocket 推送输出。
+ * 服务器级 Web 控制台。
+ * Linux/macOS: PTY · Windows: ConPTY
+ * xterm 原始按键透传,支持 resize。
  */
 export function TerminalPage() {
   const hostRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
   const wsRef = useRef(null);
-  const lineBufRef = useRef("");
   const [conn, setConn] = useState("idle"); // idle|connecting|connected|closed|error
   const [shellType, setShellType] = useState("");
   const [sessionId, setSessionId] = useState("");
+  const [backend, setBackend] = useState("");
 
   const { data: info } = useQuery({
     queryKey: ["shell-info"],
@@ -58,7 +59,45 @@ export function TerminalPage() {
     if (!shellType && defaultShell) setShellType(defaultShell);
   }, [defaultShell, shellType]);
 
-  // 初始化 xterm
+  useEffect(() => {
+    if (info?.backend) setBackend(info.backend);
+  }, [info]);
+
+  const sendResize = useCallback(() => {
+    const ws = wsRef.current;
+    const term = termRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || !term) return;
+    try {
+      ws.send(
+        JSON.stringify({
+          type: "resize",
+          cols: term.cols,
+          rows: term.rows,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const disconnect = useCallback(() => {
+    const ws = wsRef.current;
+    if (ws) {
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "close" }));
+        }
+        ws.close();
+      } catch {
+        /* ignore */
+      }
+      wsRef.current = null;
+    }
+    setConn("closed");
+    setSessionId("");
+  }, []);
+
+  // 初始化 xterm:按键直通 WebSocket
   useEffect(() => {
     if (!hostRef.current || termRef.current) return;
     const term = new Terminal({
@@ -72,9 +111,10 @@ export function TerminalPage() {
         cursor: "#38bdf8",
         selectionBackground: "#1e3a5f",
       },
-      convertEol: true,
-      scrollback: 8000,
+      convertEol: false, // PTY 自己处理换行
+      scrollback: 10000,
       allowProposedApi: true,
+      windowsMode: false,
     });
     const fit = new FitAddon();
     term.loadAddon(fit);
@@ -88,55 +128,23 @@ export function TerminalPage() {
       }
     });
 
-    term.writeln("\x1b[90m# Aluka Ops 服务器控制台(系统级)\x1b[0m");
+    term.writeln("\x1b[90m# Aluka Ops 服务器控制台 · PTY / ConPTY\x1b[0m");
     term.writeln(
-      "\x1b[90m# Windows 默认 PowerShell · 回车发送一行 · Ctrl+C 发送中断\x1b[0m"
+      "\x1b[90m# 原始按键透传 · 支持方向键/Tab/Ctrl+C · 窗口变化自动 resize\x1b[0m"
     );
     term.writeln("\x1b[90m# 点击「连接」开始会话\x1b[0m");
     term.writeln("");
 
     term.onData((data) => {
       const ws = wsRef.current;
-      for (let i = 0; i < data.length; i++) {
-        const ch = data[i];
-        const code = ch.charCodeAt(0);
-
-        // Ctrl+C
-        if (code === 3) {
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(String.fromCharCode(3));
-            term.write("^C\r\n");
-            lineBufRef.current = "";
-          }
-          continue;
-        }
-
-        // Enter
-        if (ch === "\r" || ch === "\n") {
-          const line = lineBufRef.current;
-          lineBufRef.current = "";
-          term.write("\r\n");
-          if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(line);
-          } else {
-            term.writeln("\x1b[33m[未连接] 请先点击连接\x1b[0m");
-          }
-          continue;
-        }
-
-        // Backspace
-        if (ch === "\x7f" || ch === "\b") {
-          if (lineBufRef.current.length > 0) {
-            lineBufRef.current = lineBufRef.current.slice(0, -1);
-            term.write("\b \b");
-          }
-          continue;
-        }
-
-        if (code < 32) continue;
-        lineBufRef.current += ch;
-        term.write(ch);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // 二进制发送,避免 JSON 转义破坏控制字符
+        ws.send(new TextEncoder().encode(data));
       }
+    });
+
+    term.onResize(() => {
+      sendResize();
     });
 
     termRef.current = term;
@@ -145,6 +153,7 @@ export function TerminalPage() {
     const onResize = () => {
       try {
         fit.fit();
+        sendResize();
       } catch {
         /* ignore */
       }
@@ -157,37 +166,29 @@ export function TerminalPage() {
       termRef.current = null;
       fitRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const disconnect = useCallback(() => {
-    const ws = wsRef.current;
-    if (ws) {
-      try {
-        if (ws.readyState === WebSocket.OPEN) ws.send("__CLOSE__");
-        ws.close();
-      } catch {
-        /* ignore */
-      }
-      wsRef.current = null;
-    }
-    setConn("closed");
-    setSessionId("");
-  }, []);
+  }, [disconnect, sendResize]);
 
   const connect = useCallback(() => {
     const term = termRef.current;
     if (!term) return;
     disconnect();
 
-    const sh = shellType || defaultShell || "powershell";
+    try {
+      fitRef.current?.fit();
+    } catch {
+      /* ignore */
+    }
+
+    const sh = shellType || defaultShell || "powershell_noprofile";
+    const cols = term.cols || 120;
+    const rows = term.rows || 30;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const url = withAuthQuery(
-      `${proto}//${window.location.host}/api/shell/ws?shell=${encodeURIComponent(sh)}`
+      `${proto}//${window.location.host}/api/shell/ws?shell=${encodeURIComponent(sh)}&cols=${cols}&rows=${rows}`
     );
 
     setConn("connecting");
-    term.writeln(`\x1b[90m# 正在连接 ${sh} …\x1b[0m`);
+    term.writeln(`\x1b[90m# 正在连接 ${sh} (${cols}x${rows}) …\x1b[0m`);
 
     const ws = new WebSocket(url);
     ws.binaryType = "arraybuffer";
@@ -196,48 +197,45 @@ export function TerminalPage() {
     ws.onopen = () => {
       setConn("connected");
       term.writeln("\x1b[32m# 已连接\x1b[0m");
-      try {
-        fitRef.current?.fit();
-      } catch {
-        /* ignore */
-      }
+      // 连上后再发一次尺寸
+      setTimeout(() => {
+        try {
+          fitRef.current?.fit();
+          sendResize();
+        } catch {
+          /* ignore */
+        }
+      }, 100);
     };
 
     ws.onmessage = (ev) => {
       const t = termRef.current;
       if (!t) return;
 
-      let text = "";
       if (typeof ev.data === "string") {
-        text = ev.data;
-      } else if (ev.data instanceof ArrayBuffer) {
-        text = new TextDecoder("utf-8", { fatal: false }).decode(ev.data);
-      } else {
+        const text = ev.data;
+        if (text.startsWith("\x1eMETA:")) {
+          const meta = text.slice(6).trim();
+          const m = /session=([^;]+)/.exec(meta);
+          if (m) setSessionId(m[1]);
+          const b = /backend=([^;]+)/.exec(meta);
+          if (b) setBackend(b[1]);
+          t.writeln(`\x1b[90m# ${meta}\x1b[0m`);
+          return;
+        }
+        if (text.startsWith("\x1eERROR:")) {
+          t.writeln(`\x1b[31m# ${text.slice(7).trim()}\x1b[0m`);
+          toast.error(text.slice(7).trim());
+          return;
+        }
+        // 其它文本直接写
+        t.write(text);
         return;
       }
 
-      // 元信息
-      if (text.startsWith("\x1eMETA:")) {
-        const meta = text.slice(6).trim();
-        const m = /session=([^;]+)/.exec(meta);
-        if (m) setSessionId(m[1]);
-        t.writeln(`\x1b[90m# ${meta}\x1b[0m`);
-        return;
-      }
-      if (text.startsWith("\x1eERROR:")) {
-        t.writeln(`\x1b[31m# ${text.slice(7).trim()}\x1b[0m`);
-        toast.error(text.slice(7).trim());
-        return;
-      }
-
-      // 若有本地输入缓冲,先换行再写输出,再回显输入
-      if (lineBufRef.current.length > 0) {
-        const pending = lineBufRef.current;
-        t.write("\r\n");
-        t.write(text.replace(/\r?\n/g, "\r\n"));
-        t.write(pending);
-      } else {
-        t.write(text.replace(/\r?\n/g, "\r\n"));
+      if (ev.data instanceof ArrayBuffer) {
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(ev.data);
+        t.write(text);
       }
     };
 
@@ -252,7 +250,7 @@ export function TerminalPage() {
       wsRef.current = null;
       term.writeln("\x1b[90m# 连接已关闭\x1b[0m");
     };
-  }, [shellType, defaultShell, disconnect]);
+  }, [shellType, defaultShell, disconnect, sendResize]);
 
   const connBadge = () => {
     switch (conn) {
@@ -260,14 +258,11 @@ export function TerminalPage() {
         return (
           <Badge variant="success" className="gap-1">
             <Wifi className="h-3 w-3" /> 已连接
+            {backend ? ` · ${backend}` : ""}
           </Badge>
         );
       case "connecting":
-        return (
-          <Badge variant="secondary" className="gap-1">
-            连接中…
-          </Badge>
-        );
+        return <Badge variant="secondary">连接中…</Badge>;
       case "error":
         return (
           <Badge variant="danger" className="gap-1">
@@ -293,26 +288,29 @@ export function TerminalPage() {
                 <TerminalSquare className="h-4 w-4" /> 服务器控制台
               </CardTitle>
               <CardDescription>
-                系统级 Shell（非服务进程）。Windows 使用 PowerShell，输入按行发送。
+                系统级伪终端：Linux/macOS 使用 PTY，Windows 使用 ConPTY。
                 {sessionId ? (
-                  <span className="ml-2 font-mono text-[11px]">session={sessionId}</span>
+                  <span className="ml-2 font-mono text-[11px]">
+                    session={sessionId}
+                  </span>
                 ) : null}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               {connBadge()}
               <Select
-                value={shellType || defaultShell || "powershell"}
+                value={shellType || defaultShell || "powershell_noprofile"}
                 onValueChange={setShellType}
                 disabled={conn === "connected" || conn === "connecting"}
               >
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Shell" />
                 </SelectTrigger>
                 <SelectContent>
                   {(shells.length
                     ? shells
                     : [
+                        { id: "powershell_noprofile", name: "PowerShell (无配置)" },
                         { id: "powershell", name: "PowerShell" },
                         { id: "cmd", name: "CMD" },
                       ]
@@ -343,8 +341,8 @@ export function TerminalPage() {
             className="h-[min(70vh,640px)] w-full overflow-hidden rounded-md border border-border/60 bg-[#0b0f17] p-2"
           />
           <p className="mt-2 text-[11px] text-muted-foreground">
-            说明：通过管道驱动 PowerShell/CMD，适合执行命令与查看输出；非完整 ConPTY
-            伪终端，部分交互式 TUI 程序可能表现异常。权限与 aluka_ops 进程相同，请谨慎使用。
+            后端：{backend || info?.backend || "…"}。权限与 aluka_ops
+            进程相同，请谨慎操作。完整交互终端（方向键、Tab 补全、颜色、resize）已启用。
           </p>
         </CardContent>
       </Card>

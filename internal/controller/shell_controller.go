@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,7 +14,7 @@ import (
 	"aluka_ops/internal/pkg/shell"
 )
 
-// ShellController 服务器级 Web 控制台。
+// ShellController 服务器级 Web 控制台(PTY/ConPTY)。
 type ShellController struct {
 	mgr *shell.Manager
 }
@@ -22,10 +24,10 @@ func NewShellController(mgr *shell.Manager) *ShellController {
 }
 
 var shellUpgrader = websocket.Upgrader{
-	ReadBufferSize:  4096,
-	WriteBufferSize: 4096,
+	ReadBufferSize:  8192,
+	WriteBufferSize: 8192,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 管理面同源/内网;鉴权已在中间件完成
+		return true
 	},
 }
 
@@ -35,8 +37,9 @@ func (h *ShellController) Info(c *gin.Context) {
 		"default":   shell.DefaultShell(),
 		"shells":    shell.AvailableShells(),
 		"sessions":  h.mgr.List(),
-		"note":      "Windows 推荐 powershell;输入按行发送(CRLF)。",
-		"websocket": "/api/shell/ws?shell=powershell",
+		"backend":   shell.Backend(),
+		"note":      "Linux/macOS=pty, Windows=ConPTY; xterm 原始按键透传。",
+		"websocket": "/api/shell/ws?shell=powershell_noprofile&cols=120&rows=30",
 	})
 }
 
@@ -59,20 +62,32 @@ func (h *ShellController) CloseSession(c *gin.Context) {
 	OKMsg(c, "已关闭")
 }
 
-// WS GET /api/shell/ws?shell=powershell
-// 文本帧:客户端发送命令行;服务端推送 shell 输出。
-// 控制帧(JSON 文本,以 \x00 前缀可选):简化为纯文本行协议。
+// clientMsg 前端 → 后端控制消息(JSON 文本帧)。
+// type:
+//   - input: data 为原始按键(也可直接发 Binary/纯文本按键)
+//   - resize: cols/rows
+//   - close
+type clientMsg struct {
+	Type string `json:"type"`
+	Data string `json:"data,omitempty"`
+	Cols int    `json:"cols,omitempty"`
+	Rows int    `json:"rows,omitempty"`
+}
+
+// WS GET /api/shell/ws?shell=&cols=&rows=
 //
 // 协议:
-//   - 客户端 → 服务端:一行命令(可无换行,服务端补 CRLF/LF)
-//   - 客户端 → 服务端:特殊 "\x03" 表示中断(尽力写入 Ctrl+C 字节)
-//   - 服务端 → 客户端:原始输出字节(UTF-8 文本帧)
-//   - 服务端 → 客户端:以 "\x1eMETA:" 开头的元信息行(会话 id 等)
+//   - 服务端 → 客户端 Binary: PTY 原始输出
+//   - 服务端 → 客户端 Text 以 \x1eMETA: / \x1eERROR: 开头:元信息
+//   - 客户端 → 服务端 Binary 或 Text: 原始输入(按键)
+//   - 客户端 → 服务端 JSON Text: {"type":"resize","cols":120,"rows":30} / {"type":"close"}
 func (h *ShellController) WS(c *gin.Context) {
 	shellType := c.Query("shell")
 	if shellType == "" {
 		shellType = shell.DefaultShell()
 	}
+	cols := parseU16(c.Query("cols"), 120)
+	rows := parseU16(c.Query("rows"), 30)
 
 	conn, err := shellUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -80,7 +95,7 @@ func (h *ShellController) WS(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	sess, err := h.mgr.Create(shellType)
+	sess, err := h.mgr.Create(shellType, cols, rows)
 	if err != nil {
 		_ = conn.WriteMessage(websocket.TextMessage, []byte("\x1eERROR:"+err.Error()+"\n"))
 		return
@@ -88,21 +103,18 @@ func (h *ShellController) WS(c *gin.Context) {
 	defer func() { _ = h.mgr.Close(sess.ID) }()
 
 	_ = conn.WriteMessage(websocket.TextMessage, []byte(
-		"\x1eMETA:session="+sess.ID+";shell="+sess.Shell+"\n",
-	))
-	_ = conn.WriteMessage(websocket.TextMessage, []byte(
-		"# Aluka Ops 服务器控制台 · "+sess.Shell+" · session "+sess.ID+"\r\n",
+		"\x1eMETA:session="+sess.ID+";shell="+sess.Shell+";backend="+shell.Backend()+
+			";cols="+itoa(int(cols))+";rows="+itoa(int(rows))+"\n",
 	))
 
-	// 输出:shell stdout → websocket
+	// PTY 输出 → WebSocket
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
-		buf := make([]byte, 4096)
+		buf := make([]byte, 8192)
 		for {
-			n, rerr := sess.Stdout().Read(buf)
+			n, rerr := sess.Read(buf)
 			if n > 0 {
-				// 写超时保护
 				_ = conn.SetWriteDeadline(time.Now().Add(30 * time.Second))
 				if werr := conn.WriteMessage(websocket.BinaryMessage, buf[:n]); werr != nil {
 					return
@@ -117,15 +129,7 @@ func (h *ShellController) WS(c *gin.Context) {
 		}
 	}()
 
-	// 输入:websocket → shell stdin
-	conn.SetReadLimit(64 << 10)
-	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Minute))
-	conn.SetPongHandler(func(string) error {
-		_ = conn.SetReadDeadline(time.Now().Add(30 * time.Minute))
-		return nil
-	})
-
-	// 心跳 ping
+	// 心跳
 	pingDone := make(chan struct{})
 	go func() {
 		t := time.NewTicker(20 * time.Second)
@@ -144,35 +148,70 @@ func (h *ShellController) WS(c *gin.Context) {
 	}()
 	defer close(pingDone)
 
+	conn.SetReadLimit(256 << 10)
+	_ = conn.SetReadDeadline(time.Now().Add(30 * time.Minute))
+	conn.SetPongHandler(func(string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(30 * time.Minute))
+		return nil
+	})
+
+	// WebSocket 输入 → PTY
 	for {
 		mt, data, err := conn.ReadMessage()
 		if err != nil {
 			break
 		}
-		if mt != websocket.TextMessage && mt != websocket.BinaryMessage {
+		if mt == websocket.BinaryMessage {
+			if len(data) > 0 {
+				_, _ = sess.Write(data)
+			}
+			continue
+		}
+		if mt != websocket.TextMessage {
 			continue
 		}
 		if len(data) == 0 {
 			continue
 		}
-		// Ctrl+C
-		if len(data) == 1 && data[0] == 3 {
-			_, _ = sess.Write([]byte{3})
-			continue
+		// JSON 控制消息
+		if data[0] == '{' {
+			var msg clientMsg
+			if json.Unmarshal(data, &msg) == nil {
+				switch strings.ToLower(msg.Type) {
+				case "resize":
+					_ = sess.Resize(uint16(msg.Cols), uint16(msg.Rows))
+					continue
+				case "close":
+					goto done
+				case "input":
+					if msg.Data != "" {
+						_, _ = sess.Write([]byte(msg.Data))
+					}
+					continue
+				}
+			}
 		}
-		// 特殊关闭
-		if string(data) == "\x1eCLOSE" || strings.TrimSpace(string(data)) == "__CLOSE__" {
+		// 兼容旧协议:纯文本一行 / __CLOSE__ / Ctrl+C 单字节
+		if string(data) == "__CLOSE__" || string(data) == "\x1eCLOSE" {
 			break
 		}
-		// 按文本行写入(Windows 自动 CRLF)
-		line := string(data)
-		// 去掉客户端可能带的换行,由 WriteLine 统一补
-		line = strings.TrimRight(line, "\r\n")
-		if err := sess.WriteLine(line); err != nil {
-			_ = conn.WriteMessage(websocket.TextMessage, []byte("\r\n\x1eERROR:write: "+err.Error()+"\r\n"))
-			break
-		}
+		_, _ = sess.Write(data)
 	}
-
+done:
 	<-outDone
+}
+
+func parseU16(s string, def uint16) uint16 {
+	if s == "" {
+		return def
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n <= 0 || n > 65535 {
+		return def
+	}
+	return uint16(n)
+}
+
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }

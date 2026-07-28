@@ -1,5 +1,10 @@
 // Package shell 提供服务器级交互式 Shell 会话(Web 控制台)。
-// Windows 默认 PowerShell,Unix 默认 bash。
+//
+// 伪终端:
+//   - Linux/macOS: creack/pty
+//   - Windows: ConPTY (UserExistsError/conpty)
+//
+// 会话 I/O 为原始字节流,前端 xterm 直通按键与输出。
 package shell
 
 import (
@@ -20,18 +25,21 @@ var (
 	ErrTooManySessions = errors.New("会话数已达上限")
 )
 
-// Session 一个交互式 shell 进程。
+// Session 一个交互式 PTY shell。
 type Session struct {
 	ID        string
 	Shell     string
 	StartedAt time.Time
+	Cols      uint16
+	Rows      uint16
 
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout io.ReadCloser
+	// 平台实现:读写同一 PTY 主端
+	io     io.ReadWriteCloser
+	cmd    *exec.Cmd // Unix 侧保留以便 Kill;Windows 可能为 nil
+	closer func() error
 
 	closed atomic.Bool
-	mu     sync.Mutex
+	writeMu sync.Mutex
 }
 
 // Manager 管理多个 shell 会话。
@@ -55,10 +63,9 @@ func NewManager(dataDir string, max int) *Manager {
 	}
 }
 
-// DefaultShell 当前平台默认 shell 类型。
+// DefaultShell 当前平台默认 shell。
 func DefaultShell() string {
 	if runtime.GOOS == "windows" {
-		// 默认无 profile,避免用户 profile 报错干扰 Web 控制台
 		return "powershell_noprofile"
 	}
 	return "bash"
@@ -74,14 +81,23 @@ func AvailableShells() []map[string]string {
 		}
 	}
 	return []map[string]string{
-		{"id": "bash", "name": "Bash", "desc": "交互式 bash"},
-		{"id": "sh", "name": "sh", "desc": "POSIX sh"},
+		{"id": "bash", "name": "Bash", "desc": "交互式 bash + PTY"},
+		{"id": "sh", "name": "sh", "desc": "POSIX sh + PTY"},
 	}
 }
 
-// Create 启动一个 shell 会话。
-// shellType: powershell | cmd | bash | sh;空则平台默认。
-func (m *Manager) Create(shellType string) (*Session, error) {
+// Backend 返回伪终端后端名。
+func Backend() string {
+	if runtime.GOOS == "windows" {
+		return "conpty"
+	}
+	return "pty"
+}
+
+// Create 启动 PTY shell 会话。
+// shellType: powershell | powershell_noprofile | cmd | bash | sh
+// cols/rows 初始终端尺寸,0 则默认 120x30。
+func (m *Manager) Create(shellType string, cols, rows uint16) (*Session, error) {
 	m.mu.Lock()
 	if len(m.sessions) >= m.max {
 		m.mu.Unlock()
@@ -92,12 +108,17 @@ func (m *Manager) Create(shellType string) (*Session, error) {
 	if shellType == "" {
 		shellType = DefaultShell()
 	}
-	// 别名
 	switch shellType {
 	case "ps", "pwsh":
 		shellType = "powershell"
 	case "ps_clean", "powershell-noprofile":
 		shellType = "powershell_noprofile"
+	}
+	if cols == 0 {
+		cols = 120
+	}
+	if rows == 0 {
+		rows = 30
 	}
 
 	name, args, err := shellCmd(shellType)
@@ -105,35 +126,22 @@ func (m *Manager) Create(shellType string) (*Session, error) {
 		return nil, err
 	}
 
-	cmd := exec.Command(name, args...)
+	workDir := m.dataDir
 	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		cmd.Dir = home
-	} else if m.dataDir != "" {
-		cmd.Dir = m.dataDir
+		workDir = home
 	}
-	cmd.Env = append(os.Environ(),
+
+	env := append(os.Environ(),
 		"TERM=xterm-256color",
+		"COLORTERM=truecolor",
 	)
 	if runtime.GOOS == "windows" {
-		cmd.Env = append(cmd.Env, "POWERSHELL_TELEMETRY_OPTOUT=1")
+		env = append(env, "POWERSHELL_TELEMETRY_OPTOUT=1")
 	}
-	setShellSysProcAttr(cmd)
 
-	stdin, err := cmd.StdinPipe()
+	rw, cmd, closer, err := startPTY(name, args, workDir, env, cols, rows)
 	if err != nil {
-		return nil, fmt.Errorf("stdin: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		_ = stdin.Close()
-		return nil, fmt.Errorf("stdout: %w", err)
-	}
-	cmd.Stderr = cmd.Stdout
-
-	if err := cmd.Start(); err != nil {
-		_ = stdin.Close()
-		_ = stdout.Close()
-		return nil, fmt.Errorf("启动 shell 失败: %w", err)
+		return nil, fmt.Errorf("启动 PTY 失败: %w", err)
 	}
 
 	id := fmt.Sprintf("sh-%d-%d", time.Now().UnixMilli(), m.seq.Add(1))
@@ -141,34 +149,25 @@ func (m *Manager) Create(shellType string) (*Session, error) {
 		ID:        id,
 		Shell:     shellType,
 		StartedAt: time.Now(),
+		Cols:      cols,
+		Rows:      rows,
+		io:        rw,
 		cmd:       cmd,
-		stdin:     stdin,
-		stdout:    stdout,
+		closer:    closer,
 	}
 
 	m.mu.Lock()
 	m.sessions[id] = s
 	m.mu.Unlock()
 
-	go func() {
-		_ = cmd.Wait()
-		s.closed.Store(true)
-		s.mu.Lock()
-		if s.stdin != nil {
-			_ = s.stdin.Close()
-			s.stdin = nil
-		}
-		s.mu.Unlock()
-		m.mu.Lock()
-		delete(m.sessions, id)
-		m.mu.Unlock()
-	}()
-
-	// Windows PowerShell:启动后初始化编码与欢迎语
-	if shellType == "powershell" || shellType == "powershell_noprofile" {
+	// 进程退出后清理映射(仅 Unix 有 *exec.Cmd;Windows 由读侧 EOF/Close 清理)
+	if cmd != nil {
 		go func() {
-			time.Sleep(300 * time.Millisecond)
-			_ = s.WriteLine("$ProgressPreference='SilentlyContinue'; try { [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $OutputEncoding=[System.Text.Encoding]::UTF8 } catch {}; Write-Host 'Aluka Ops Web Console (PowerShell)' -ForegroundColor Cyan")
+			_ = cmd.Wait()
+			s.markClosed()
+			m.mu.Lock()
+			delete(m.sessions, id)
+			m.mu.Unlock()
 		}()
 	}
 
@@ -183,23 +182,17 @@ func shellCmd(shellType string) (name string, args []string, err error) {
 		} else {
 			name = "pwsh"
 		}
-		// -Command - : 从 stdin 持续读取命令(管道模式)
-		args = []string{
-			"-NoLogo",
-			"-NoExit",
-			"-ExecutionPolicy", "Bypass",
-		}
+		args = []string{"-NoLogo", "-ExecutionPolicy", "Bypass"}
 		if shellType == "powershell_noprofile" {
 			args = append(args, "-NoProfile")
 		}
-		args = append(args, "-Command", "-")
+		// 交互式:不使用 -Command -,由 PTY 驱动完整交互
 	case "cmd":
 		if runtime.GOOS != "windows" {
 			return "", nil, fmt.Errorf("cmd 仅支持 Windows")
 		}
 		name = "cmd.exe"
-		// /Q 关闭 echo;/K 执行后保持
-		args = []string{"/Q", "/K", "prompt $P$G"}
+		args = []string{}
 	case "bash":
 		name = "bash"
 		args = []string{"--login", "-i"}
@@ -233,7 +226,10 @@ func (m *Manager) List() []map[string]any {
 			"id":         s.ID,
 			"shell":      s.Shell,
 			"started_at": s.StartedAt,
+			"cols":       s.Cols,
+			"rows":       s.Rows,
 			"closed":     s.closed.Load(),
+			"backend":    Backend(),
 		})
 	}
 	return out
@@ -266,83 +262,71 @@ func (m *Manager) CloseAll() {
 	}
 }
 
-// Write 向 shell stdin 写入原始字节。
+// Write 向 PTY 写入原始字节(按键透传)。
 func (s *Session) Write(p []byte) (int, error) {
 	if s.closed.Load() {
 		return 0, ErrSessionClosed
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.stdin == nil {
+	s.writeMu.Lock()
+	defer s.writeMu.Unlock()
+	if s.io == nil {
 		return 0, ErrSessionClosed
 	}
-	return s.stdin.Write(p)
+	return s.io.Write(p)
 }
 
-// WriteLine 写入一行(Windows 用 CRLF)。
-func (s *Session) WriteLine(line string) error {
-	payload := line
-	if runtime.GOOS == "windows" {
-		if payload == "" {
-			payload = "\r\n"
-		} else if !hasEOL(payload) {
-			payload += "\r\n"
-		} else {
-			payload = toCRLF(payload)
-		}
-	} else {
-		if payload == "" {
-			payload = "\n"
-		} else if !hasEOL(payload) {
-			payload += "\n"
-		}
+// Read 从 PTY 读取输出。
+func (s *Session) Read(p []byte) (int, error) {
+	if s.closed.Load() {
+		return 0, io.EOF
 	}
-	_, err := s.Write([]byte(payload))
-	return err
-}
-
-func hasEOL(s string) bool {
-	n := len(s)
-	return n > 0 && (s[n-1] == '\n')
-}
-
-func toCRLF(s string) string {
-	// 简单把孤立 \n 换成 \r\n(若已是 \r\n 则不动)
-	out := make([]byte, 0, len(s)+8)
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			if i == 0 || s[i-1] != '\r' {
-				out = append(out, '\r', '\n')
-				continue
-			}
-		}
-		out = append(out, s[i])
+	if s.io == nil {
+		return 0, io.EOF
 	}
-	return string(out)
+	return s.io.Read(p)
 }
 
-// Stdout 输出 reader。
-func (s *Session) Stdout() io.Reader { return s.stdout }
+// Resize 调整终端尺寸。
+func (s *Session) Resize(cols, rows uint16) error {
+	if s.closed.Load() {
+		return ErrSessionClosed
+	}
+	if cols == 0 || rows == 0 {
+		return nil
+	}
+	if err := resizePTY(s, cols, rows); err != nil {
+		return err
+	}
+	s.Cols = cols
+	s.Rows = rows
+	return nil
+}
 
-// Close 终止 shell。
+// Close 关闭 PTY 与进程。
 func (s *Session) Close() error {
 	if s.closed.Swap(true) {
 		return nil
 	}
-	s.mu.Lock()
-	if s.stdin != nil {
-		_ = s.stdin.Close()
-		s.stdin = nil
+	var err error
+	if s.closer != nil {
+		err = s.closer()
+	} else if s.io != nil {
+		err = s.io.Close()
 	}
-	s.mu.Unlock()
 	if s.cmd != nil && s.cmd.Process != nil {
 		_ = s.cmd.Process.Kill()
-		_, _ = s.cmd.Process.Wait()
 	}
-	return nil
+	return err
+}
+
+func (s *Session) markClosed() {
+	s.closed.Store(true)
 }
 
 // Alive 是否仍在运行。
 func (s *Session) Alive() bool {
 	return s != nil && !s.closed.Load()
 }
+
+// Stdout 兼容旧接口:返回自身作为 Reader。
+func (s *Session) Stdout() io.Reader { return s }
