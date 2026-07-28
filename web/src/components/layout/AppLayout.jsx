@@ -1,8 +1,8 @@
 import { Outlet, useLocation } from "react-router-dom";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
-// 路径到标题的映射,供 Topbar 显示。
 const titleMap = {
   "/": { title: "仪表盘", desc: "服务运行概览与异常一览" },
   "/services": { title: "服务管理", desc: "服务的安装、启停、升级与卸载" },
@@ -18,7 +18,6 @@ const titleMap = {
   "/settings": { title: "设置", desc: "系统全局配置" },
 };
 
-// resolveMeta 解析标题,支持动态路由(如 /services/:id)。
 function resolveMeta(pathname) {
   if (titleMap[pathname]) return titleMap[pathname];
   if (/^\/services\/\d+/.test(pathname)) {
@@ -35,15 +34,16 @@ export function AppLayout() {
   const meta = resolveMeta(pathname);
 
   return (
-    // h-full + min-h-0：避免 flex 子项默认 min-height:auto 把高度撑破视口，产生双滚动条
-    <div className="flex h-full min-h-0 w-full overflow-hidden">
-      <Sidebar />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <Topbar title={meta.title} description={meta.desc} />
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background p-6">
-          <Outlet />
-        </main>
+    <TooltipProvider delayDuration={300}>
+      <div className="flex h-full min-h-0 w-full overflow-hidden">
+        <Sidebar />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <Topbar title={meta.title} description={meta.desc} />
+          <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background p-6">
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

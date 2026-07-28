@@ -53,7 +53,7 @@ export function PaginationBar({
           className="h-7 w-7"
           disabled={page <= 1}
           onClick={() => go(1)}
-          title="首页"
+          aria-label="首页"
         >
           <ChevronsLeft className="h-3.5 w-3.5" />
         </Button>
@@ -64,7 +64,7 @@ export function PaginationBar({
           className="h-7 w-7"
           disabled={page <= 1}
           onClick={() => go(page - 1)}
-          title="上一页"
+          aria-label="上一页"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
@@ -78,7 +78,7 @@ export function PaginationBar({
           className="h-7 w-7"
           disabled={page >= totalPages}
           onClick={() => go(page + 1)}
-          title="下一页"
+          aria-label="下一页"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
@@ -89,7 +89,7 @@ export function PaginationBar({
           className="h-7 w-7"
           disabled={page >= totalPages}
           onClick={() => go(totalPages)}
-          title="末页"
+          aria-label="末页"
         >
           <ChevronsRight className="h-3.5 w-3.5" />
         </Button>

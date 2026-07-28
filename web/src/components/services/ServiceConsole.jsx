@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { serviceApi } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { IconTooltip } from "@/components/ued";
 import { Badge } from "@/components/ui/badge";
 
 // ServiceConsole 基于 xterm.js 的交互式控制台。
@@ -272,9 +273,9 @@ export function ServiceConsole({ serviceId, active, running }) {
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Button size="sm" variant="ghost" onClick={handleClear} title="清屏">
+          <IconTooltip label="清屏"><Button size="sm" variant="ghost" onClick={handleClear} aria-label="清屏">
             <Eraser className="h-3.5 w-3.5" />
-          </Button>
+          </Button></IconTooltip>
           {(conn === "closed" || conn === "reconnecting") && (
             <Button size="sm" variant="outline" onClick={handleReconnect}>
               重连

@@ -117,7 +117,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="如:JDK 17"
               />
-              {errors.name && <p className="text-xs text-red-400">{errors.name}</p>}
+              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -155,7 +155,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
                 placeholder="如:C:/Program Files/Java/jdk-17"
               />
               {errors.install_path && (
-                <p className="text-xs text-red-400">{errors.install_path}</p>
+                <p className="text-xs text-destructive">{errors.install_path}</p>
               )}
             </div>
           </div>

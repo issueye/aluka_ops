@@ -176,7 +176,7 @@ export function ServiceConfigForm({ service, config }) {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           {running && (
-            <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200">
+            <div className="flex items-start gap-2 rounded-md border border-warning/30 bg-warning-muted p-3 text-xs text-warning">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 当前服务正在运行。启动命令 / 参数 / JVM / 环境变量 / 端口已锁定;

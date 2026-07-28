@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageShell } from "@/components/ued";
 
 /**
  * 服务器级 Web 控制台。
@@ -279,7 +280,7 @@ export function TerminalPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -346,6 +347,6 @@ export function TerminalPage() {
           </p>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

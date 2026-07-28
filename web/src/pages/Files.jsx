@@ -56,21 +56,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { formatTime } from "@/lib/utils";
+import { formatTime, formatBytes } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import { PageShell } from "@/components/ued";
 
-function formatBytes(n) {
-  if (n == null) return "—";
-  if (n < 1024) return `${n} B`;
-  const u = ["KB", "MB", "GB", "TB"];
-  let v = n;
-  let i = -1;
-  do {
-    v /= 1024;
-    i++;
-  } while (v >= 1024 && i < u.length - 1);
-  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
-}
 
 function joinPath(parent, name) {
   if (!parent) return name;
@@ -246,7 +235,7 @@ export function Files() {
   const pg = usePagination(entries, 15);
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -389,7 +378,7 @@ export function Files() {
           )}
 
           {isError && (
-            <div className="mb-3 rounded-md border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-400">
+            <div className="mb-3 rounded-md border border-danger/30 bg-danger-muted p-3 text-sm text-destructive">
               {error?.message || "加载失败"}
             </div>
           )}
@@ -432,7 +421,7 @@ export function Files() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {ent.is_dir ? (
-                            <Folder className="h-4 w-4 shrink-0 text-amber-400" />
+                            <Folder className="h-4 w-4 shrink-0 text-warning" />
                           ) : (
                             <File className="h-4 w-4 shrink-0 text-muted-foreground" />
                           )}
@@ -453,7 +442,7 @@ export function Files() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                title="编辑"
+                                aria-label="编辑"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   openEditor(ent.path);
@@ -465,7 +454,7 @@ export function Files() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                title="下载"
+                                aria-label="下载"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDownload(ent);
@@ -479,7 +468,7 @@ export function Files() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            title="重命名"
+                            aria-label="重命名"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelected(ent);
@@ -492,8 +481,8 @@ export function Files() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-red-400 hover:text-red-300"
-                            title="删除"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            aria-label="删除"
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelected(ent);
@@ -639,7 +628,7 @@ export function Files() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() =>
                 deleteMut.mutate({
                   p: selected.path,
@@ -688,6 +677,6 @@ export function Files() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

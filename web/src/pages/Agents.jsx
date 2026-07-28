@@ -32,6 +32,7 @@ import {
 import { PaginationBar } from "@/components/ui/pagination";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import { PageShell } from "@/components/ued";
 
 const agentsApi = {
   list: () => api.get("/api/agents"),
@@ -72,7 +73,7 @@ export function Agents() {
   const onlineCount = agents.filter((a) => a.online).length;
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <div className="space-y-1.5">
@@ -90,7 +91,7 @@ export function Agents() {
         </CardHeader>
         <CardContent>
           {isError ? (
-            <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
+            <div className="rounded-md border border-danger/30 bg-danger-muted p-4 text-sm text-destructive">
               加载失败。请确认以 controller 模式运行,或后端已启动。
             </div>
           ) : isLoading ? (
@@ -193,7 +194,7 @@ export function Agents() {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      title="启动"
+                                      aria-label="启动"
                                       disabled={!a.online || actionMut.isPending}
                                       onClick={() =>
                                         actionMut.mutate({
@@ -208,7 +209,7 @@ export function Agents() {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      title="停止"
+                                      aria-label="停止"
                                       disabled={!a.online || actionMut.isPending}
                                       onClick={() =>
                                         actionMut.mutate({
@@ -223,7 +224,7 @@ export function Agents() {
                                     <Button
                                       size="icon"
                                       variant="ghost"
-                                      title="重启"
+                                      aria-label="重启"
                                       disabled={!a.online || actionMut.isPending}
                                       onClick={() =>
                                         actionMut.mutate({
@@ -261,6 +262,6 @@ export function Agents() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

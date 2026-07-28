@@ -45,6 +45,7 @@ import {
 import { ArtifactUpload } from "./ArtifactUpload";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
+import { IconTooltip, RowActions } from "@/components/ued";
 
 // ArtifactList 服务制品列表 + 安装/卸载/上传/删除/下载。
 export function ArtifactList({ service }) {
@@ -162,7 +163,7 @@ export function ArtifactList({ service }) {
               <Button
                 variant="outline"
                 size="sm"
-                className="text-red-400 hover:text-red-300"
+                className="text-destructive hover:text-destructive"
                 onClick={() => setUninstallOpen(true)}
               >
                 <PackageX /> 卸载
@@ -206,7 +207,7 @@ export function ArtifactList({ service }) {
                   <TableRow key={a.id}>
                     <TableCell>
                       {a.is_current ? (
-                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                        <Star className="h-4 w-4 fill-amber-400 text-warning" />
                       ) : (
                         <span className="text-muted-foreground/30">—</span>
                       )}
@@ -243,7 +244,7 @@ export function ArtifactList({ service }) {
                                 className="gap-1.5"
                                 disabled={switchMut.isPending}
                                 onClick={() => setSwitching({ ...a, action })}
-                                title={isUpgrade ? "升级到此版本" : "回滚到此版本"}
+                                aria-label={isUpgrade ? "升级到此版本" : "回滚到此版本"}
                               >
                                 {isUpgrade ? <ArrowUpCircle className="h-3.5 w-3.5" /> : <ArrowDownCircle className="h-3.5 w-3.5" />}
                                 {isUpgrade ? "升级" : "回滚"}
@@ -261,21 +262,25 @@ export function ArtifactList({ service }) {
                             安装
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" asChild title="下载">
-                          <a href={artifactApi.downloadURL(sid, a.id)} download>
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                        {!a.is_current && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-red-400 hover:text-red-300"
-                            onClick={() => setDeleting(a)}
-                            title="删除"
-                          >
-                            <Trash2 className="h-4 w-4" />
+                        <IconTooltip label="下载">
+                          <Button variant="ghost" size="icon" asChild aria-label="下载">
+                            <a href={artifactApi.downloadURL(sid, a.id)} download>
+                              <Download className="h-4 w-4" />
+                            </a>
                           </Button>
+                        </IconTooltip>
+                        {!a.is_current && (
+                          <IconTooltip label="删除">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleting(a)}
+                              aria-label="删除"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </IconTooltip>
                         )}
                       </div>
                     </TableCell>

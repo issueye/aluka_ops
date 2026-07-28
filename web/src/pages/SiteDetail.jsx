@@ -58,6 +58,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const EMPTY_APP = {
@@ -394,7 +401,7 @@ export function SiteDetail() {
                 {site.enabled ? "启用" : "停用"}
               </Badge>
               {site.enabled && listening.has(site.port) && (
-                <Badge variant="outline" className="font-mono text-[10px] text-emerald-400">
+                <Badge variant="outline" className="font-mono text-[10px] text-success">
                   :{site.port} LISTEN
                 </Badge>
               )}
@@ -548,7 +555,7 @@ export function SiteDetail() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-400"
+                                className="h-8 w-8 text-destructive"
                                 onClick={() => setDeletingApp(app)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -650,7 +657,7 @@ export function SiteDetail() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-400"
+                                className="h-8 w-8 text-destructive"
                                 onClick={() => setDeletingProxy(px)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -767,7 +774,7 @@ export function SiteDetail() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-400"
+                                className="h-8 w-8 text-destructive"
                                 onClick={() => setDeletingScript(sc)}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -1013,16 +1020,14 @@ export function SiteDetail() {
             {!editingScript && templates.length > 0 && (
               <div className="space-y-1.5 sm:col-span-2">
                 <Label>套用模板</Label>
-                <select
-                  className="flex h-9 w-full rounded-md border bg-background px-2 text-sm"
-                  value={scriptForm.template_id || ""}
-                  onChange={(e) => {
-                    const tid = e.target.value;
-                    if (!tid) {
+                <Select
+                  value={scriptForm.template_id || "__none__"}
+                  onValueChange={(tid) => {
+                    if (!tid || tid === "__none__") {
                       setScriptForm((f) => ({ ...f, template_id: "" }));
                       return;
                     }
-                    const tpl = templates.find((t) => t.id === tid);
+                    const tpl = templates.find((t) => String(t.id) === String(tid));
                     if (!tpl) return;
                     setScriptForm((f) => ({
                       ...f,
@@ -1036,13 +1041,18 @@ export function SiteDetail() {
                     }));
                   }}
                 >
-                  <option value="">自定义 / 不套用</option>
-                  {templates.map((tpl) => (
-                    <option key={tpl.id} value={tpl.id}>
-                      [{CATEGORY_LABEL[tpl.category] || tpl.category}] {tpl.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="自定义 / 不套用" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">自定义 / 不套用</SelectItem>
+                    {templates.map((tpl) => (
+                      <SelectItem key={tpl.id} value={String(tpl.id)}>
+                        [{CATEGORY_LABEL[tpl.category] || tpl.category}] {tpl.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div className="space-y-1.5">
@@ -1145,7 +1155,7 @@ export function SiteDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => delAppMut.mutate(deletingApp.id)}
             >
               删除
@@ -1162,7 +1172,7 @@ export function SiteDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => delProxyMut.mutate(deletingProxy.id)}
             >
               删除
@@ -1179,7 +1189,7 @@ export function SiteDetail() {
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => delScriptMut.mutate(deletingScript.id)}
             >
               删除

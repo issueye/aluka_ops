@@ -1,0 +1,28 @@
+import { cn } from "@/lib/utils";
+
+/** 等宽内联文本 */
+export function CodeText({ className, children, ...props }) {
+  return (
+    <span
+      className={cn("font-mono text-xs text-muted-foreground", className)}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** 路径文本 */
+export function PathText({ className, children, ...props }) {
+  return (
+    <span
+      className={cn(
+        "break-all font-mono text-xs text-muted-foreground",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
