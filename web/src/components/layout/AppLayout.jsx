@@ -11,6 +11,7 @@ const titleMap = {
   "/templates": { title: "服务模板", desc: "配置配方与从模板创建服务" },
   "/files": { title: "文件管理", desc: "管理 data 目录内的文件与文件夹" },
   "/sites": { title: "站点管理", desc: "动态端口站点：APP、反代与路由脚本" },
+  "/terminal": { title: "服务器控制台", desc: "系统级 Shell（Windows 默认 PowerShell）" },
   "/artifacts": { title: "制品管理", desc: "服务安装包的版本与回滚" },
   "/operations": { title: "操作记录", desc: "所有服务操作的执行历史" },
   "/audit-logs": { title: "审计日志", desc: "写操作的留痕追溯" },

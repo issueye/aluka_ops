@@ -24,6 +24,7 @@ import (
 	"aluka_ops/internal/pkg/hostinfo"
 	"aluka_ops/internal/pkg/logstream"
 	"aluka_ops/internal/pkg/process"
+	"aluka_ops/internal/pkg/shell"
 	"aluka_ops/internal/repository"
 	"aluka_ops/internal/service"
 )
@@ -110,6 +111,10 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 		authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
 		authCtl := controller.NewAuthController(authStore)
 
+		// 服务器级 Web 控制台(Windows 默认 PowerShell)
+		shellMgr := shell.NewManager(cfg.DataDir, 4)
+		shellCtl := controller.NewShellController(shellMgr)
+
 		// ===== API =====
 		api := r.Group("/api")
 		// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
@@ -123,6 +128,15 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			sys := api.Group("/system")
 			{
 				sys.GET("/host", systemCtl.Host)
+			}
+
+			// 服务器控制台 WebSocket / REST
+			sh := api.Group("/shell")
+			{
+				sh.GET("/info", shellCtl.Info)
+				sh.GET("/sessions", shellCtl.ListSessions)
+				sh.DELETE("/sessions/:id", shellCtl.CloseSession)
+				sh.GET("/ws", shellCtl.WS)
 			}
 
 			// 文件管理(限定 data 目录)
@@ -319,6 +333,7 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 		stop := func() {
 			hb.Stop()
 			gwMgr.Close()
+			shellMgr.CloseAll()
 		}
 
 		return r, stop

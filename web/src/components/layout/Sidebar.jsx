@@ -12,6 +12,7 @@ import {
   Network,
   FolderOpen,
   Globe,
+  TerminalSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const navItems = [
   { to: "/runtimes", label: "环境管理", icon: Cpu },
   { to: "/templates", label: "服务模板", icon: FileCode2 },
   { to: "/sites", label: "站点管理", icon: Globe },
+  { to: "/terminal", label: "服务器控制台", icon: TerminalSquare },
   { to: "/files", label: "文件管理", icon: FolderOpen },
   { to: "/artifacts", label: "制品管理", icon: Package },
   { to: "/operations", label: "操作记录", icon: History },

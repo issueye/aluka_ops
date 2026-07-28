@@ -10,6 +10,7 @@ import { Templates } from "@/pages/Templates";
 import { Files } from "@/pages/Files";
 import { Sites } from "@/pages/Sites";
 import { SiteDetail } from "@/pages/SiteDetail";
+import { TerminalPage } from "@/pages/Terminal";
 import { Artifacts } from "@/pages/Artifacts";
 import { Operations } from "@/pages/Operations";
 import { AuditLog } from "@/pages/AuditLog";
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/templates" element={<Templates />} />
         <Route path="/sites" element={<Sites />} />
         <Route path="/sites/:id" element={<SiteDetail />} />
+        <Route path="/terminal" element={<TerminalPage />} />
         <Route path="/files" element={<Files />} />
         <Route path="/artifacts" element={<Artifacts />} />
         <Route path="/operations" element={<Operations />} />
