@@ -11,24 +11,29 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
+	"aluka_ops/internal/config"
 	"aluka_ops/internal/pkg/shell"
 )
 
 // ShellController 服务器级 Web 控制台(PTY/ConPTY)。
 type ShellController struct {
-	mgr *shell.Manager
+	mgr         *shell.Manager
+	allowOrigin string
+	upgrader    websocket.Upgrader
 }
 
-func NewShellController(mgr *shell.Manager) *ShellController {
-	return &ShellController{mgr: mgr}
-}
-
-var shellUpgrader = websocket.Upgrader{
-	ReadBufferSize:  8192,
-	WriteBufferSize: 8192,
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+func NewShellController(mgr *shell.Manager, allowOrigin string) *ShellController {
+	return &ShellController{
+		mgr:         mgr,
+		allowOrigin: allowOrigin,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  8192,
+			WriteBufferSize: 8192,
+			CheckOrigin: func(r *http.Request) bool {
+				return config.OriginAllowed(allowOrigin, r.Header.Get("Origin"))
+			},
+		},
+	}
 }
 
 // Info GET /api/shell/info
@@ -89,7 +94,7 @@ func (h *ShellController) WS(c *gin.Context) {
 	cols := parseU16(c.Query("cols"), 120)
 	rows := parseU16(c.Query("rows"), 30)
 
-	conn, err := shellUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}

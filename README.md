@@ -118,9 +118,9 @@
 
 ### ✅ 登录鉴权(可选)
 
-- 环境变量 `ALUKA_PASSWORD` 非空时启用单管理员密码登录
-- 签发随机 Token(内存存储),默认 24h 有效;`Authorization: Bearer` 或 `?token=`(SSE)
-- 未设置密码时所有 API 开放,兼容纯内网部署
+- 环境变量 `ALUKA_PASSWORD` 非空时启用单管理员密码登录(仅空白字符视为空)
+- 签发随机 Token(内存存储),默认 24h 有效;`Authorization: Bearer` 或 `?token=`(SSE/WebSocket)
+- 未设置密码时所有 API 开放,兼容纯内网部署；生产环境建议始终设置密码并限制监听网络
 - 前端:登录页 + AuthGate 门禁 + 顶栏退出
 
 ### ✅ 服务模板
@@ -288,12 +288,13 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | `ALUKA_DATA_DIR` | `./data` | 数据目录(sqlite、制品、日志) |
 | `ALUKA_MODE` | `standalone` | `standalone` / **`agent`** |
 | `ALUKA_WEB_DIR` | (空) | 指定磁盘前端目录,优先于内嵌(开发用) |
-| `ALUKA_ALLOW_ORIGIN` | `*` | CORS 来源 |
-| `ALUKA_PASSWORD` | (空) | 管理密码;**非空则启用登录鉴权** |
+| `ALUKA_ALLOW_ORIGIN` | `*` | CORS 来源；`*` 返回通配来源且不启用 credentials，生产环境建议配置控制台的精确 Origin |
+| `ALUKA_TRUSTED_PROXIES` | (空) | 可信反向代理 IP/CIDR；为空时忽略客户端 `X-Forwarded-For`/`X-Real-IP`，前置代理需清理客户端转发头 |
+| `ALUKA_PASSWORD` | (空) | 管理密码;**非空则启用登录鉴权**(仅空白字符视为空) |
 | `ALUKA_TOKEN_TTL_HOURS` | `24` | Token 有效期(小时) |
 | `ALUKA_AGENT_ID` | 主机名 | Agent 唯一标识 |
 | `ALUKA_CONTROLLER_URL` | (空) | 中心 Controller 地址(启用心跳) |
-| `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent) |
+| `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent)；跨源浏览器请求需允许 `X-Agent-Token` |
 | `ALUKA_HEARTBEAT_SEC` | `15` | 心跳间隔秒 |
 | `ALUKA_ADVERTISE_URL` | (空) | Agent 对外 API 根地址(供中心回连) |
 | `ALUKA_OFFLINE_AFTER_SEC` | `45` | Controller 判定 Agent 离线的秒数 |

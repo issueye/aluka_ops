@@ -16,7 +16,7 @@ import (
 	"aluka_ops/internal/repository"
 )
 
-	var (
+var (
 	ErrPortNotFound     = errors.New("代理端口不存在")
 	ErrPortExists       = errors.New("端口已存在")
 	ErrPortInUse        = errors.New("端口下仍有 APP/反代/脚本")
@@ -65,7 +65,10 @@ func (s *AppGatewayService) Reload() error {
 	if err != nil {
 		return err
 	}
-	cfgs := compilePortConfigs(list, s.dataDir)
+	cfgs, err := compilePortConfigs(list, s.dataDir)
+	if err != nil {
+		return err
+	}
 	if s.legacy != nil {
 		if old, err := s.legacy.ListEnabled(); err == nil && len(old) > 0 {
 			legacyCfgs := gateway.RulesToPortConfigs(old, s.dataDir)
@@ -743,7 +746,7 @@ func (s *AppGatewayService) DeleteScript(id uint) error {
 
 // ===== compile runtime =====
 
-func compilePortConfigs(ports []model.GatewayPort, dataDir string) []gateway.PortConfig {
+func compilePortConfigs(ports []model.GatewayPort, dataDir string) ([]gateway.PortConfig, error) {
 	out := make([]gateway.PortConfig, 0, len(ports))
 	for _, p := range ports {
 		if !p.Enabled || p.Port <= 0 {
@@ -815,14 +818,17 @@ func compilePortConfigs(ports []model.GatewayPort, dataDir string) []gateway.Por
 			}
 			cfg.Scripts = append(cfg.Scripts, *cs)
 		}
-		if ipf, err := gateway.NewIPFilter(p.IPWhitelist, p.IPBlacklist); err == nil {
+		if ipf, err := gateway.NewIPFilter(p.IPWhitelist, p.IPBlacklist); err != nil {
+			return nil, fmt.Errorf("站点 %d IP 过滤配置无效: %w", p.ID, err)
+		} else {
 			cfg.IPFilter = ipf
 		}
+
 		if len(cfg.Rules) > 0 || len(cfg.Scripts) > 0 {
 			out = append(out, cfg)
 		}
 	}
-	return out
+	return out, nil
 }
 
 func mergePortConfigs(a, b []gateway.PortConfig) []gateway.PortConfig {

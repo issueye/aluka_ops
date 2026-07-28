@@ -82,131 +82,135 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	ctrlAgentsCtl := controller.NewControllerAgentsController(cfg, ctrlReg)
 
 	healthCtl := controller.NewHealthController(db, cfg)
-		// 本机主机信息采集(缓存 3s,供仪表盘定时拉取)
-		hostCollector := hostinfo.NewCollector(3 * time.Second)
-		systemCtl := controller.NewSystemController(hostCollector)
-		// 文件管理:仅允许 data 目录内操作
-		fileStore, err := files.NewStore(cfg.DataDir)
-		if err != nil {
-			panic("初始化文件管理根目录失败: " + err.Error())
-		}
-		fileCtl := controller.NewFileController(fileStore)
-		// 网关:代理端口 + APP(静态) + 端口反代
-		gwMgr := gateway.NewManager(cfg.DataDir)
-		portRepo := repository.NewGatewayPortRepository(db)
-		appRepo := repository.NewAppRepository(db)
-		proxyRepo := repository.NewPortProxyRepository(db)
-		scriptRepo := repository.NewPortScriptRepository(db)
-		gatewayRepo := repository.NewGatewayRepository(db)
-		appGwSvc := service.NewAppGatewayService(portRepo, appRepo, proxyRepo, scriptRepo, gwMgr, cfg.DataDir)
-		appGwSvc.SetLegacyRepo(gatewayRepo)
-		gatewaySvc := service.NewGatewayService(gatewayRepo, gwMgr)
-		gatewaySvc.SetReload(appGwSvc.Reload)
-		if err := appGwSvc.Reload(); err != nil {
-			_ = err
-		}
-		appCtl := controller.NewAppController(appGwSvc)
-		gatewayCtl := controller.NewGatewayController(gatewaySvc)
-		// 鉴权:ALUKA_PASSWORD 非空时启用
-		authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
-		authCtl := controller.NewAuthController(authStore)
+	// 本机主机信息采集(缓存 3s,供仪表盘定时拉取)
+	hostCollector := hostinfo.NewCollector(3 * time.Second)
+	systemCtl := controller.NewSystemController(hostCollector)
+	// 文件管理:仅允许 data 目录内操作
+	fileStore, err := files.NewStore(cfg.DataDir)
+	if err != nil {
+		panic("初始化文件管理根目录失败: " + err.Error())
+	}
+	fileCtl := controller.NewFileController(fileStore)
+	// 网关:代理端口 + APP(静态) + 端口反代
+	gwMgr := gateway.NewManager(cfg.DataDir)
+	if err := gwMgr.SetTrustedProxies(cfg.TrustedProxies); err != nil {
+		panic("解析可信代理配置失败: " + err.Error())
+	}
 
-		// 服务器级 Web 控制台(Windows 默认 PowerShell)
-		shellMgr := shell.NewManager(cfg.DataDir, 4)
-		shellCtl := controller.NewShellController(shellMgr)
+	portRepo := repository.NewGatewayPortRepository(db)
+	appRepo := repository.NewAppRepository(db)
+	proxyRepo := repository.NewPortProxyRepository(db)
+	scriptRepo := repository.NewPortScriptRepository(db)
+	gatewayRepo := repository.NewGatewayRepository(db)
+	appGwSvc := service.NewAppGatewayService(portRepo, appRepo, proxyRepo, scriptRepo, gwMgr, cfg.DataDir)
+	appGwSvc.SetLegacyRepo(gatewayRepo)
+	gatewaySvc := service.NewGatewayService(gatewayRepo, gwMgr)
+	gatewaySvc.SetReload(appGwSvc.Reload)
+	if err := appGwSvc.Reload(); err != nil {
+		_ = err
+	}
+	appCtl := controller.NewAppController(appGwSvc)
+	gatewayCtl := controller.NewGatewayController(gatewaySvc)
+	// 鉴权:ALUKA_PASSWORD 非空时启用
+	authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
+	authCtl := controller.NewAuthController(authStore)
 
-		// ===== API =====
-		api := r.Group("/api")
-		// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
-		api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
-		// 写操作审计(成功后落库)
-		api.Use(middleware.AuditWrite(auditSvc))
+	// 服务器级 Web 控制台(Windows 默认 PowerShell)
+	shellMgr := shell.NewManager(cfg.DataDir, 4)
+	shellCtl := controller.NewShellController(shellMgr, cfg.AllowOrigin)
+
+	// ===== API =====
+	api := r.Group("/api")
+	// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
+	api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
+	// 写操作审计(成功后落库)
+	api.Use(middleware.AuditWrite(auditSvc))
+	{
+		api.GET("/health", healthCtl.Health)
+
+		// 本机系统信息(CPU/内存/磁盘),前端定时拉取
+		sys := api.Group("/system")
 		{
-			api.GET("/health", healthCtl.Health)
+			sys.GET("/host", systemCtl.Host)
+		}
 
-			// 本机系统信息(CPU/内存/磁盘),前端定时拉取
-			sys := api.Group("/system")
-			{
-				sys.GET("/host", systemCtl.Host)
-			}
+		// 服务器控制台 WebSocket / REST
+		sh := api.Group("/shell")
+		{
+			sh.GET("/info", shellCtl.Info)
+			sh.GET("/sessions", shellCtl.ListSessions)
+			sh.DELETE("/sessions/:id", shellCtl.CloseSession)
+			sh.GET("/ws", shellCtl.WS)
+		}
 
-			// 服务器控制台 WebSocket / REST
-			sh := api.Group("/shell")
-			{
-				sh.GET("/info", shellCtl.Info)
-				sh.GET("/sessions", shellCtl.ListSessions)
-				sh.DELETE("/sessions/:id", shellCtl.CloseSession)
-				sh.GET("/ws", shellCtl.WS)
-			}
+		// 文件管理(限定 data 目录)
+		fg := api.Group("/files")
+		{
+			fg.GET("", fileCtl.List)
+			fg.GET("/", fileCtl.List)
+			fg.GET("/stat", fileCtl.Stat)
+			fg.GET("/read", fileCtl.Read)
+			fg.GET("/download", fileCtl.Download)
+			fg.POST("/mkdir", fileCtl.Mkdir)
+			fg.POST("/upload", fileCtl.Upload)
+			fg.PUT("/write", fileCtl.Write)
+			fg.PUT("/rename", fileCtl.Rename)
+			fg.DELETE("", fileCtl.Delete)
+		}
 
-			// 文件管理(限定 data 目录)
-			fg := api.Group("/files")
-			{
-				fg.GET("", fileCtl.List)
-				fg.GET("/", fileCtl.List)
-				fg.GET("/stat", fileCtl.Stat)
-				fg.GET("/read", fileCtl.Read)
-				fg.GET("/download", fileCtl.Download)
-				fg.POST("/mkdir", fileCtl.Mkdir)
-				fg.POST("/upload", fileCtl.Upload)
-				fg.PUT("/write", fileCtl.Write)
-				fg.PUT("/rename", fileCtl.Rename)
-				fg.DELETE("", fileCtl.Delete)
-			}
+		// 代理端口 / APP / 端口反代
+		gw := api.Group("/gateway")
+		{
+			gw.GET("/status", appCtl.Status)
+			gw.POST("/reload", appCtl.Reload)
 
-			// 代理端口 / APP / 端口反代
-			gw := api.Group("/gateway")
-			{
-				gw.GET("/status", appCtl.Status)
-				gw.POST("/reload", appCtl.Reload)
+			// 代理端口
+			gw.GET("/ports", appCtl.ListPorts)
+			gw.GET("/ports/", appCtl.ListPorts)
+			gw.POST("/ports", appCtl.CreatePort)
+			gw.GET("/ports/:id", appCtl.GetPort)
+			gw.PUT("/ports/:id", appCtl.UpdatePort)
+			gw.DELETE("/ports/:id", appCtl.DeletePort)
 
-				// 代理端口
-				gw.GET("/ports", appCtl.ListPorts)
-				gw.GET("/ports/", appCtl.ListPorts)
-				gw.POST("/ports", appCtl.CreatePort)
-				gw.GET("/ports/:id", appCtl.GetPort)
-				gw.PUT("/ports/:id", appCtl.UpdatePort)
-				gw.DELETE("/ports/:id", appCtl.DeletePort)
+			// APP(静态前端)
+			gw.GET("/apps", appCtl.ListApps)
+			gw.GET("/apps/", appCtl.ListApps)
+			gw.POST("/apps", appCtl.CreateApp)
+			gw.GET("/apps/:id", appCtl.GetApp)
+			gw.PUT("/apps/:id", appCtl.UpdateApp)
+			gw.DELETE("/apps/:id", appCtl.DeleteApp)
 
-				// APP(静态前端)
-				gw.GET("/apps", appCtl.ListApps)
-				gw.GET("/apps/", appCtl.ListApps)
-				gw.POST("/apps", appCtl.CreateApp)
-				gw.GET("/apps/:id", appCtl.GetApp)
-				gw.PUT("/apps/:id", appCtl.UpdateApp)
-				gw.DELETE("/apps/:id", appCtl.DeleteApp)
+			// 反代规则(挂在端口下)
+			gw.GET("/proxies", appCtl.ListProxies)
+			gw.GET("/proxies/", appCtl.ListProxies)
+			gw.POST("/proxies", appCtl.CreateProxy)
+			gw.GET("/proxies/:id", appCtl.GetProxy)
+			gw.PUT("/proxies/:id", appCtl.UpdateProxy)
+			gw.DELETE("/proxies/:id", appCtl.DeleteProxy)
 
-				// 反代规则(挂在端口下)
-				gw.GET("/proxies", appCtl.ListProxies)
-				gw.GET("/proxies/", appCtl.ListProxies)
-				gw.POST("/proxies", appCtl.CreateProxy)
-				gw.GET("/proxies/:id", appCtl.GetProxy)
-				gw.PUT("/proxies/:id", appCtl.UpdateProxy)
-				gw.DELETE("/proxies/:id", appCtl.DeleteProxy)
+			// 路由脚本预设(须在 /scripts/:id 前注册)
+			gw.GET("/script-templates", appCtl.ListScriptTemplates)
+			gw.GET("/script-templates/", appCtl.ListScriptTemplates)
+			gw.GET("/script-templates/:id", appCtl.GetScriptTemplate)
 
-				// 路由脚本预设(须在 /scripts/:id 前注册)
-				gw.GET("/script-templates", appCtl.ListScriptTemplates)
-				gw.GET("/script-templates/", appCtl.ListScriptTemplates)
-				gw.GET("/script-templates/:id", appCtl.GetScriptTemplate)
+			// 路由脚本(挂在端口下,优先于 APP/反代)
+			gw.GET("/scripts", appCtl.ListScripts)
+			gw.GET("/scripts/", appCtl.ListScripts)
+			gw.POST("/scripts", appCtl.CreateScript)
+			gw.GET("/scripts/:id", appCtl.GetScript)
+			gw.PUT("/scripts/:id", appCtl.UpdateScript)
+			gw.DELETE("/scripts/:id", appCtl.DeleteScript)
 
-				// 路由脚本(挂在端口下,优先于 APP/反代)
-				gw.GET("/scripts", appCtl.ListScripts)
-				gw.GET("/scripts/", appCtl.ListScripts)
-				gw.POST("/scripts", appCtl.CreateScript)
-				gw.GET("/scripts/:id", appCtl.GetScript)
-				gw.PUT("/scripts/:id", appCtl.UpdateScript)
-				gw.DELETE("/scripts/:id", appCtl.DeleteScript)
+			// 旧扁平 rules(兼容,可选)
+			gw.GET("/rules", gatewayCtl.List)
+			gw.POST("/rules", gatewayCtl.Create)
+			gw.GET("/rules/:id", gatewayCtl.Get)
+			gw.PUT("/rules/:id", gatewayCtl.Update)
+			gw.DELETE("/rules/:id", gatewayCtl.Delete)
+		}
 
-				// 旧扁平 rules(兼容,可选)
-				gw.GET("/rules", gatewayCtl.List)
-				gw.POST("/rules", gatewayCtl.Create)
-				gw.GET("/rules/:id", gatewayCtl.Get)
-				gw.PUT("/rules/:id", gatewayCtl.Update)
-				gw.DELETE("/rules/:id", gatewayCtl.Delete)
-			}
-
-			// 认证
-			authG := api.Group("/auth")
+		// 认证
+		authG := api.Group("/auth")
 		{
 			authG.GET("/status", authCtl.Status)
 			authG.POST("/login", authCtl.Login)
@@ -240,10 +244,10 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			svc.POST("/:id/start", serviceCtl.Start)
 			svc.POST("/:id/stop", serviceCtl.Stop)
 			svc.POST("/:id/restart", serviceCtl.Restart)
-				svc.GET("/:id/status", serviceCtl.Status)
-				svc.GET("/:id/config", serviceCtl.GetConfig)
-				svc.PUT("/:id/config", serviceCtl.UpdateConfig)
-				svc.GET("/:id/operations", serviceCtl.Operations)
+			svc.GET("/:id/status", serviceCtl.Status)
+			svc.GET("/:id/config", serviceCtl.GetConfig)
+			svc.PUT("/:id/config", serviceCtl.UpdateConfig)
+			svc.GET("/:id/operations", serviceCtl.Operations)
 			// 控制台:向进程 stdin 写入(配合前端 xterm + 日志 SSE)
 			svc.POST("/:id/console", serviceCtl.ConsoleInput)
 
@@ -272,72 +276,72 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			ops.GET("/:id", operationCtl.Get)
 		}
 
-			// 仪表盘
-			dash := api.Group("/dashboard")
-			{
-				dash.GET("/stats", dashboardCtl.Stats)
-			}
-
-			// 审计日志
-			audit := api.Group("/audit-logs")
-			{
-				audit.GET("", auditCtl.List)
-				audit.GET("/", auditCtl.List)
-				audit.GET("/:id", auditCtl.Get)
-			}
-
-			// 服务模板
-			tpl := api.Group("/templates")
-			{
-				tpl.GET("", templateCtl.List)
-				tpl.GET("/", templateCtl.List)
-				tpl.POST("", templateCtl.Create)
-				// apply 须在 /:id 的子路径,Gin 支持
-				tpl.POST("/:id/apply", templateCtl.Apply)
-				tpl.GET("/:id", templateCtl.Get)
-				tpl.PUT("/:id", templateCtl.Update)
-				tpl.DELETE("/:id", templateCtl.Delete)
-			}
-
-			// Agent 侧 API(供中心 Controller 查询/下发启停)
-			agentG := api.Group("/agent")
-			{
-				agentG.GET("/status", agentCtl.Status)
-				agentG.GET("/info", agentCtl.Info)
-				agentG.GET("/services", agentCtl.Services)
-				agentG.POST("/services/:id/start", agentCtl.Start)
-				agentG.POST("/services/:id/stop", agentCtl.Stop)
-				agentG.POST("/services/:id/restart", agentCtl.Restart)
-			}
-
-			// 中心 Controller:接收心跳 + 多节点管控
-			agents := api.Group("/agents")
-			{
-				agents.POST("/heartbeat", ctrlAgentsCtl.Heartbeat)
-				agents.GET("", ctrlAgentsCtl.List)
-				agents.GET("/", ctrlAgentsCtl.List)
-				agents.GET("/:id", ctrlAgentsCtl.Get)
-				agents.GET("/:id/services", ctrlAgentsCtl.Services)
-				agents.POST("/:id/services/:sid/start", ctrlAgentsCtl.Start)
-				agents.POST("/:id/services/:sid/stop", ctrlAgentsCtl.Stop)
-				agents.POST("/:id/services/:sid/restart", ctrlAgentsCtl.Restart)
-			}
+		// 仪表盘
+		dash := api.Group("/dashboard")
+		{
+			dash.GET("/stats", dashboardCtl.Stats)
 		}
+
+		// 审计日志
+		audit := api.Group("/audit-logs")
+		{
+			audit.GET("", auditCtl.List)
+			audit.GET("/", auditCtl.List)
+			audit.GET("/:id", auditCtl.Get)
+		}
+
+		// 服务模板
+		tpl := api.Group("/templates")
+		{
+			tpl.GET("", templateCtl.List)
+			tpl.GET("/", templateCtl.List)
+			tpl.POST("", templateCtl.Create)
+			// apply 须在 /:id 的子路径,Gin 支持
+			tpl.POST("/:id/apply", templateCtl.Apply)
+			tpl.GET("/:id", templateCtl.Get)
+			tpl.PUT("/:id", templateCtl.Update)
+			tpl.DELETE("/:id", templateCtl.Delete)
+		}
+
+		// Agent 侧 API(供中心 Controller 查询/下发启停)
+		agentG := api.Group("/agent")
+		{
+			agentG.GET("/status", agentCtl.Status)
+			agentG.GET("/info", agentCtl.Info)
+			agentG.GET("/services", agentCtl.Services)
+			agentG.POST("/services/:id/start", agentCtl.Start)
+			agentG.POST("/services/:id/stop", agentCtl.Stop)
+			agentG.POST("/services/:id/restart", agentCtl.Restart)
+		}
+
+		// 中心 Controller:接收心跳 + 多节点管控
+		agents := api.Group("/agents")
+		{
+			agents.POST("/heartbeat", ctrlAgentsCtl.Heartbeat)
+			agents.GET("", ctrlAgentsCtl.List)
+			agents.GET("/", ctrlAgentsCtl.List)
+			agents.GET("/:id", ctrlAgentsCtl.Get)
+			agents.GET("/:id/services", ctrlAgentsCtl.Services)
+			agents.POST("/:id/services/:sid/start", ctrlAgentsCtl.Start)
+			agents.POST("/:id/services/:sid/stop", ctrlAgentsCtl.Stop)
+			agents.POST("/:id/services/:sid/restart", ctrlAgentsCtl.Restart)
+		}
+	}
 
 	// ===== 静态前端(embed) =====
-		registerStatic(r)
+	registerStatic(r)
 
-		// Agent 心跳上报
-		hb := agent.NewHeartbeatLoop(cfg, agentSvc)
-		hb.Start()
-		stop := func() {
-			hb.Stop()
-			gwMgr.Close()
-			shellMgr.CloseAll()
-		}
-
-		return r, stop
+	// Agent 心跳上报
+	hb := agent.NewHeartbeatLoop(cfg, agentSvc)
+	hb.Start()
+	stop := func() {
+		hb.Stop()
+		gwMgr.Close()
+		shellMgr.CloseAll()
 	}
+
+	return r, stop
+}
 
 // registerPlaceholder 为尚未实现的路由组注册统一占位 handler。
 // 覆盖常见 CRUD 方法,统一返回 501。
@@ -357,17 +361,16 @@ func registerPlaceholder(rg *gin.RouterGroup, path, name string) {
 func corsMiddleware(allowOrigin string) gin.HandlerFunc {
 	allowOrigin = strings.TrimSpace(allowOrigin)
 	return func(c *gin.Context) {
-		origin := allowOrigin
+		requestOrigin := c.Request.Header.Get("Origin")
 		if allowOrigin == "*" {
-			origin = c.Request.Header.Get("Origin")
-			if origin == "" {
-				origin = "*"
-			}
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else if requestOrigin != "" && config.OriginAllowed(allowOrigin, requestOrigin) {
+			c.Header("Access-Control-Allow-Origin", allowOrigin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Vary", "Origin")
 		}
-		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Token, X-Operator")
-		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Token, X-Operator, X-Agent-Token")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)
 			return

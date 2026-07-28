@@ -16,8 +16,8 @@ import (
 
 // 限制
 const (
-	MaxTextReadBytes  = 2 << 20  // 文本读取上限 2MB
-	MaxTextWriteBytes = 5 << 20  // 文本写入上限 5MB
+	MaxTextReadBytes  = 2 << 20   // 文本读取上限 2MB
+	MaxTextWriteBytes = 5 << 20   // 文本写入上限 5MB
 	MaxUploadBytes    = 200 << 20 // 单文件上传 200MB
 )
 
@@ -46,9 +46,9 @@ type Entry struct {
 
 // ListResult 列目录结果。
 type ListResult struct {
-	Root    string  `json:"root"`    // 绝对根路径(只读展示)
-	Path    string  `json:"path"`    // 当前相对路径
-	Parent  string  `json:"parent"`  // 上级相对路径,根时为空
+	Root    string  `json:"root"`   // 绝对根路径(只读展示)
+	Path    string  `json:"path"`   // 当前相对路径
+	Parent  string  `json:"parent"` // 上级相对路径,根时为空
 	Entries []Entry `json:"entries"`
 }
 
@@ -66,7 +66,11 @@ func NewStore(root string) (*Store, error) {
 	if err := os.MkdirAll(abs, 0o755); err != nil {
 		return nil, fmt.Errorf("创建文件根目录失败: %w", err)
 	}
-	return &Store{root: abs}, nil
+	realRoot, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return nil, fmt.Errorf("解析文件根目录失败: %w", err)
+	}
+	return &Store{root: filepath.Clean(realRoot)}, nil
 }
 
 // Root 返回绝对根路径。
@@ -75,6 +79,9 @@ func (s *Store) Root() string { return s.root }
 // resolve 把相对路径解析为绝对路径,并确保仍在 root 内。
 // rel 使用 / 或系统分隔符均可;空或 "." 表示根。
 func (s *Store) resolve(rel string) (abs string, cleanRel string, err error) {
+	if s == nil {
+		return "", "", ErrOutsideRoot
+	}
 	rel = strings.TrimSpace(rel)
 	rel = strings.ReplaceAll(rel, "\\", "/")
 	// 禁止 UNC / 双斜线网络路径
@@ -116,7 +123,51 @@ func (s *Store) resolve(rel string) (abs string, cleanRel string, err error) {
 	if !isUnder(s.root, abs) {
 		return "", "", ErrOutsideRoot
 	}
+	if err := s.checkPath(abs, cleanRel == ""); err != nil {
+		return "", "", err
+	}
 	return abs, cleanRel, nil
+}
+
+// checkPath rejects symlink components and verifies existing paths stay below root.
+// allowRoot is used for the root itself, which is known to be canonical at construction.
+func (s *Store) checkPath(abs string, allowRoot bool) error {
+	if s == nil || !isUnder(s.root, abs) {
+		return ErrOutsideRoot
+	}
+	rel, err := filepath.Rel(s.root, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return ErrOutsideRoot
+	}
+	if rel == "." {
+		if allowRoot {
+			return nil
+		}
+		return ErrOutsideRoot
+	}
+	current := s.root
+	for _, part := range strings.Split(rel, string(os.PathSeparator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if os.IsNotExist(err) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return ErrOutsideRoot
+		}
+	}
+	return nil
+}
+
+func (s *Store) checkParent(abs string) error {
+	parent := filepath.Dir(abs)
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		return err
+	}
+	return s.checkPath(parent, true)
 }
 
 func isUnder(root, abs string) bool {
@@ -244,7 +295,10 @@ func (s *Store) Mkdir(rel string, parents bool) error {
 		return ErrExists
 	}
 	if parents {
-		return os.MkdirAll(abs, 0o755)
+		return s.checkParent(abs)
+	}
+	if err := s.checkPath(filepath.Dir(abs), true); err != nil {
+		return err
 	}
 	return os.Mkdir(abs, 0o755)
 }
@@ -265,7 +319,7 @@ func (s *Store) WriteFile(rel string, content []byte) error {
 	if fi, err := os.Stat(abs); err == nil && fi.IsDir() {
 		return ErrIsDir
 	}
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+	if err := s.checkParent(abs); err != nil {
 		return err
 	}
 	return os.WriteFile(abs, content, 0o644)
@@ -370,7 +424,7 @@ func (s *Store) SaveUpload(rel string, r io.Reader, size int64) error {
 	if fi, err := os.Stat(abs); err == nil && fi.IsDir() {
 		return ErrIsDir
 	}
-	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
+	if err := s.checkParent(abs); err != nil {
 		return err
 	}
 	tmp := abs + ".uploading"
@@ -425,7 +479,7 @@ func (s *Store) Rename(fromRel, toRel string) error {
 	if _, err := os.Stat(toAbs); err == nil {
 		return ErrExists
 	}
-	if err := os.MkdirAll(filepath.Dir(toAbs), 0o755); err != nil {
+	if err := s.checkParent(toAbs); err != nil {
 		return err
 	}
 	return os.Rename(fromAbs, toAbs)

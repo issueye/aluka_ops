@@ -53,7 +53,7 @@ type Manager struct {
 	mu              sync.RWMutex
 	procs           map[uint]*ProcessInfo // serviceID -> info
 	stopper         map[uint]chan struct{}
-	intentionalStop map[uint]bool // 标记主动停止,避免误触发崩溃回调
+	intentionalStop map[uint]int // serviceID -> 主动停止对应 PID
 	onExit          ExitHandler
 }
 
@@ -62,7 +62,7 @@ func NewManager() *Manager {
 	return &Manager{
 		procs:           make(map[uint]*ProcessInfo),
 		stopper:         make(map[uint]chan struct{}),
-		intentionalStop: make(map[uint]bool),
+		intentionalStop: make(map[uint]int),
 	}
 }
 

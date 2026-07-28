@@ -16,8 +16,24 @@ type DeployResult struct {
 	Kind       Kind   // 部署类型
 }
 
-// Deploy 把制品部署到 install_dir。
-//   - 单文件:复制到 install_dir/<filename>
+func ValidateInstallDir(dataDir, installDir string) (string, error) {
+	if strings.TrimSpace(installDir) == "" {
+		return "", fmt.Errorf("install_dir 未指定")
+	}
+	root, err := filepath.Abs(filepath.Clean(dataDir))
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Abs(filepath.Clean(installDir))
+	if err != nil || !isUnder(root, path) {
+		return "", ErrOutsideRoot
+	}
+	if err := checkNoSymlink(root, path, true); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
 //   - zip    :解压到 install_dir/
 //
 // install_dir 为空时,使用 defaultInstallDir(dataDir, serviceCode)。
@@ -141,10 +157,27 @@ func deployZip(srcZip, dstDir string) (string, error) {
 
 // extractZipFile 解压单个 zip 条目(安全:防 Zip Slip 路径穿越)。
 func extractZipFile(f *zip.File, dstDir string) error {
-	// 安全检查:目标路径必须仍在 dstDir 内,防止 Zip Slip 攻击
-	target := filepath.Join(dstDir, f.Name)
-	if !strings.HasPrefix(filepath.Clean(target)+string(os.PathSeparator), filepath.Clean(dstDir)+string(os.PathSeparator)) {
+	name := strings.ReplaceAll(f.Name, "\\", "/")
+	if name == "" || filepath.IsAbs(name) || (len(name) >= 2 && name[1] == ':') {
 		return fmt.Errorf("zip 含非法路径: %s", f.Name)
+	}
+	for _, part := range strings.Split(name, "/") {
+		if part == ".." || part == "." || part == "" {
+			if part == "" && name != "" {
+				continue
+			}
+			return fmt.Errorf("zip 含非法路径: %s", f.Name)
+		}
+		if strings.ContainsAny(part, `<>:"|?*`) {
+			return fmt.Errorf("zip 含非法路径: %s", f.Name)
+		}
+	}
+	target := filepath.Join(dstDir, filepath.FromSlash(name))
+	if !isUnder(filepath.Clean(dstDir), filepath.Clean(target)) {
+		return fmt.Errorf("zip 含非法路径: %s", f.Name)
+	}
+	if err := checkNoSymlink(filepath.Clean(dstDir), filepath.Dir(target), true); err != nil {
+		return err
 	}
 
 	if f.FileInfo().IsDir() {

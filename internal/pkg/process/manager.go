@@ -61,8 +61,15 @@ func (m *Manager) startProcess(opts StartOptions) (*ProcessInfo, error) {
 
 	pid := cmd.Process.Pid
 
-	// 异步等待进程退出,关闭日志/stdin 并从内存移除。
-	// 若非主动 Stop,触发 onExit 回调(供自动拉起等逻辑)。
+	// 异步等待进程退出,关闭日志/stdin并从内存移除。
+	info := &ProcessInfo{
+		ServiceID: opts.ServiceID,
+		PID:       pid,
+		Cmd:       cmd,
+		LogPath:   opts.LogFile,
+		Stdin:     stdin,
+	}
+	m.procs[opts.ServiceID] = info
 	go func() {
 		waitErr := cmd.Wait()
 		_ = stdin.Close()
@@ -73,37 +80,26 @@ func (m *Manager) startProcess(opts StartOptions) (*ProcessInfo, error) {
 		if cur, ok := m.procs[opts.ServiceID]; ok && cur.PID == pid {
 			delete(m.procs, opts.ServiceID)
 		}
-		intentional := m.intentionalStop[opts.ServiceID]
-		delete(m.intentionalStop, opts.ServiceID)
+		intentional := m.intentionalStop[opts.ServiceID] == pid
+		if intentional {
+			delete(m.intentionalStop, opts.ServiceID)
+		}
 		handler := m.onExit
 		m.mu.Unlock()
 
 		if !intentional && handler != nil {
-			// 意外退出:回调业务层(崩溃检测 / 自动拉起)
 			go handler(opts.ServiceID, pid, waitErr)
 		}
 	}()
-
-	info := &ProcessInfo{
-		ServiceID: opts.ServiceID,
-		PID:       pid,
-		Cmd:       cmd,
-		LogPath:   opts.LogFile,
-		Stdin:     stdin,
-	}
-	m.mu.Lock()
-	m.procs[opts.ServiceID] = info
-	m.mu.Unlock()
 
 	return info, nil
 }
 
 // Start 拉起一个进程。若该服务已有运行中进程,返回错误。
 func (m *Manager) Start(opts StartOptions) (*ProcessInfo, error) {
-	m.mu.RLock()
-	_, exists := m.procs[opts.ServiceID]
-	m.mu.RUnlock()
-	if exists {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.procs[opts.ServiceID]; exists {
 		return nil, ErrAlreadyRunning
 	}
 	return m.startProcess(opts)
@@ -112,17 +108,21 @@ func (m *Manager) Start(opts StartOptions) (*ProcessInfo, error) {
 // Stop 停止进程:先尝试优雅停止,超时后强杀整进程树。
 // 标记为 intentional,避免 Wait 回调误判为崩溃。
 func (m *Manager) Stop(serviceID uint, pid int, shutdownTimeoutSec int) error {
+	if pid <= 0 {
+		return fmt.Errorf("PID 无效: %d", pid)
+	}
 	m.mu.Lock()
-	m.intentionalStop[serviceID] = true
 	info, ok := m.procs[serviceID]
-	m.mu.Unlock()
 	if !ok {
-		// 内存中无记录:可能是后端重启后的残留进程,直接按 PID 强杀清理。
+		m.mu.Unlock()
 		return killProcessTree(pid)
 	}
 	if info.PID != pid {
+		m.mu.Unlock()
 		return fmt.Errorf("PID 不匹配(内存 %d != 传入 %d),可能进程已重启", info.PID, pid)
 	}
+	m.intentionalStop[serviceID] = pid
+	m.mu.Unlock()
 
 	timeout := shutdownTimeoutSec
 	if timeout <= 0 {
@@ -135,26 +135,20 @@ func (m *Manager) Stop(serviceID uint, pid int, shutdownTimeoutSec int) error {
 		_ = err
 	}
 
-	// 2) 等待退出或超时强杀
-	done := make(chan error, 1)
-	go func() {
-		// 给 cmd.Wait() 一个出口;这里复用 info.Cmd 的 Wait,但主 Wait goroutine 可能已消费。
-		// 为避免冲突,改用纯 PID 等待。
-		done <- waitForExit(pid, time.Duration(timeout)*time.Second)
-	}()
-
-	select {
-	case <-done:
-		// 已优雅退出
-	case <-time.After(time.Duration(timeout) * time.Second):
-		// 超时,强杀整树
-		if err := killProcessTree(pid); err != nil {
-			return fmt.Errorf("强杀失败: %w", err)
+	// 2) 等待退出;等待异常或超时都走强杀。
+	if err := waitForExit(pid, time.Duration(timeout)*time.Second); err != nil {
+		if killErr := killProcessTree(pid); killErr != nil {
+			return fmt.Errorf("等待停止失败: %v; 强杀失败: %w", err, killErr)
 		}
 	}
 
 	m.mu.Lock()
-	delete(m.procs, serviceID)
+	if cur, ok := m.procs[serviceID]; ok && cur.PID == pid {
+		delete(m.procs, serviceID)
+	}
+	if m.intentionalStop[serviceID] == pid {
+		delete(m.intentionalStop, serviceID)
+	}
 	m.mu.Unlock()
 	return nil
 }

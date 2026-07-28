@@ -34,7 +34,9 @@ func gracefulStop(cmd *exec.Cmd) error {
 
 // killProcessTree 强杀整个进程组。
 func killProcessTree(pid int) error {
-	// 先尝试按进程组杀(-pgid),失败再按 PID 杀。
+	if pid <= 0 {
+		return fmt.Errorf("PID 无效: %d", pid)
+	}
 	if err := syscall.Kill(-pid, syscall.SIGKILL); err != nil {
 		return syscall.Kill(pid, syscall.SIGKILL)
 	}

@@ -43,11 +43,26 @@ func TestBlacklistOnly(t *testing.T) {
 	}
 }
 
-func TestClientIP(t *testing.T) {
+func TestClientIPIgnoresUntrustedHeaders(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/", nil)
 	r.RemoteAddr = "1.1.1.1:1234"
 	r.Header.Set("X-Forwarded-For", "9.9.9.9, 8.8.8.8")
+	r.Header.Set("X-Real-IP", "7.7.7.7")
 	ip := ClientIP(r)
+	if ip == nil || ip.String() != "1.1.1.1" {
+		t.Fatalf("got %v", ip)
+	}
+}
+
+func TestClientIPUsesTrustedProxyChain(t *testing.T) {
+	_, trusted, err := net.ParseCIDR("10.0.0.0/8")
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, _ := http.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "10.0.0.2:1234"
+	r.Header.Set("X-Forwarded-For", "9.9.9.9, 10.0.0.3")
+	ip := ClientIP(r, []*net.IPNet{trusted})
 	if ip == nil || ip.String() != "9.9.9.9" {
 		t.Fatalf("got %v", ip)
 	}

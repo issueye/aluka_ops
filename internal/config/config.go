@@ -29,6 +29,8 @@ type Config struct {
 	DBPath      string // SQLite 数据库文件路径
 	Mode        Mode   // 运行模式
 	AllowOrigin string // CORS 允许来源(开发期跨域)
+	// TrustedProxies 可信反向代理 IP/CIDR 列表;为空时忽略转发头。
+	TrustedProxies string
 	// AuthPassword 管理密码;为空则关闭鉴权(兼容内网裸奔)。
 	// 设置后所有 /api/*(除 /api/health 与 /api/auth/login)需 Bearer Token。
 	AuthPassword string
@@ -59,20 +61,32 @@ func Default() *Config {
 		DBPath:            filepath.Join(dataDir, "aluka_ops.db"),
 		Mode:              Mode(envOr("ALUKA_MODE", string(ModeStandalone))),
 		AllowOrigin:       envOr("ALUKA_ALLOW_ORIGIN", "*"),
+		TrustedProxies:    envOr("ALUKA_TRUSTED_PROXIES", ""),
 		AuthPassword:      envOr("ALUKA_PASSWORD", ""),
 		AuthTokenTTLHours: envIntOr("ALUKA_TOKEN_TTL_HOURS", 24),
-		AgentID:          envOr("ALUKA_AGENT_ID", host),
-		ControllerURL:    strings.TrimRight(envOr("ALUKA_CONTROLLER_URL", ""), "/"),
-		AgentToken:       envOr("ALUKA_AGENT_TOKEN", ""),
-		HeartbeatSec:     envIntOr("ALUKA_HEARTBEAT_SEC", 15),
-		AdvertiseURL:     strings.TrimRight(envOr("ALUKA_ADVERTISE_URL", ""), "/"),
-		OfflineAfterSec:  envIntOr("ALUKA_OFFLINE_AFTER_SEC", 45),
+		AgentID:           envOr("ALUKA_AGENT_ID", host),
+		ControllerURL:     strings.TrimRight(envOr("ALUKA_CONTROLLER_URL", ""), "/"),
+		AgentToken:        envOr("ALUKA_AGENT_TOKEN", ""),
+		HeartbeatSec:      envIntOr("ALUKA_HEARTBEAT_SEC", 15),
+		AdvertiseURL:      strings.TrimRight(envOr("ALUKA_ADVERTISE_URL", ""), "/"),
+		OfflineAfterSec:   envIntOr("ALUKA_OFFLINE_AFTER_SEC", 45),
 	}
 }
 
 // AuthEnabled 是否启用登录鉴权。
 func (c *Config) AuthEnabled() bool {
 	return c != nil && strings.TrimSpace(c.AuthPassword) != ""
+}
+
+// OriginAllowed 判断请求来源是否符合配置。
+// 空 Origin 通常来自非浏览器客户端,保留兼容性;固定来源按完整字符串精确匹配。
+func OriginAllowed(allowOrigin, origin string) bool {
+	allowOrigin = strings.TrimSpace(allowOrigin)
+	origin = strings.TrimSpace(origin)
+	if origin == "" || allowOrigin == "*" {
+		return true
+	}
+	return origin == allowOrigin
 }
 
 // IsAgentMode 是否 Agent 模式。

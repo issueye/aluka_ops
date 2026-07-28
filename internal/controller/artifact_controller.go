@@ -136,7 +136,7 @@ func (h *ArtifactController) Download(c *gin.Context) {
 		FailBind(c, err)
 		return
 	}
-	a, err := h.artSvc.Get(id, aid)
+	a, path, err := h.artSvc.ResolveFile(id, aid)
 	if err != nil {
 		if service.IsNotFound(err) {
 			FailNotFound(c, "制品")
@@ -145,7 +145,8 @@ func (h *ArtifactController) Download(c *gin.Context) {
 		FailServer(c, err)
 		return
 	}
-	c.FileAttachment(a.StoragePath, a.Filename)
+	c.FileAttachment(path, a.Filename)
+
 }
 
 // Install POST /api/services/:id/install?artifact_id=X

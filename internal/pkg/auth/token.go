@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/hex"
+	"strings"
 	"sync"
 	"time"
 )
@@ -31,7 +32,7 @@ func NewStore(password string, ttlHours int) *Store {
 
 // Enabled 是否启用鉴权。
 func (s *Store) Enabled() bool {
-	return s != nil && s.password != ""
+	return s != nil && strings.TrimSpace(s.password) != ""
 }
 
 // Login 校验密码并签发 Token。

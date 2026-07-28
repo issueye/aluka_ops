@@ -60,10 +60,11 @@ type PortConfig struct {
 
 // Manager 管理多端口 HTTP 服务。
 type Manager struct {
-	mu       sync.RWMutex
-	ports    map[int]*portServer // port -> server
-	dataDir  string
-	onChange func() // 可选回调
+	mu             sync.RWMutex
+	ports          map[int]*portServer // port -> server
+	dataDir        string              // data 根目录
+	onChange       func()              // 可选回调
+	trustedProxies []*net.IPNet
 }
 
 type portServer struct {
@@ -71,10 +72,11 @@ type portServer struct {
 	server   *http.Server
 	listener net.Listener
 	// rules / scripts / ip 快照
-	rules    []Rule
-	scripts  []CompiledScript
-	ipFilter *IPFilter
-	cancel   context.CancelFunc
+	rules          []Rule
+	scripts        []CompiledScript
+	ipFilter       *IPFilter
+	trustedProxies []*net.IPNet
+	cancel         context.CancelFunc
 }
 
 // NewManager 构造。
@@ -83,6 +85,18 @@ func NewManager(dataDir string) *Manager {
 		ports:   make(map[int]*portServer),
 		dataDir: dataDir,
 	}
+}
+
+// SetTrustedProxies 设置可信反向代理列表。
+func (m *Manager) SetTrustedProxies(raw string) error {
+	list, err := ParseIPList(raw)
+	if err != nil {
+		return err
+	}
+	m.mu.Lock()
+	m.trustedProxies = list
+	m.mu.Unlock()
+	return nil
 }
 
 // DataDir 返回数据根目录(脚本 static 相对路径解析用)。
@@ -160,6 +174,7 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 			ps.rules = cfg.Rules
 			ps.scripts = cfg.Scripts
 			ps.ipFilter = cfg.IPFilter
+			ps.trustedProxies = append([]*net.IPNet(nil), m.trustedProxies...)
 			continue
 		}
 		ps, err := m.startPortLocked(port, cfg.Rules, cfg.Scripts, cfg.IPFilter)
@@ -170,7 +185,9 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 			}
 			continue
 		}
+		ps.trustedProxies = append([]*net.IPNet(nil), m.trustedProxies...)
 		m.ports[port] = ps
+
 		log.Printf("[gateway] listen :%d rules=%d scripts=%d", port, len(cfg.Rules), len(cfg.Scripts))
 	}
 	return firstErr
@@ -269,11 +286,12 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 	rules := ps.rules
 	scripts := ps.scripts
 	ipf := ps.ipFilter
+	trustedProxies := ps.trustedProxies
 	m.mu.RUnlock()
 
 	// IP 黑白名单(站点级)
 	if ipf != nil {
-		cip := ClientIP(r)
+		cip := ClientIP(r, trustedProxies)
 		if !ipf.Allowed(cip) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			http.Error(w, "403 forbidden: ip not allowed", http.StatusForbidden)
@@ -337,7 +355,7 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 				rule.PathPrefix = normalizePrefix(act.StripPrefix)
 				rule.StripPrefix = true
 			}
-			serveProxy(w, r2, rule)
+			serveProxy(w, r2, rule, trustedProxies)
 			return
 		case "static":
 			root := act.StaticRoot
@@ -374,7 +392,7 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 	case model.GatewayTypeStatic:
 		serveStatic(w, r, *rule)
 	case model.GatewayTypeProxy:
-		serveProxy(w, r, *rule)
+		serveProxy(w, r, *rule, trustedProxies)
 	default:
 		http.Error(w, "unknown rule type", http.StatusInternalServerError)
 	}
@@ -554,7 +572,7 @@ func isUnder(root, abs string) bool {
 
 // ===== reverse proxy (upload-friendly streaming) =====
 
-func serveProxy(w http.ResponseWriter, r *http.Request, rule Rule) {
+func serveProxy(w http.ResponseWriter, r *http.Request, rule Rule, trustedProxies []*net.IPNet) {
 	target, err := url.Parse(rule.Upstream)
 	if err != nil || target.Scheme == "" || target.Host == "" {
 		http.Error(w, "invalid upstream", http.StatusBadGateway)
@@ -619,30 +637,32 @@ func serveProxy(w http.ResponseWriter, r *http.Request, rule Rule) {
 		if !rule.PassHost {
 			req.Host = target.Host
 		}
-		// 上传友好:确保不缓冲
-		// Content-Length 保留;Transfer-Encoding chunked 原样
-		req.Header.Set("X-Forwarded-Host", req.Header.Get("Host"))
-		if req.Header.Get("X-Forwarded-Proto") == "" {
-			if req.TLS != nil {
-				req.Header.Set("X-Forwarded-Proto", "https")
-			} else {
-				req.Header.Set("X-Forwarded-Proto", "http")
-			}
+		// 反代头由网关统一生成,不信任客户端传入值。
+		req.Header.Del("X-Forwarded-For")
+		req.Header.Del("X-Real-IP")
+		req.Header.Del("X-Forwarded-Proto")
+		req.Header.Set("X-Forwarded-Host", req.Host)
+		if req.TLS != nil {
+			req.Header.Set("X-Forwarded-Proto", "https")
+		} else {
+			req.Header.Set("X-Forwarded-Proto", "http")
 		}
-		if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
-			prior := req.Header.Get("X-Forwarded-For")
-			if prior != "" {
-				clientIP = prior + ", " + clientIP
-			}
-			req.Header.Set("X-Forwarded-For", clientIP)
+		if clientIP := ClientIP(req, trustedProxies); clientIP != nil {
+
+			req.Header.Set("X-Real-IP", clientIP.String())
+			req.Header.Set("X-Forwarded-For", clientIP.String())
 		}
 		for k, v := range rule.ExtraHeaders {
+			if isForwardedHeader(k) {
+				continue
+			}
 			if v == "" {
 				req.Header.Del(k)
 			} else {
 				req.Header.Set(k, v)
 			}
 		}
+
 		// 删除可能干扰 hop-by-hop 的头由 ReverseProxy 处理
 	}
 
@@ -673,6 +693,15 @@ func serveProxy(w http.ResponseWriter, r *http.Request, rule Rule) {
 	}
 
 	proxy.ServeHTTP(w, r)
+}
+
+func isForwardedHeader(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "x-forwarded-for", "x-real-ip", "x-forwarded-proto", "x-forwarded-host":
+		return true
+	default:
+		return false
+	}
 }
 
 func isWebSocket(r *http.Request) bool {

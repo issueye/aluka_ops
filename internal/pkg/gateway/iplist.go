@@ -12,6 +12,7 @@ import (
 //  1. 命中黑名单 → 拒绝
 //  2. 白名单非空且未命中 → 拒绝
 //  3. 否则放行
+//
 // 列表项支持单 IP 或 CIDR(如 10.0.0.0/8、192.168.1.1)。
 type IPFilter struct {
 	Whitelist []*net.IPNet
@@ -86,27 +87,38 @@ func (f *IPFilter) Allowed(ip net.IP) bool {
 }
 
 // ClientIP 从请求提取客户端 IP。
-// 优先 X-Forwarded-For 最左、X-Real-IP,再 RemoteAddr。
-func ClientIP(r *http.Request) net.IP {
+// 未配置可信代理时只使用 TCP 对端;只有 immediate peer 可信时才解析转发头。
+func ClientIP(r *http.Request, trusted ...[]*net.IPNet) net.IP {
 	if r == nil {
 		return nil
 	}
+	peer := remoteIP(r.RemoteAddr)
+	var proxies []*net.IPNet
+	if len(trusted) > 0 {
+		proxies = trusted[0]
+	}
+	if !MatchIPList(proxies, peer) {
+		return peer
+	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// 取第一个
 		parts := strings.Split(xff, ",")
-		if ip := net.ParseIP(strings.TrimSpace(parts[0])); ip != nil {
-			return ip
+		for i := len(parts) - 1; i >= 0; i-- {
+			ip := net.ParseIP(strings.TrimSpace(parts[i]))
+			if ip != nil && !MatchIPList(proxies, ip) {
+				return ip
+			}
 		}
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		if ip := net.ParseIP(strings.TrimSpace(xri)); ip != nil {
-			return ip
-		}
+	if xri := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP"))); xri != nil {
+		return xri
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	return peer
+}
+
+func remoteIP(remoteAddr string) net.IP {
+	host, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
-		// 可能无端口
-		return net.ParseIP(r.RemoteAddr)
+		return net.ParseIP(strings.TrimSpace(remoteAddr))
 	}
 	return net.ParseIP(host)
 }

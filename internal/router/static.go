@@ -3,6 +3,7 @@ package router
 import (
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -71,11 +72,57 @@ func tryReadFileFromDisk(name string) ([]byte, bool) {
 	if dir == "" {
 		return nil, false
 	}
-	b, err := os.ReadFile(dir + string(os.PathSeparator) + name)
+	dir, err := filepath.Abs(filepath.Clean(dir))
+	if err != nil {
+		return nil, false
+	}
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, false
+	}
+	name = strings.ReplaceAll(name, "\\", "/")
+	if name == "" || strings.HasPrefix(name, "/") {
+		return nil, false
+	}
+	for _, part := range strings.Split(name, "/") {
+		if part == ".." || part == "." || part == "" {
+			return nil, false
+		}
+	}
+	path := filepath.Join(root, filepath.FromSlash(name))
+	if !staticPathUnder(root, path) || staticPathHasSymlink(root, path) {
+		return nil, false
+	}
+	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, false
 	}
 	return b, true
+}
+
+func staticPathUnder(root, path string) bool {
+	root = filepath.Clean(root)
+	path = filepath.Clean(path)
+	return root == path || strings.HasPrefix(path, root+string(os.PathSeparator))
+}
+
+func staticPathHasSymlink(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return true
+	}
+	current := root
+	for _, part := range strings.Split(rel, string(os.PathSeparator)) {
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return true
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // contentType 按扩展名推断。

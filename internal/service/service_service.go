@@ -45,8 +45,10 @@ type ServiceService struct {
 	health  *healthcheck.Monitor
 	dataDir string // 用于拼接日志目录
 
-	restartMu sync.Mutex
-	restarts  map[uint]*restartState // serviceID -> 连续自动拉起次数
+	restartMu   sync.Mutex
+	restarts    map[uint]*restartState // serviceID -> 连续自动拉起次数
+	lifecycleMu sync.Mutex
+	lifecycle   map[uint]*sync.Mutex
 }
 
 // SetLogHub 注入日志分发中心(避免循环依赖,setter 注入)。
@@ -106,12 +108,13 @@ func NewServiceService(
 	dataDir string,
 ) *ServiceService {
 	s := &ServiceService{
-		db:       db,
-		repo:     repo,
-		opRepo:   opRepo,
-		procs:    procs,
-		dataDir:  dataDir,
-		restarts: make(map[uint]*restartState),
+		db:        db,
+		repo:      repo,
+		opRepo:    opRepo,
+		procs:     procs,
+		dataDir:   dataDir,
+		restarts:  make(map[uint]*restartState),
+		lifecycle: make(map[uint]*sync.Mutex),
 	}
 	// 注册进程意外退出回调 → 崩溃检测 + 自动拉起
 	procs.SetExitHandler(s.onProcessExit)
@@ -122,12 +125,12 @@ func NewServiceService(
 
 // CreateServiceInput 创建服务入参。
 type CreateServiceInput struct {
-	Code        string             `json:"code"        binding:"required"`
-	Name        string             `json:"name"        binding:"required"`
-	Type        model.ServiceType  `json:"type"`
-	Description string             `json:"description"`
-	RuntimeID   *uint              `json:"runtime_id"`
-	WorkDir     string             `json:"work_dir"`
+	Code        string            `json:"code"        binding:"required"`
+	Name        string            `json:"name"        binding:"required"`
+	Type        model.ServiceType `json:"type"`
+	Description string            `json:"description"`
+	RuntimeID   *uint             `json:"runtime_id"`
+	WorkDir     string            `json:"work_dir"`
 	// 初始配置
 	Command         string `json:"command"`
 	Args            string `json:"args"`
@@ -229,10 +232,10 @@ func (s *ServiceService) GetDetail(id uint) (map[string]any, error) {
 
 // UpdateInput 更新服务基础信息。
 type UpdateServiceInput struct {
-	Name        *string            `json:"name"`
-	Description *string            `json:"description"`
-	RuntimeID   *uint              `json:"runtime_id"`
-	WorkDir     *string            `json:"work_dir"`
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	RuntimeID   *uint   `json:"runtime_id"`
+	WorkDir     *string `json:"work_dir"`
 }
 
 // Update 更新(运行中只允许改描述)。
@@ -391,11 +394,29 @@ func (s *ServiceService) UpdateConfig(id uint, in UpdateConfigInput) (*model.Ser
 	return cfg, nil
 }
 
-// ===== 生命周期动作 =====
+func (s *ServiceService) serviceLock(id uint) *sync.Mutex {
+	s.lifecycleMu.Lock()
+	defer s.lifecycleMu.Unlock()
+	if mu := s.lifecycle[id]; mu != nil {
+		return mu
+	}
+	mu := &sync.Mutex{}
+	s.lifecycle[id] = mu
+	return mu
+}
+
+func (s *ServiceService) withLifecycle(id uint, fn func() (*model.Operation, error)) (*model.Operation, error) {
+	mu := s.serviceLock(id)
+	mu.Lock()
+	defer mu.Unlock()
+	return fn()
+}
 
 // Start 启动服务。
 func (s *ServiceService) Start(id uint) (*model.Operation, error) {
-	return s.startInternal(id, false)
+	return s.withLifecycle(id, func() (*model.Operation, error) {
+		return s.startInternal(id, false)
+	})
 }
 
 // startInternal 启动实现。auto=true 表示崩溃自动拉起(不重置连续计数)。
@@ -432,6 +453,7 @@ func (s *ServiceService) startInternal(id uint, auto bool) (*model.Operation, er
 	// 更新服务状态
 	now := time.Now()
 	if err := s.repo.UpdateStatus(svc.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
+		_ = s.procs.Stop(svc.ID, info.PID, cfg.ShutdownTimeout)
 		s.finishOpFail(op, err)
 		return op, err
 	}
@@ -447,6 +469,12 @@ func (s *ServiceService) startInternal(id uint, auto bool) (*model.Operation, er
 
 // Stop 停止服务。
 func (s *ServiceService) Stop(id uint) (*model.Operation, error) {
+	return s.withLifecycle(id, func() (*model.Operation, error) {
+		return s.stopInternal(id)
+	})
+}
+
+func (s *ServiceService) stopInternal(id uint) (*model.Operation, error) {
 	svc, _, err := s.loadForAction(id)
 	if err != nil {
 		return nil, err
@@ -463,6 +491,10 @@ func (s *ServiceService) Stop(id uint) (*model.Operation, error) {
 		timeout = cfg.ShutdownTimeout
 	}
 
+	if err := s.repo.UpdateStatus(svc.ID, model.StatusStopping, svc.PID, nil); err != nil {
+		s.finishOpFail(op, err)
+		return op, err
+	}
 	if err := s.procs.Stop(svc.ID, svc.PID, timeout); err != nil {
 		s.finishOpFail(op, err)
 		return op, err
@@ -482,6 +514,12 @@ func (s *ServiceService) Stop(id uint) (*model.Operation, error) {
 
 // Restart 重启:先 stop 再 start。
 func (s *ServiceService) Restart(id uint) (*model.Operation, error) {
+	return s.withLifecycle(id, func() (*model.Operation, error) {
+		return s.restartInternal(id)
+	})
+}
+
+func (s *ServiceService) restartInternal(id uint) (*model.Operation, error) {
 	svc, _, err := s.loadForAction(id)
 	if err != nil {
 		return nil, err
@@ -495,6 +533,10 @@ func (s *ServiceService) Restart(id uint) (*model.Operation, error) {
 		timeout := 10
 		if cfg != nil && cfg.ShutdownTimeout > 0 {
 			timeout = cfg.ShutdownTimeout
+		}
+		if err := s.repo.UpdateStatus(svc.ID, model.StatusStopping, svc.PID, nil); err != nil {
+			s.finishOpFail(op, err)
+			return op, err
 		}
 		if err := s.procs.Stop(svc.ID, svc.PID, timeout); err != nil {
 			s.finishOpFail(op, err)
@@ -518,30 +560,34 @@ func (s *ServiceService) Restart(id uint) (*model.Operation, error) {
 		s.finishOpFail(op, err)
 		return op, err
 	}
-		now := time.Now()
-		if err := s.repo.UpdateStatus(svc2.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
-			s.finishOpFail(op, err)
-			return op, err
-		}
-		s.resetRestartCount(svc2.ID)
-		s.finishOpOK(op, fmt.Sprintf("已重启, PID=%d", info.PID))
-		// 重启产生新日志文件,通知日志中心切换
-		s.NotifyLogPath(svc2.ID)
-		return op, nil
+	now := time.Now()
+	if err := s.repo.UpdateStatus(svc2.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
+		s.finishOpFail(op, err)
+		return op, err
 	}
+	s.resetRestartCount(svc2.ID)
+	s.finishOpOK(op, fmt.Sprintf("已重启, PID=%d", info.PID))
+	// 重启产生新日志文件,通知日志中心切换
+	s.NotifyLogPath(svc2.ID)
+	return op, nil
+}
 
 // ===== 安装 / 卸载(M4)=====
 
 // Install 部署指定制品到 install_dir,并标记当前版本(首次安装)。
 // 语义:首次安装或重新安装同一版本。升级/回滚用 Upgrade/Rollback。
 func (s *ServiceService) Install(serviceID, artifactID uint) (*model.Operation, error) {
-	return s.deployWithOpType(serviceID, artifactID, model.OpInstall)
+	return s.withLifecycle(serviceID, func() (*model.Operation, error) {
+		return s.deployWithOpType(serviceID, artifactID, model.OpInstall)
+	})
 }
 
 // Upgrade 升级到指定制品(部署新版本)。
 // 部署失败时由 Deploy 原子替换保证当前版本不变(自动回滚)。
 func (s *ServiceService) Upgrade(serviceID, artifactID uint) (*model.Operation, error) {
-	return s.deployWithOpType(serviceID, artifactID, model.OpUpgrade)
+	return s.withLifecycle(serviceID, func() (*model.Operation, error) {
+		return s.deployWithOpType(serviceID, artifactID, model.OpUpgrade)
+	})
 }
 
 // Rollback 回滚到指定历史制品(重新部署旧版本)。
@@ -559,7 +605,9 @@ func (s *ServiceService) Rollback(serviceID, artifactID uint) (*model.Operation,
 	if art.IsCurrent {
 		return nil, ErrAlreadyCurrent
 	}
-	return s.deployWithOpType(serviceID, artifactID, model.OpUpgrade)
+	return s.withLifecycle(serviceID, func() (*model.Operation, error) {
+		return s.deployWithOpType(serviceID, artifactID, model.OpUpgrade)
+	})
 }
 
 // deployWithOpType 部署指定制品的统一实现,Install/Upgrade/Rollback 共用。
@@ -603,6 +651,10 @@ func (s *ServiceService) deployWithOpType(serviceID, artifactID uint, opType mod
 		if cfg != nil && cfg.ShutdownTimeout > 0 {
 			timeout = cfg.ShutdownTimeout
 		}
+		if err := s.repo.UpdateStatus(serviceID, model.StatusStopping, svc.PID, nil); err != nil {
+			s.finishOpFail(op, err)
+			return op, err
+		}
 		if err := s.procs.Stop(serviceID, svc.PID, timeout); err != nil {
 			s.finishOpFail(op, err)
 			return op, err
@@ -612,7 +664,7 @@ func (s *ServiceService) deployWithOpType(serviceID, artifactID uint, opType mod
 
 	// 2) 校验制品完整性
 	if art.Checksum != "" {
-		ok, err := artifact.VerifyChecksum(art.StoragePath, art.Checksum)
+		ok, err := s.store.VerifyChecksum(art.StoragePath, art.Checksum)
 		if err != nil {
 			s.finishOpFail(op, fmt.Errorf("校验制品失败: %w", err))
 			return op, err
@@ -628,8 +680,18 @@ func (s *ServiceService) deployWithOpType(serviceID, artifactID uint, opType mod
 	if installDir == "" {
 		installDir = artifact.DefaultInstallDir(s.dataDir, svc.Code)
 	}
+	installDir, err = artifact.ValidateInstallDir(s.dataDir, installDir)
+	if err != nil {
+		s.finishOpFail(op, err)
+		return op, err
+	}
 	kind := artifact.DetectKind(art.Filename)
-	result, err := artifact.Deploy(art.StoragePath, kind, installDir)
+	storagePath, err := s.store.ResolveFile(art.StoragePath)
+	if err != nil {
+		s.finishOpFail(op, err)
+		return op, err
+	}
+	result, err := artifact.Deploy(storagePath, kind, installDir)
 	if err != nil {
 		// 部署失败:install_dir 仍是旧版本,DB 未改动 → 自动回滚已生效
 		s.finishOpFail(op, fmt.Errorf("部署失败,已自动回滚到当前版本: %w", err))
@@ -651,9 +713,9 @@ func (s *ServiceService) deployWithOpType(serviceID, artifactID uint, opType mod
 		}
 		// 更新服务
 		return tx.Model(&model.Service{}).Where("id = ?", serviceID).Updates(map[string]any{
-			"install_dir":      result.InstallDir,
-			"current_version":  art.Version,
-			"status":           model.StatusStopped,
+			"install_dir":     result.InstallDir,
+			"current_version": art.Version,
+			"status":          model.StatusStopped,
 		}).Error
 	})
 	if err != nil {
@@ -680,6 +742,12 @@ func (s *ServiceService) deployWithOpType(serviceID, artifactID uint, opType mod
 //
 // keepData=true 时保留 install_dir 内容(仅重置版本标记)。
 func (s *ServiceService) Uninstall(serviceID uint, keepData bool) (*model.Operation, error) {
+	return s.withLifecycle(serviceID, func() (*model.Operation, error) {
+		return s.uninstallInternal(serviceID, keepData)
+	})
+}
+
+func (s *ServiceService) uninstallInternal(serviceID uint, keepData bool) (*model.Operation, error) {
 	svc, err := s.repo.GetByID(serviceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -697,6 +765,10 @@ func (s *ServiceService) Uninstall(serviceID uint, keepData bool) (*model.Operat
 		if cfg != nil && cfg.ShutdownTimeout > 0 {
 			timeout = cfg.ShutdownTimeout
 		}
+		if err := s.repo.UpdateStatus(serviceID, model.StatusStopping, svc.PID, nil); err != nil {
+			s.finishOpFail(op, err)
+			return op, err
+		}
 		if err := s.procs.Stop(serviceID, svc.PID, timeout); err != nil {
 			s.finishOpFail(op, err)
 			return op, err
@@ -705,7 +777,12 @@ func (s *ServiceService) Uninstall(serviceID uint, keepData bool) (*model.Operat
 
 	// 2) 清理 install_dir(可选)
 	if !keepData && svc.InstallDir != "" {
-		if err := artifact.CleanDir(svc.InstallDir, false); err != nil {
+		installDir, err := artifact.ValidateInstallDir(s.dataDir, svc.InstallDir)
+		if err != nil {
+			s.finishOpFail(op, err)
+			return op, err
+		}
+		if err := artifact.CleanDir(installDir, false); err != nil {
 			s.finishOpFail(op, fmt.Errorf("清理目录失败: %w", err))
 			return op, err
 		}
@@ -744,11 +821,11 @@ func (s *ServiceService) onProcessExit(serviceID uint, pid int, waitErr error) {
 	if err != nil {
 		return
 	}
-	// 仅当 DB 仍认为 running 且 PID 匹配时处理(避免与主动 stop 竞态)
-	if svc.Status != model.StatusRunning {
+	// 仅当 DB 仍认为该 PID 处于运行状态时处理,避免旧进程事件覆盖新进程。
+	if svc.Status != model.StatusRunning || (svc.PID != 0 && svc.PID != pid) {
 		return
 	}
-	if svc.PID != 0 && svc.PID != pid {
+	if _, ok := s.procs.Get(serviceID); ok {
 		return
 	}
 
@@ -778,12 +855,15 @@ func (s *ServiceService) onProcessExit(serviceID uint, pid int, waitErr error) {
 	log.Printf("[auto-restart] 服务 #%d 第 %d/%d 次自动拉起, %v 后执行", serviceID, count, max, backoff)
 	time.Sleep(backoff)
 
-	// 再次确认:用户可能已手动 stop 或 start
-	svc2, err := s.repo.GetByID(serviceID)
-	if err != nil || svc2.Status == model.StatusRunning || svc2.Status == model.StatusStopping {
-		return
-	}
-	if _, err := s.startInternal(serviceID, true); err != nil {
+	// 再次确认并在同一把服务锁内启动,避免手动动作与自动拉起交错。
+	_, err = s.withLifecycle(serviceID, func() (*model.Operation, error) {
+		svc2, err := s.repo.GetByID(serviceID)
+		if err != nil || svc2.Status == model.StatusRunning || svc2.Status == model.StatusStopping {
+			return nil, err
+		}
+		return s.startInternal(serviceID, true)
+	})
+	if err != nil {
 		log.Printf("[auto-restart] 服务 #%d 自动拉起失败: %v", serviceID, err)
 	} else {
 		log.Printf("[auto-restart] 服务 #%d 自动拉起成功", serviceID)

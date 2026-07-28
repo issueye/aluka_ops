@@ -43,7 +43,11 @@ func gracefulStop(cmd *exec.Cmd) error {
 // killProcessTree 用 taskkill /T /F 强杀指定 PID 及其全部子进程。
 // /T = 含子进程; /F = 强制。这是 Windows 上最可靠的整树终止方式。
 func killProcessTree(pid int) error {
-	out, err := exec.Command("taskkill", "/PID", fmt.Sprint(pid), "/T", "/F").CombinedOutput()
+	if pid <= 0 {
+		return fmt.Errorf("PID 无效: %d", pid)
+	}
+	cmd := exec.Command("taskkill", "/PID", fmt.Sprint(pid), "/T", "/F")
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// 进程可能已自行退出,taskkill 会报"找不到进程",视作成功。
 		return nil

@@ -15,10 +15,10 @@ import (
 // ArtifactService 制品业务逻辑:上传、列表、删除。
 // 安装(install)涉及服务状态变更,放在 ServiceService 中。
 type ArtifactService struct {
-	db     *gorm.DB
-	repo   *repository.ArtifactRepository
+	db      *gorm.DB
+	repo    *repository.ArtifactRepository
 	svcRepo *repository.ServiceRepository
-	store  *artifact.Store
+	store   *artifact.Store
 }
 
 // NewArtifactService 构造。
@@ -49,6 +49,19 @@ func (s *ArtifactService) Get(serviceID, artifactID uint) (*model.Artifact, erro
 		return nil, ErrNotFound
 	}
 	return a, nil
+}
+
+// ResolveFile 校验制品路径并返回可访问的绝对路径。
+func (s *ArtifactService) ResolveFile(serviceID, artifactID uint) (*model.Artifact, string, error) {
+	a, err := s.Get(serviceID, artifactID)
+	if err != nil {
+		return nil, "", err
+	}
+	path, err := s.store.ResolveFile(a.StoragePath)
+	if err != nil {
+		return nil, "", err
+	}
+	return a, path, nil
 }
 
 // UploadInput 上传入参。

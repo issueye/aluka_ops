@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -13,6 +14,21 @@ import (
 
 	"aluka_ops/internal/service"
 )
+
+const auditBodyLimit = 2048
+
+var sensitiveAuditKeys = map[string]struct{}{
+	"password": {}, "passwd": {}, "pass": {}, "token": {}, "agent_token": {},
+	"secret": {}, "api_key": {}, "apikey": {}, "access_key": {}, "private_key": {},
+	"authorization": {}, "cookie": {}, "set-cookie": {},
+}
+
+var sensitiveAuditPayloads = map[string]struct{}{
+	"env_vars": {}, "env_template": {}, "extra_headers": {}, "config_template": {},
+	"install_steps": {}, "vars": {}, "args": {}, "jvm_args": {},
+}
+
+const redactedAuditValue = "[REDACTED]"
 
 // bodyWriter 捕获响应体(仅用于解析 code,不改写响应)。
 type bodyWriter struct {
@@ -23,6 +39,74 @@ type bodyWriter struct {
 func (w *bodyWriter) Write(b []byte) (int, error) {
 	w.buf.Write(b)
 	return w.ResponseWriter.Write(b)
+}
+
+// readAuditBody reads only a bounded prefix while restoring the complete body.
+func readAuditBody(body io.ReadCloser) (prefix []byte, restored io.ReadCloser, truncated bool, err error) {
+	read := make([]byte, auditBodyLimit+1)
+	n, readErr := io.ReadFull(body, read)
+	read = read[:n]
+	truncated = n > auditBodyLimit
+	if truncated {
+		prefix = read[:auditBodyLimit]
+	} else {
+		prefix = read
+	}
+	restored = io.NopCloser(io.MultiReader(bytes.NewReader(read), body))
+	if readErr != nil && readErr != io.ErrUnexpectedEOF && readErr != io.EOF {
+		err = readErr
+	}
+	return prefix, restored, truncated, err
+}
+
+func sanitizeAuditQuery(rawQuery string) string {
+	values, _ := url.ParseQuery(rawQuery)
+	if values == nil {
+		return ""
+	}
+	for key := range values {
+		if isSensitiveAuditKey(key) {
+			values.Set(key, redactedAuditValue)
+		}
+	}
+	return values.Encode()
+}
+
+func sanitizeAuditBody(raw []byte) (any, bool) {
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return string(raw), false
+	}
+	return sanitizeAuditValue("", value), true
+}
+
+func sanitizeAuditValue(key string, value any) any {
+	if isSensitiveAuditKey(key) {
+		return redactedAuditValue
+	}
+	if _, ok := sensitiveAuditPayloads[strings.ToLower(key)]; ok {
+		return redactedAuditValue
+	}
+	switch v := value.(type) {
+	case map[string]any:
+		for k, child := range v {
+			v[k] = sanitizeAuditValue(k, child)
+		}
+	case []any:
+		for i, child := range v {
+			v[i] = sanitizeAuditValue("", child)
+		}
+	}
+	return value
+}
+
+func isSensitiveAuditKey(key string) bool {
+	_, ok := sensitiveAuditKeys[strings.ToLower(strings.TrimSpace(key))]
+	return ok
+}
+
+func isJSONContentType(contentType string) bool {
+	return strings.Contains(contentType, "application/json") || strings.HasSuffix(contentType, "+json")
 }
 
 // AuditWrite 记录写操作(POST/PUT/DELETE)的审计日志。
@@ -44,11 +128,16 @@ func AuditWrite(audit *service.AuditService) gin.HandlerFunc {
 			return
 		}
 
-		// 读取请求体副本(供 detail 摘要)
+		// 读取有限的请求体副本,并把完整原始流恢复给下游。
 		var reqBody []byte
-		if c.Request.Body != nil {
-			reqBody, _ = io.ReadAll(c.Request.Body)
-			c.Request.Body = io.NopCloser(bytes.NewBuffer(reqBody))
+		bodyTruncated := false
+		if c.Request.Body != nil && !strings.Contains(strings.ToLower(c.ContentType()), "multipart") {
+			var err error
+			reqBody, c.Request.Body, bodyTruncated, err = readAuditBody(c.Request.Body)
+			if err != nil {
+				reqBody = nil
+				bodyTruncated = false
+			}
 		}
 
 		bw := &bodyWriter{ResponseWriter: c.Writer}
@@ -79,20 +168,24 @@ func AuditWrite(audit *service.AuditService) gin.HandlerFunc {
 		detail := map[string]any{
 			"method":   method,
 			"path":     path,
-			"query":    c.Request.URL.RawQuery,
+			"query":    sanitizeAuditQuery(c.Request.URL.RawQuery),
 			"status":   c.Writer.Status(),
 			"duration": time.Since(start).String(),
 		}
-		// 请求体摘要(截断,脱敏密码类字段不处理——单机版无登录)
-		if len(reqBody) > 0 && len(reqBody) < 2048 && !strings.Contains(c.ContentType(), "multipart") {
-			var raw any
-			if json.Unmarshal(reqBody, &raw) == nil {
+		if bodyTruncated {
+			detail["body_truncated"] = true
+		}
+		contentType := strings.ToLower(c.ContentType())
+		if len(reqBody) > 0 && !bodyTruncated && isJSONContentType(contentType) {
+			if raw, ok := sanitizeAuditBody(reqBody); ok {
 				detail["body"] = raw
 			} else {
-				detail["body"] = string(reqBody)
+				detail["body"] = "(request body omitted: invalid JSON)"
 			}
-		} else if strings.Contains(c.ContentType(), "multipart") {
+		} else if strings.Contains(contentType, "multipart") {
 			detail["body"] = "(multipart upload)"
+		} else if len(reqBody) > 0 && !bodyTruncated {
+			detail["body"] = "(request body omitted)"
 		}
 
 		operator := c.GetHeader("X-Operator")

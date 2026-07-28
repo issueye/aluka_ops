@@ -1,6 +1,7 @@
 package files
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,6 +59,42 @@ func TestJoinRelPath(t *testing.T) {
 		if got != c.want {
 			t.Errorf("JoinRelPath(%q,%q)=%q want %q", c.parent, c.rel, got, c.want)
 		}
+	}
+}
+
+func TestSymlinkPathsRejected(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	s, err := NewStore(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, fn := range map[string]func() error{
+		"list":   func() error { _, err := s.List("link"); return err },
+		"read":   func() error { _, _, err := s.ReadText("link/secret.txt"); return err },
+		"write":  func() error { return s.WriteFile("link/new.txt", []byte("x")) },
+		"mkdir":  func() error { return s.Mkdir("link/new-dir", true) },
+		"remove": func() error { return s.Remove("link/secret.txt", false) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := fn(); !errors.Is(err, ErrOutsideRoot) {
+				t.Fatalf("error = %v, want %v", err, ErrOutsideRoot)
+			}
+		})
+	}
+	data, err := os.ReadFile(filepath.Join(outside, "secret.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "secret" {
+		t.Fatal("outside file was modified")
 	}
 }
 
