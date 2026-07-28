@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ArtifactUpload } from "./ArtifactUpload";
 import { formatTime } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 // ArtifactList 服务制品列表 + 安装/卸载/上传/删除/下载。
 export function ArtifactList({ service }) {
@@ -59,6 +61,7 @@ export function ArtifactList({ service }) {
     queryKey: ["artifacts", sid],
     queryFn: () => artifactApi.list(sid),
   });
+  const pg = usePagination(artifacts, 10);
 
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ["artifacts", sid] });
@@ -199,7 +202,7 @@ export function ArtifactList({ service }) {
                   </TableCell>
                 </TableRow>
               ) : (
-                artifacts.map((a) => (
+                pg.pageItems.map((a) => (
                   <TableRow key={a.id}>
                     <TableCell>
                       {a.is_current ? (
@@ -281,6 +284,17 @@ export function ArtifactList({ service }) {
               )}
             </TableBody>
           </Table>
+          {!isLoading && artifacts.length > 0 && (
+            <PaginationBar
+              page={pg.page}
+              totalPages={pg.totalPages}
+              total={pg.total}
+              from={pg.from}
+              to={pg.to}
+              pageSize={pg.pageSize}
+              onPageChange={pg.setPage}
+            />
+          )}
         </CardContent>
       </Card>
 

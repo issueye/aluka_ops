@@ -5,10 +5,31 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aluka Ops · 服务治理系统</title>
-    <script type="module" crossorigin src="/assets/index-CQGHkOvB.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-mlgwgI4L.css">
+    <script>
+      // 首屏防闪烁:在 React 挂载前应用主题
+      (function () {
+        try {
+          var t = localStorage.getItem("aluka_ops_theme") || "system";
+          var dark =
+            t === "dark" ||
+            (t === "system" &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          var cls = dark ? "dark" : "light";
+          document.documentElement.classList.add(cls);
+          document.documentElement.style.colorScheme = cls;
+          document.addEventListener("DOMContentLoaded", function () {
+            document.body.classList.add(cls);
+          });
+        } catch (e) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BRqwUQuI.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BlmwcwRs.css">
   </head>
-  <body class="dark">
+  <body>
     <div id="root"></div>
   </body>
 </html>

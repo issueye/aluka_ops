@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
 import { siteURL } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -38,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -165,6 +167,9 @@ export function SiteDetail() {
   const apps = site?.apps || [];
   const proxies = site?.proxies || [];
   const scripts = site?.scripts || [];
+  const appsPg = usePagination(apps, 10);
+  const proxiesPg = usePagination(proxies, 10);
+  const scriptsPg = usePagination(scripts, 10);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["gateway-port", siteId] });
@@ -498,7 +503,7 @@ export function SiteDetail() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      apps.map((app) => (
+                      appsPg.pageItems.map((app) => (
                         <TableRow key={app.id}>
                           <TableCell>
                             <div className="font-medium">{app.name}</div>
@@ -555,6 +560,17 @@ export function SiteDetail() {
                     )}
                   </TableBody>
                 </Table>
+                  {apps.length > 0 && (
+                    <PaginationBar
+                      page={appsPg.page}
+                      totalPages={appsPg.totalPages}
+                      total={appsPg.total}
+                      from={appsPg.from}
+                      to={appsPg.to}
+                      pageSize={appsPg.pageSize}
+                      onPageChange={appsPg.setPage}
+                    />
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -596,7 +612,7 @@ export function SiteDetail() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      proxies.map((px) => (
+                      proxiesPg.pageItems.map((px) => (
                         <TableRow key={px.id}>
                           <TableCell>
                             <div className="font-medium">{px.name}</div>
@@ -646,6 +662,17 @@ export function SiteDetail() {
                     )}
                   </TableBody>
                 </Table>
+                  {proxies.length > 0 && (
+                    <PaginationBar
+                      page={proxiesPg.page}
+                      totalPages={proxiesPg.totalPages}
+                      total={proxiesPg.total}
+                      from={proxiesPg.from}
+                      to={proxiesPg.to}
+                      pageSize={proxiesPg.pageSize}
+                      onPageChange={proxiesPg.setPage}
+                    />
+                  )}
               </div>
             </CardContent>
           </Card>
@@ -708,7 +735,7 @@ export function SiteDetail() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      scripts.map((sc) => (
+                      scriptsPg.pageItems.map((sc) => (
                         <TableRow key={sc.id}>
                           <TableCell>
                             <div className="font-medium">{sc.name}</div>
@@ -752,6 +779,17 @@ export function SiteDetail() {
                     )}
                   </TableBody>
                 </Table>
+                  {scripts.length > 0 && (
+                    <PaginationBar
+                      page={scriptsPg.page}
+                      totalPages={scriptsPg.totalPages}
+                      total={scriptsPg.total}
+                      from={scriptsPg.from}
+                      to={scriptsPg.to}
+                      pageSize={scriptsPg.pageSize}
+                      onPageChange={scriptsPg.setPage}
+                    />
+                  )}
               </div>
             </CardContent>
           </Card>

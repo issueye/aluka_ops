@@ -29,7 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import { formatTime } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 const agentsApi = {
   list: () => api.get("/api/agents"),
@@ -66,6 +68,7 @@ export function Agents() {
 
   const toggle = (id) => setExpanded((m) => ({ ...m, [id]: !m[id] }));
 
+  const pg = usePagination(agents, 10);
   const onlineCount = agents.filter((a) => a.online).length;
 
   return (
@@ -108,7 +111,7 @@ export function Agents() {
             </div>
           ) : (
             <div className="space-y-3">
-              {agents.map((a) => (
+              {pg.pageItems.map((a) => (
                 <div key={a.agent_id} className="rounded-lg border border-border/60">
                   <button
                     type="button"
@@ -243,6 +246,17 @@ export function Agents() {
                   )}
                 </div>
               ))}
+              {agents.length > 0 && (
+                <PaginationBar
+                  page={pg.page}
+                  totalPages={pg.totalPages}
+                  total={pg.total}
+                  from={pg.from}
+                  to={pg.to}
+                  pageSize={pg.pageSize}
+                  onPageChange={pg.setPage}
+                />
+              )}
             </div>
           )}
         </CardContent>

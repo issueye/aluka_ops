@@ -6,8 +6,9 @@ import { healthApi, authApi } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-// 顶栏:页面标题 + 后端健康状态 + 退出登录。
+// 顶栏:页面标题 + 主题 + 后端健康状态 + 退出登录。
 export function Topbar({ title, description }) {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
@@ -40,19 +41,20 @@ export function Topbar({ title, description }) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b px-6">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background/80 px-6 backdrop-blur">
       <div>
         <h1 className="text-base font-semibold">{title}</h1>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
         {data?.version && (
-          <span className="text-xs text-muted-foreground">
+          <span className="hidden text-xs text-muted-foreground sm:inline">
             后端 v{data.version}
           </span>
         )}
+        <ThemeToggle />
         <Badge variant={status.variant} className="gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-current" />
           {status.text}

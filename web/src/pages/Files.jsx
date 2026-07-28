@@ -38,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +57,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { formatTime } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 function formatBytes(n) {
   if (n == null) return "—";
@@ -241,6 +243,7 @@ export function Files() {
 
   const uploading = uploadMut.isPending;
   const entries = data?.entries || [];
+  const pg = usePagination(entries, 15);
 
   return (
     <div className="space-y-4">
@@ -415,7 +418,7 @@ export function Files() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  entries.map((ent) => (
+                  pg.pageItems.map((ent) => (
                     <TableRow
                       key={ent.path}
                       className={
@@ -506,6 +509,17 @@ export function Files() {
                 )}
               </TableBody>
             </Table>
+              {!isLoading && entries.length > 0 && (
+                <PaginationBar
+                  page={pg.page}
+                  totalPages={pg.totalPages}
+                  total={pg.total}
+                  from={pg.from}
+                  to={pg.to}
+                  pageSize={pg.pageSize}
+                  onPageChange={pg.setPage}
+                />
+              )}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
             双击目录进入；双击文件打开文本编辑。删除非空目录会递归删除。

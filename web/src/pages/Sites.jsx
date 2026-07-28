@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
 import { siteURL } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +83,7 @@ export function Sites() {
   });
 
   const sites = data?.items || [];
+  const pg = usePagination(sites, 10);
   const runtime = data?.runtime || [];
   const listening = useMemo(
     () => new Set((runtime || []).map((r) => r.port)),
@@ -217,7 +220,7 @@ export function Sites() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  sites.map((s) => {
+                  pg.pageItems.map((s) => {
                     const appN = (s.apps || []).length;
                     const pxN = (s.proxies || []).length;
                     const scN = (s.scripts || []).length;
@@ -341,6 +344,17 @@ export function Sites() {
                 )}
               </TableBody>
             </Table>
+              {!isLoading && sites.length > 0 && (
+                <PaginationBar
+                  page={pg.page}
+                  totalPages={pg.totalPages}
+                  total={pg.total}
+                  from={pg.from}
+                  to={pg.to}
+                  pageSize={pg.pageSize}
+                  onPageChange={pg.setPage}
+                />
+              )}
           </div>
         </CardContent>
       </Card>

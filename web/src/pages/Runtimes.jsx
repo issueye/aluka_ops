@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ import {
 } from "@/components/ui/dialog";
 import { RuntimeDialog } from "@/components/runtimes/RuntimeDialog";
 import { formatTime } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 // 运行环境类型标签映射。
 const TYPE_META = {
@@ -60,6 +62,8 @@ export function Runtimes() {
     queryKey: ["runtimes"],
     queryFn: runtimeApi.list,
   });
+
+  const pg = usePagination(runtimes, 10);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => runtimeApi.remove(id),
@@ -142,12 +146,13 @@ export function Runtimes() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isError ? (
-            <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
+            <div className="m-6 rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
               加载失败,请确认后端服务已启动。
             </div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -174,7 +179,7 @@ export function Runtimes() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  runtimes.map((rt) => {
+                  pg.pageItems.map((rt) => {
                     const tm = TYPE_META[rt.type] || { label: rt.type, color: "bg-muted text-muted-foreground" };
                     return (
                       <TableRow key={rt.id}>
@@ -229,6 +234,18 @@ export function Runtimes() {
                 )}
               </TableBody>
             </Table>
+              {!isLoading && runtimes.length > 0 && (
+                <PaginationBar
+                  page={pg.page}
+                  totalPages={pg.totalPages}
+                  total={pg.total}
+                  from={pg.from}
+                  to={pg.to}
+                  pageSize={pg.pageSize}
+                  onPageChange={pg.setPage}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>

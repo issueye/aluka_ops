@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PaginationBar } from "@/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatTime } from "@/lib/utils";
+import { usePagination } from "@/hooks/usePagination";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -69,6 +71,8 @@ export function Operations() {
     queryFn: () => operationApi.list(params),
     refetchInterval: 5000,
   });
+
+  const pg = usePagination(operations, 10);
 
   return (
     <div className="space-y-4">
@@ -113,12 +117,13 @@ export function Operations() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isError ? (
-            <div className="rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
+            <div className="m-6 rounded-md border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-400">
               加载失败,请确认后端服务已启动。
             </div>
           ) : (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -144,7 +149,7 @@ export function Operations() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  operations.map((op) => (
+                  pg.pageItems.map((op) => (
                     <TableRow key={op.id}>
                       <TableCell className="text-muted-foreground">{op.id}</TableCell>
                       <TableCell className="font-medium uppercase">{op.type}</TableCell>
@@ -188,6 +193,18 @@ export function Operations() {
                 )}
               </TableBody>
             </Table>
+              {!isLoading && operations.length > 0 && (
+                <PaginationBar
+                  page={pg.page}
+                  totalPages={pg.totalPages}
+                  total={pg.total}
+                  from={pg.from}
+                  to={pg.to}
+                  pageSize={pg.pageSize}
+                  onPageChange={pg.setPage}
+                />
+              )}
+            </>
           )}
         </CardContent>
       </Card>
