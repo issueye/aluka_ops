@@ -12,7 +12,7 @@
 | 状态 | TanStack Query · React Router |
 | 部署 | Go `embed` 内嵌前端,产出**单二进制** |
 
-## 当前阶段:M5 升级/回滚(原始需求全部完成)
+## 当前阶段:服务治理 + 网关/APP/文件管理
 
 ### ✅ M1 骨架(已完成)
 
@@ -159,10 +159,42 @@ ALUKA_MODE=agent ALUKA_PORT=18080 \
 ALUKA_CONTROLLER_URL=http://中心:19090 \
 ALUKA_AGENT_TOKEN=tok \
 ALUKA_ADVERTISE_URL=http://本机IP:18080 \
-./bin/aluka_ops.exe
-```
+	./bin/aluka_ops.exe
+	```
 
-## 目录结构
+	### ✅ 本机主机信息定时采集
+
+	- `GET /api/system/host`:CPU/内存/磁盘/进程数/运行时长(3s 服务端缓存)
+	- 仪表盘每 5 秒刷新「当前服务器」卡片;设置页同步展示
+
+	### ✅ 文件管理(限定 data 目录)
+
+	- 仅可操作 `ALUKA_DATA_DIR` 内路径(防穿越)
+	- 浏览 / 上传 / 下载 / 新建目录与文件 / 文本编辑 / 重命名 / 删除
+	- 前端「文件管理」页
+
+	### ✅ 代理端口 + APP 管理 + 端口反代 + 路由脚本
+
+	类似 nginx 的轻量网关,与管理面分离(动态独立端口):
+
+	| 实体 | 说明 |
+	|------|------|
+	| **代理端口** | 动态 Listen,启停控制 |
+	| **APP** | 静态前端:绑定端口、路径前缀、root_dir、SPA fallback |
+	| **反代** | 挂在端口下,路径前缀 → upstream;流式转发,适合大文件上传 |
+	| **路由脚本** | 挂在端口下,优先执行;JSON 规则 rewrite/redirect/deny/proxy/static |
+
+	反代上传友好默认:`max_body_bytes=0`、`io_timeout_sec=0`(不限制 body/长传)。
+
+	```bash
+	# 示例:端口 18100 托管静态站 + /api 反代
+	# 1) 代理端口 → 18100
+	# 2) APP → path=/ root=apps/web
+	# 3) 反代 → path=/api upstream=http://127.0.0.1:8080
+	# 访问 http://127.0.0.1:18100/ 与 http://127.0.0.1:18100/api/...
+	```
+	
+	## 目录结构
 
 ```
 aluka_ops/
@@ -303,11 +335,30 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | GET/POST | `/api/templates` | 服务模板列表 / 创建 |
 | GET/PUT/DELETE | `/api/templates/:id` | 模板详情 / 更新 / 删除 |
 | POST | `/api/templates/:id/apply` | **从模板创建服务**(变量渲染) |
+| GET | `/api/system/host` | **本机资源**:CPU/内存/磁盘等 |
+| GET/POST/… | `/api/files` | **文件管理**(data 内 CRUD/上传下载) |
+| GET/POST | `/api/gateway/ports` | **代理端口** 列表/创建 |
+| GET/PUT/DELETE | `/api/gateway/ports/:id` | 端口详情/更新/删除(`force=1` 级联) |
+| GET/POST | `/api/gateway/apps` | **APP** 列表/创建(静态站) |
+| GET/PUT/DELETE | `/api/gateway/apps/:id` | APP 详情/更新/删除 |
+| GET/POST | `/api/gateway/proxies` | **端口反代**(`?port_id=` 过滤) |
+| GET/PUT/DELETE | `/api/gateway/proxies/:id` | 反代详情/更新/删除 |
+| GET/POST | `/api/gateway/scripts` | **路由脚本**(`?port_id=` 过滤) |
+| GET/PUT/DELETE | `/api/gateway/scripts/:id` | 脚本详情/更新/删除 |
+| GET/POST | `/api/gateway/status` `/reload` | 运行时监听状态 / 重载 |
 
 统一响应:`{ "code": 0, "message": "ok", "data": ... }`,`code=0` 为成功。
 
 ## 数据模型
 
-`Node`(节点,单机版恒为 `local`)· `Runtime`(运行环境,如 JDK)· `Service`(服务)· `ServiceConfig`(配置快照)· `Artifact`(制品)· `Template`(服务模板)· `Operation`(操作记录)· `AuditLog`(审计)· `Setting`(全局设置)。
+`Node` · `Runtime` · `Service` · `ServiceConfig` · `Artifact` · `Template` · `Operation` · `AuditLog` · `Setting` · **`GatewayPort`** · **`App`** · **`PortProxyRule`** · **`PortRouteScript`** ·(兼容旧 `GatewayRule`)。
 
-M1 已建全部表,后续阶段填充业务,无需变更 schema。
+路由脚本 `script` 示例:
+
+```json
+[
+  {"when":{"path_regex":"^/old/(.*)$"},"then":{"rewrite":"/new/$1"}},
+  {"when":{"path_prefix":"/blocked"},"then":{"deny":403,"body":"forbidden"}},
+  {"when":{"path_exact":"/go"},"then":{"redirect":"/home","status":302}}
+]
+```
