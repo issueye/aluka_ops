@@ -170,6 +170,11 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 				gw.PUT("/proxies/:id", appCtl.UpdateProxy)
 				gw.DELETE("/proxies/:id", appCtl.DeleteProxy)
 
+				// 路由脚本预设(须在 /scripts/:id 前注册)
+				gw.GET("/script-templates", appCtl.ListScriptTemplates)
+				gw.GET("/script-templates/", appCtl.ListScriptTemplates)
+				gw.GET("/script-templates/:id", appCtl.GetScriptTemplate)
+
 				// 路由脚本(挂在端口下,优先于 APP/反代)
 				gw.GET("/scripts", appCtl.ListScripts)
 				gw.GET("/scripts/", appCtl.ListScripts)

@@ -87,6 +87,16 @@ const EMPTY_SCRIPT = {
   priority: 100,
   script: DEFAULT_SCRIPT,
   description: "",
+  template_id: "",
+};
+
+const CATEGORY_LABEL = {
+  rewrite: "重写",
+  redirect: "跳转",
+  deny: "拦截",
+  proxy: "反代",
+  static: "静态",
+  combo: "组合",
 };
 
 export function ProxyPorts() {
@@ -112,6 +122,13 @@ export function ProxyPorts() {
     queryFn: gatewayApi.listPorts,
     refetchInterval: 10000,
   });
+
+  const { data: tplData } = useQuery({
+    queryKey: ["gateway-script-templates"],
+    queryFn: gatewayApi.listScriptTemplates,
+    staleTime: 60_000,
+  });
+  const scriptTemplates = tplData?.items || [];
 
   const ports = data?.items || [];
   const runtime = data?.runtime || [];
@@ -279,15 +296,50 @@ export function ProxyPorts() {
     setProxyOpen(true);
   };
 
-  const openCreateScript = (portId) => {
+  const applyTemplate = (tpl, portId) => {
+    if (!tpl) return;
+    const pid = portId || scriptForm.port_id || ports[0]?.id || 0;
+    setScriptForm((f) => ({
+      ...f,
+      port_id: pid || f.port_id,
+      template_id: tpl.id,
+      code: editingScript ? f.code : tpl.suggest_code || f.code || `route${pid || ""}`,
+      name: tpl.suggest_name || tpl.name || f.name,
+      path_prefix: tpl.suggest_path_prefix || "/",
+      priority: tpl.suggest_priority ?? 100,
+      script: tpl.script || DEFAULT_SCRIPT,
+      description: tpl.description || "",
+      enabled: true,
+    }));
+  };
+
+  const openCreateScript = (portId, templateId) => {
     setEditingScript(null);
     const pid = portId || ports[0]?.id || 0;
-    setScriptForm({
+    let form = {
       ...EMPTY_SCRIPT,
       port_id: pid,
       code: `route${pid || ""}`,
       name: "路由脚本",
-    });
+      template_id: "",
+    };
+    if (templateId) {
+      const tpl = scriptTemplates.find((t) => t.id === templateId);
+      if (tpl) {
+        form = {
+          ...form,
+          template_id: tpl.id,
+          code: tpl.suggest_code || form.code,
+          name: tpl.suggest_name || tpl.name || form.name,
+          path_prefix: tpl.suggest_path_prefix || "/",
+          priority: tpl.suggest_priority ?? 100,
+          script: tpl.script || DEFAULT_SCRIPT,
+          description: tpl.description || "",
+          enabled: true,
+        };
+      }
+    }
+    setScriptForm(form);
     setScriptOpen(true);
   };
 
@@ -302,6 +354,7 @@ export function ProxyPorts() {
       priority: sc.priority ?? 100,
       script: sc.script || DEFAULT_SCRIPT,
       description: sc.description || "",
+      template_id: "",
     });
     setScriptOpen(true);
   };
@@ -573,7 +626,35 @@ export function ProxyPorts() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* 内置预设 */}
+          {scriptTemplates.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-muted-foreground">内置模板（一键创建）</div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {scriptTemplates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    disabled={ports.length === 0}
+                    onClick={() => openCreateScript(undefined, tpl.id)}
+                    className="rounded-md border border-border/60 bg-card/40 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5 disabled:opacity-50"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-sm font-medium">{tpl.name}</span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {CATEGORY_LABEL[tpl.category] || tpl.category}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                      {tpl.description}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -590,7 +671,7 @@ export function ProxyPorts() {
                 {scripts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-muted-foreground">
-                      暂无路由脚本。示例：将 /old/* rewrite 到 /new/*，或 deny 某些路径。
+                      暂无路由脚本。可点上方模板一键创建，或手动添加。
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -884,10 +965,40 @@ export function ProxyPorts() {
           <DialogHeader>
             <DialogTitle>{editingScript ? "编辑路由脚本" : "添加路由脚本"}</DialogTitle>
             <DialogDescription>
-              JSON 数组规则，按顺序匹配；priority 越小越先执行。
+              JSON 数组规则，按顺序匹配；priority 越小越先执行。可从内置模板套用后再改。
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
+            {!editingScript && scriptTemplates.length > 0 && (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label>套用模板</Label>
+                <select
+                  className="flex h-9 w-full rounded-md border bg-background px-2 text-sm"
+                  value={scriptForm.template_id || ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) {
+                      setScriptForm((f) => ({ ...f, template_id: "" }));
+                      return;
+                    }
+                    const tpl = scriptTemplates.find((t) => t.id === id);
+                    if (tpl) applyTemplate(tpl, scriptForm.port_id);
+                  }}
+                >
+                  <option value="">自定义 / 不套用</option>
+                  {scriptTemplates.map((tpl) => (
+                    <option key={tpl.id} value={tpl.id}>
+                      [{CATEGORY_LABEL[tpl.category] || tpl.category}] {tpl.name}
+                    </option>
+                  ))}
+                </select>
+                {scriptForm.template_id && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {scriptTemplates.find((t) => t.id === scriptForm.template_id)?.description}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>所属端口</Label>
               <select
@@ -952,7 +1063,13 @@ export function ProxyPorts() {
                 rows={12}
                 className="font-mono text-xs"
                 value={scriptForm.script}
-                onChange={(e) => setScriptForm((f) => ({ ...f, script: e.target.value }))}
+                onChange={(e) =>
+                  setScriptForm((f) => ({
+                    ...f,
+                    script: e.target.value,
+                    template_id: "", // 手改后视为自定义
+                  }))
+                }
                 spellCheck={false}
               />
             </div>

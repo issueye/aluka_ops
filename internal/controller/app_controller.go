@@ -253,6 +253,22 @@ func (h *AppController) DeleteProxy(c *gin.Context) {
 
 // ----- route scripts (under port) -----
 
+// ListScriptTemplates GET /api/gateway/script-templates
+func (h *AppController) ListScriptTemplates(c *gin.Context) {
+	OK(c, gin.H{"items": h.svc.ListScriptTemplates()})
+}
+
+// GetScriptTemplate GET /api/gateway/script-templates/:id
+func (h *AppController) GetScriptTemplate(c *gin.Context) {
+	id := c.Param("id")
+	t, err := h.svc.GetScriptTemplate(id)
+	if err != nil {
+		h.mapErr(c, err)
+		return
+	}
+	OK(c, t)
+}
+
 func (h *AppController) ListScripts(c *gin.Context) {
 	if pid := c.Query("port_id"); pid != "" {
 		id, err := strconv.ParseUint(pid, 10, 64)

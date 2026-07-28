@@ -152,6 +152,9 @@ export const gatewayApi = {
   createScript: (data) => api.post("/api/gateway/scripts", data),
   updateScript: (id, data) => api.put(`/api/gateway/scripts/${id}`, data),
   removeScript: (id) => api.del(`/api/gateway/scripts/${id}`),
+  // 内置脚本模板
+  listScriptTemplates: () => api.get("/api/gateway/script-templates"),
+  getScriptTemplate: (id) => api.get(`/api/gateway/script-templates/${id}`),
 };
 
 // 认证

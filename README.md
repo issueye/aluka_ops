@@ -345,6 +345,8 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | GET/PUT/DELETE | `/api/gateway/proxies/:id` | 反代详情/更新/删除 |
 | GET/POST | `/api/gateway/scripts` | **路由脚本**(`?port_id=` 过滤) |
 | GET/PUT/DELETE | `/api/gateway/scripts/:id` | 脚本详情/更新/删除 |
+| GET | `/api/gateway/script-templates` | **内置脚本模板**列表 |
+| GET | `/api/gateway/script-templates/:id` | 模板详情 |
 | GET/POST | `/api/gateway/status` `/reload` | 运行时监听状态 / 重载 |
 
 统一响应:`{ "code": 0, "message": "ok", "data": ... }`,`code=0` 为成功。

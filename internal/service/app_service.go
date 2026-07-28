@@ -563,6 +563,20 @@ type ScriptCreateInput struct {
 	Description string `json:"description"`
 }
 
+// ListScriptTemplates 内置路由脚本预设。
+func (s *AppGatewayService) ListScriptTemplates() []gateway.ScriptTemplate {
+	return gateway.BuiltinScriptTemplates()
+}
+
+// GetScriptTemplate 按 id 取预设。
+func (s *AppGatewayService) GetScriptTemplate(id string) (*gateway.ScriptTemplate, error) {
+	t := gateway.FindScriptTemplate(id)
+	if t == nil {
+		return nil, fmt.Errorf("%w: 模板不存在", ErrAppInvalid)
+	}
+	return t, nil
+}
+
 func (s *AppGatewayService) ListScripts() ([]model.PortRouteScript, error) {
 	if s.scripts == nil {
 		return nil, nil
