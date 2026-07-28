@@ -2,4 +2,4 @@
 package version
 
 // AppVersion 当前应用版本。
-const AppVersion = "0.1.0-m1"
+const AppVersion = "0.2.0"

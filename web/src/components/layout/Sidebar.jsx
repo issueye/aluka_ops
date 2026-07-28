@@ -69,7 +69,7 @@ export function Sidebar() {
 
       {/* 版本 */}
       <div className="border-t p-3 text-[11px] text-muted-foreground">
-        <div>v0.1.0 · M1 骨架</div>
+        <div>v0.2.0 · 服务治理 / 网关</div>
         <div className="mt-0.5">© Aluka Ops</div>
       </div>
     </aside>
