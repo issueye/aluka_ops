@@ -8,8 +8,8 @@ import { Agents } from "@/pages/Agents";
 import { Runtimes } from "@/pages/Runtimes";
 import { Templates } from "@/pages/Templates";
 import { Files } from "@/pages/Files";
-import { ProxyPorts } from "@/pages/ProxyPorts";
-import { Apps } from "@/pages/Apps";
+import { Sites } from "@/pages/Sites";
+import { SiteDetail } from "@/pages/SiteDetail";
 import { Artifacts } from "@/pages/Artifacts";
 import { Operations } from "@/pages/Operations";
 import { AuditLog } from "@/pages/AuditLog";
@@ -33,13 +33,16 @@ export default function App() {
         <Route path="/agents" element={<Agents />} />
         <Route path="/runtimes" element={<Runtimes />} />
         <Route path="/templates" element={<Templates />} />
+        <Route path="/sites" element={<Sites />} />
+        <Route path="/sites/:id" element={<SiteDetail />} />
         <Route path="/files" element={<Files />} />
-        <Route path="/proxy-ports" element={<ProxyPorts />} />
-        <Route path="/apps" element={<Apps />} />
         <Route path="/artifacts" element={<Artifacts />} />
         <Route path="/operations" element={<Operations />} />
         <Route path="/audit-logs" element={<AuditLog />} />
         <Route path="/settings" element={<Settings />} />
+        {/* 兼容旧路径 */}
+        <Route path="/proxy-ports" element={<Sites />} />
+        <Route path="/apps" element={<Sites />} />
         {/* 兜底:未知路径回到仪表盘 */}
         <Route path="*" element={<Dashboard />} />
       </Route>

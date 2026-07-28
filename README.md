@@ -173,24 +173,24 @@ ALUKA_ADVERTISE_URL=http://本机IP:18080 \
 	- 浏览 / 上传 / 下载 / 新建目录与文件 / 文本编辑 / 重命名 / 删除
 	- 前端「文件管理」页
 
-	### ✅ 代理端口 + APP 管理 + 端口反代 + 路由脚本
+	### ✅ 站点管理(端口 + APP + 反代 + 路由脚本)
 
-	类似 nginx 的轻量网关,与管理面分离(动态独立端口):
+	类似 nginx 的轻量网关。前端以「站点」管理一个监听端口,进入站点后配置:
 
 	| 实体 | 说明 |
 	|------|------|
-	| **代理端口** | 动态 Listen,启停控制 |
-	| **APP** | 静态前端:绑定端口、路径前缀、root_dir、SPA fallback |
-	| **反代** | 挂在端口下,路径前缀 → upstream;流式转发,适合大文件上传 |
-	| **路由脚本** | 挂在端口下,优先执行;JSON 规则 rewrite/redirect/deny/proxy/static |
+	| **站点** | 动态 Listen 端口,启停控制(侧边栏「站点管理」) |
+	| **APP** | 站点内静态前端:路径前缀、root_dir、SPA fallback |
+	| **反代** | 站点内路径前缀 → upstream;流式转发,适合大文件上传 |
+	| **路由脚本** | 站点内优先执行;JSON 规则 rewrite/redirect/deny/proxy/static |
 
 	反代上传友好默认:`max_body_bytes=0`、`io_timeout_sec=0`(不限制 body/长传)。
 
 	```bash
-	# 示例:端口 18100 托管静态站 + /api 反代
-	# 1) 代理端口 → 18100
-	# 2) APP → path=/ root=apps/web
-	# 3) 反代 → path=/api upstream=http://127.0.0.1:8080
+	# 示例:站点 :18100 托管静态站 + /api 反代
+	# 1) 站点管理 → 新建站点 18100
+	# 2) 进入站点 → APP path=/ root=apps/web
+	# 3) 反代 Tab → path=/api upstream=http://127.0.0.1:8080
 	# 访问 http://127.0.0.1:18100/ 与 http://127.0.0.1:18100/api/...
 	```
 	
@@ -337,7 +337,7 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | POST | `/api/templates/:id/apply` | **从模板创建服务**(变量渲染) |
 | GET | `/api/system/host` | **本机资源**:CPU/内存/磁盘等 |
 | GET/POST/… | `/api/files` | **文件管理**(data 内 CRUD/上传下载) |
-| GET/POST | `/api/gateway/ports` | **代理端口** 列表/创建 |
+| GET/POST | `/api/gateway/ports` | **站点(端口)** 列表/创建 |
 | GET/PUT/DELETE | `/api/gateway/ports/:id` | 端口详情/更新/删除(`force=1` 级联) |
 | GET/POST | `/api/gateway/apps` | **APP** 列表/创建(静态站) |
 | GET/PUT/DELETE | `/api/gateway/apps/:id` | APP 详情/更新/删除 |

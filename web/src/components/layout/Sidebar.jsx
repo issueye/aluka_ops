@@ -11,8 +11,7 @@ import {
   FileCode2,
   Network,
   FolderOpen,
-  Server,
-  AppWindow,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,8 +21,7 @@ const navItems = [
   { to: "/agents", label: "多节点", icon: Network },
   { to: "/runtimes", label: "环境管理", icon: Cpu },
   { to: "/templates", label: "服务模板", icon: FileCode2 },
-  { to: "/apps", label: "APP 管理", icon: AppWindow },
-  { to: "/proxy-ports", label: "代理端口", icon: Server },
+  { to: "/sites", label: "站点管理", icon: Globe },
   { to: "/files", label: "文件管理", icon: FolderOpen },
   { to: "/artifacts", label: "制品管理", icon: Package },
   { to: "/operations", label: "操作记录", icon: History },
