@@ -57,7 +57,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const EMPTY = { port: 18090, name: "", enabled: true, description: "" };
+const EMPTY = {
+  port: 18090,
+  name: "",
+  enabled: true,
+  description: "",
+  ip_whitelist: "",
+  ip_blacklist: "",
+};
 
 export function Sites() {
   const qc = useQueryClient();
@@ -120,6 +127,8 @@ export function Sites() {
       name: s.name,
       enabled: !!s.enabled,
       description: s.description || "",
+      ip_whitelist: s.ip_whitelist || "",
+      ip_blacklist: s.ip_blacklist || "",
     });
     setOpen(true);
   };
@@ -248,9 +257,21 @@ export function Sites() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={s.enabled ? "success" : "secondary"}>
-                            {s.enabled ? "启用" : "停用"}
-                          </Badge>
+                          <div className="flex flex-wrap gap-1">
+                            <Badge variant={s.enabled ? "success" : "secondary"}>
+                              {s.enabled ? "启用" : "停用"}
+                            </Badge>
+                            {s.ip_whitelist?.trim() && (
+                              <Badge variant="outline" className="text-[10px]">
+                                白名单
+                              </Badge>
+                            )}
+                            {s.ip_blacklist?.trim() && (
+                              <Badge variant="outline" className="text-[10px] text-red-400">
+                                黑名单
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
@@ -358,6 +379,29 @@ export function Sites() {
               />
             </div>
             <div className="space-y-1.5">
+              <Label>IP 白名单</Label>
+              <Textarea
+                rows={3}
+                className="font-mono text-xs"
+                placeholder={"留空=不限制\n每行一个 IP 或 CIDR\n例: 10.0.0.0/8\n192.168.1.1"}
+                value={form.ip_whitelist}
+                onChange={(e) => setForm((f) => ({ ...f, ip_whitelist: e.target.value }))}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                非空时仅允许列表内访问；黑名单优先于白名单。
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>IP 黑名单</Label>
+              <Textarea
+                rows={3}
+                className="font-mono text-xs"
+                placeholder={"例: 1.2.3.4\n203.0.113.0/24"}
+                value={form.ip_blacklist}
+                onChange={(e) => setForm((f) => ({ ...f, ip_blacklist: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label>备注</Label>
               <Textarea
                 rows={2}
@@ -378,6 +422,8 @@ export function Sites() {
                     name: form.name,
                     enabled: form.enabled,
                     description: form.description,
+                    ip_whitelist: form.ip_whitelist,
+                    ip_blacklist: form.ip_blacklist,
                   });
                 } else {
                   saveMut.mutate({
@@ -385,6 +431,8 @@ export function Sites() {
                     name: form.name,
                     enabled: form.enabled,
                     description: form.description,
+                    ip_whitelist: form.ip_whitelist,
+                    ip_blacklist: form.ip_blacklist,
                   });
                 }
               }}

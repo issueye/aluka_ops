@@ -54,6 +54,8 @@ type PortConfig struct {
 	Port    int
 	Rules   []Rule
 	Scripts []CompiledScript
+	// IP 过滤(可空)
+	IPFilter *IPFilter
 }
 
 // Manager 管理多端口 HTTP 服务。
@@ -68,10 +70,11 @@ type portServer struct {
 	port     int
 	server   *http.Server
 	listener net.Listener
-	// rules / scripts 快照
-	rules   []Rule
-	scripts []CompiledScript
-	cancel  context.CancelFunc
+	// rules / scripts / ip 快照
+	rules    []Rule
+	scripts  []CompiledScript
+	ipFilter *IPFilter
+	cancel   context.CancelFunc
 }
 
 // NewManager 构造。
@@ -132,7 +135,12 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 		if len(rules) == 0 && len(scripts) == 0 {
 			continue
 		}
-		byPort[c.Port] = PortConfig{Port: c.Port, Rules: rules, Scripts: scripts}
+		byPort[c.Port] = PortConfig{
+			Port:     c.Port,
+			Rules:    rules,
+			Scripts:  scripts,
+			IPFilter: c.IPFilter,
+		}
 	}
 
 	m.mu.Lock()
@@ -151,9 +159,10 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 		if ps, ok := m.ports[port]; ok {
 			ps.rules = cfg.Rules
 			ps.scripts = cfg.Scripts
+			ps.ipFilter = cfg.IPFilter
 			continue
 		}
-		ps, err := m.startPortLocked(port, cfg.Rules, cfg.Scripts)
+		ps, err := m.startPortLocked(port, cfg.Rules, cfg.Scripts, cfg.IPFilter)
 		if err != nil {
 			log.Printf("[gateway] listen :%d failed: %v", port, err)
 			if firstErr == nil {
@@ -217,7 +226,7 @@ func (m *Manager) stopPortLocked(ps *portServer) {
 	}
 }
 
-func (m *Manager) startPortLocked(port int, rules []Rule, scripts []CompiledScript) (*portServer, error) {
+func (m *Manager) startPortLocked(port int, rules []Rule, scripts []CompiledScript, ipf *IPFilter) (*portServer, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
@@ -228,6 +237,7 @@ func (m *Manager) startPortLocked(port int, rules []Rule, scripts []CompiledScri
 		listener: ln,
 		rules:    rules,
 		scripts:  scripts,
+		ipFilter: ipf,
 		cancel:   cancel,
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -258,7 +268,18 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 	m.mu.RLock()
 	rules := ps.rules
 	scripts := ps.scripts
+	ipf := ps.ipFilter
 	m.mu.RUnlock()
+
+	// IP 黑白名单(站点级)
+	if ipf != nil {
+		cip := ClientIP(r)
+		if !ipf.Allowed(cip) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			http.Error(w, "403 forbidden: ip not allowed", http.StatusForbidden)
+			return
+		}
+	}
 
 	path := r.URL.Path
 	if path == "" {

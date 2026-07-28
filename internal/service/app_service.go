@@ -86,6 +86,8 @@ type PortCreateInput struct {
 	Name        string `json:"name"`
 	Enabled     *bool  `json:"enabled"`
 	Description string `json:"description"`
+	IPWhitelist string `json:"ip_whitelist"`
+	IPBlacklist string `json:"ip_blacklist"`
 }
 
 func (s *AppGatewayService) ListPorts() ([]model.GatewayPort, error) {
@@ -124,11 +126,16 @@ func (s *AppGatewayService) CreatePort(in PortCreateInput) (*model.GatewayPort, 
 	if in.Enabled != nil {
 		en = *in.Enabled
 	}
+	if _, err := gateway.NewIPFilter(in.IPWhitelist, in.IPBlacklist); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAppInvalid, err)
+	}
 	m := &model.GatewayPort{
 		Port:        in.Port,
 		Name:        name,
 		Enabled:     en,
 		Description: in.Description,
+		IPWhitelist: strings.TrimSpace(in.IPWhitelist),
+		IPBlacklist: strings.TrimSpace(in.IPBlacklist),
 	}
 	if err := s.ports.Create(m); err != nil {
 		return nil, err
@@ -141,6 +148,8 @@ type PortUpdateInput struct {
 	Name        *string `json:"name"`
 	Enabled     *bool   `json:"enabled"`
 	Description *string `json:"description"`
+	IPWhitelist *string `json:"ip_whitelist"`
+	IPBlacklist *string `json:"ip_blacklist"`
 	// Port 不允许改端口号(避免混乱);需删建
 }
 
@@ -162,6 +171,18 @@ func (s *AppGatewayService) UpdatePort(id uint, in PortUpdateInput) (*model.Gate
 	if in.Description != nil {
 		m.Description = *in.Description
 	}
+	wl, bl := m.IPWhitelist, m.IPBlacklist
+	if in.IPWhitelist != nil {
+		wl = strings.TrimSpace(*in.IPWhitelist)
+	}
+	if in.IPBlacklist != nil {
+		bl = strings.TrimSpace(*in.IPBlacklist)
+	}
+	if _, err := gateway.NewIPFilter(wl, bl); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAppInvalid, err)
+	}
+	m.IPWhitelist = wl
+	m.IPBlacklist = bl
 	if err := s.ports.Update(m); err != nil {
 		return nil, err
 	}
@@ -793,6 +814,9 @@ func compilePortConfigs(ports []model.GatewayPort, dataDir string) []gateway.Por
 				continue
 			}
 			cfg.Scripts = append(cfg.Scripts, *cs)
+		}
+		if ipf, err := gateway.NewIPFilter(p.IPWhitelist, p.IPBlacklist); err == nil {
+			cfg.IPFilter = ipf
 		}
 		if len(cfg.Rules) > 0 || len(cfg.Scripts) > 0 {
 			out = append(out, cfg)

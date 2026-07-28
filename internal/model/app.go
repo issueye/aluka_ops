@@ -1,6 +1,6 @@
 package model
 
-// GatewayPort 可动态监听的代理端口。
+// GatewayPort 可动态监听的代理端口(站点)。
 // 其下可挂: APP(静态前端) + ProxyRule(反代) + RouteScript(路由脚本)。
 // 端口启用且存在启用中的 APP/反代/脚本时才 Listen。
 type GatewayPort struct {
@@ -9,6 +9,11 @@ type GatewayPort struct {
 	Name        string `gorm:"size:128;not null" json:"name"`
 	Enabled     bool   `gorm:"not null;default:true;index" json:"enabled"`
 	Description string `gorm:"type:text" json:"description"`
+
+	// IP 访问控制(换行/逗号分隔;支持单 IP 与 CIDR)
+	// 白名单非空时仅允许列表内;黑名单优先拒绝。
+	IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
+	IPBlacklist string `gorm:"type:text" json:"ip_blacklist"`
 
 	// 关联(查询时 Preload)
 	Apps    []App             `gorm:"foreignKey:PortID" json:"apps,omitempty"`

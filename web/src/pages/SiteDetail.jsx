@@ -13,6 +13,7 @@ import {
   ArrowRightLeft,
   ScrollText,
   Globe,
+  Shield,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -129,6 +130,12 @@ export function SiteDetail() {
   const [scriptForm, setScriptForm] = useState(EMPTY_SCRIPT);
   const [deletingScript, setDeletingScript] = useState(null);
 
+  const [accessOpen, setAccessOpen] = useState(false);
+  const [accessForm, setAccessForm] = useState({
+    ip_whitelist: "",
+    ip_blacklist: "",
+  });
+
   const { data: site, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["gateway-port", siteId],
     queryFn: () => gatewayApi.getPort(siteId),
@@ -229,6 +236,16 @@ export function SiteDetail() {
     onSuccess: () => {
       toast.success("脚本已删除");
       setDeletingScript(null);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const saveAccessMut = useMutation({
+    mutationFn: (body) => gatewayApi.updatePort(siteId, body),
+    onSuccess: () => {
+      toast.success("访问控制已保存");
+      setAccessOpen(false);
       invalidate();
     },
     onError: (e) => toast.error(e.message),
@@ -388,6 +405,20 @@ export function SiteDetail() {
             <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
             刷新
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setAccessForm({
+                ip_whitelist: site.ip_whitelist || "",
+                ip_blacklist: site.ip_blacklist || "",
+              });
+              setAccessOpen(true);
+            }}
+          >
+            <Shield className="mr-1.5 h-3.5 w-3.5" />
+            IP 访问控制
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <a href={`http://127.0.0.1:${site.port}/`} target="_blank" rel="noreferrer">
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
@@ -396,6 +427,25 @@ export function SiteDetail() {
           </Button>
         </div>
       </div>
+
+      {(site.ip_whitelist?.trim() || site.ip_blacklist?.trim()) && (
+        <Card>
+          <CardContent className="grid gap-3 p-4 text-xs sm:grid-cols-2">
+            <div>
+              <div className="mb-1 font-medium text-muted-foreground">白名单</div>
+              <pre className="max-h-24 overflow-auto rounded bg-muted/40 p-2 font-mono whitespace-pre-wrap">
+                {site.ip_whitelist?.trim() || "（空=不限制）"}
+              </pre>
+            </div>
+            <div>
+              <div className="mb-1 font-medium text-muted-foreground">黑名单</div>
+              <pre className="max-h-24 overflow-auto rounded bg-muted/40 p-2 font-mono whitespace-pre-wrap">
+                {site.ip_blacklist?.trim() || "（空）"}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -1099,6 +1149,59 @@ export function SiteDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>IP 访问控制 · :{site.port}</DialogTitle>
+            <DialogDescription>
+              黑名单优先拒绝；白名单非空时仅允许列表内 IP。支持单 IP 与 CIDR，换行/逗号分隔。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>白名单</Label>
+              <Textarea
+                rows={4}
+                className="font-mono text-xs"
+                placeholder={"10.0.0.0/8\n192.168.1.1"}
+                value={accessForm.ip_whitelist}
+                onChange={(e) =>
+                  setAccessForm((f) => ({ ...f, ip_whitelist: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>黑名单</Label>
+              <Textarea
+                rows={4}
+                className="font-mono text-xs"
+                placeholder={"1.2.3.4\n203.0.113.0/24"}
+                value={accessForm.ip_blacklist}
+                onChange={(e) =>
+                  setAccessForm((f) => ({ ...f, ip_blacklist: e.target.value }))
+                }
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAccessOpen(false)}>
+              取消
+            </Button>
+            <Button
+              disabled={saveAccessMut.isPending}
+              onClick={() =>
+                saveAccessMut.mutate({
+                  ip_whitelist: accessForm.ip_whitelist,
+                  ip_blacklist: accessForm.ip_blacklist,
+                })
+              }
+            >
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
