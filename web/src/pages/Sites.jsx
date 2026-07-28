@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
+import { siteURL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -288,7 +289,7 @@ export function Sites() {
                               asChild
                             >
                               <a
-                                href={`http://127.0.0.1:${s.port}/`}
+                                href={siteURL(s.port)}
                                 target="_blank"
                                 rel="noreferrer"
                               >

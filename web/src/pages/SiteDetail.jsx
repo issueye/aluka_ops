@@ -16,6 +16,7 @@ import {
   Shield,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
+import { siteURL } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -347,8 +348,7 @@ export function SiteDetail() {
 
   const appUrl = (app) => {
     if (!site?.port) return "";
-    const prefix = app.path_prefix === "/" ? "" : app.path_prefix || "";
-    return `http://127.0.0.1:${site.port}${prefix}/`;
+    return siteURL(site.port, app.path_prefix || "/");
   };
 
   if (isLoading) {
@@ -420,7 +420,7 @@ export function SiteDetail() {
             IP 访问控制
           </Button>
           <Button variant="outline" size="sm" asChild>
-            <a href={`http://127.0.0.1:${site.port}/`} target="_blank" rel="noreferrer">
+            <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
               <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
               打开站点
             </a>
