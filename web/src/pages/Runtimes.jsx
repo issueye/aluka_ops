@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Star, Cpu, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Star, Cpu, RefreshCw, Search, CheckCircle2 } from "lucide-react";
 import { runtimeApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { RuntimeDialog } from "@/components/runtimes/RuntimeDialog";
 import { formatTime } from "@/lib/utils";
 
@@ -46,6 +53,8 @@ export function Runtimes() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null); // null=新建, 对象=编辑
   const [deleting, setDeleting] = useState(null);
+  const [detectOpen, setDetectOpen] = useState(false);
+  const [detected, setDetected] = useState([]);
 
   const { data: runtimes = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["runtimes"],
@@ -60,6 +69,39 @@ export function Runtimes() {
       setDeleting(null);
     },
     onError: (e) => toast.error(`删除失败: ${e.message}`),
+  });
+
+  const detectMutation = useMutation({
+    mutationFn: () => runtimeApi.detect(),
+    onSuccess: (items) => {
+      setDetected(items || []);
+      setDetectOpen(true);
+      if (!items?.length) toast.message("未探测到本机 JDK");
+    },
+    onError: (e) => toast.error(`探测失败: ${e.message}`),
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: (item) =>
+      runtimeApi.create({
+        name: item.name || `JDK ${item.version || ""}`.trim(),
+        type: "jdk",
+        version: item.version || "",
+        install_path: item.install_path,
+        is_default: false,
+        env_template: JSON.stringify({
+          JAVA_HOME: "{{install_path}}",
+          PATH: "{{install_path}}\\bin;{{PATH}}",
+        }),
+        description: `本机探测(${item.source})`,
+      }),
+    onSuccess: () => {
+      toast.success("已登记运行环境");
+      queryClient.invalidateQueries({ queryKey: ["runtimes"] });
+      // 刷新探测列表中的 registered 状态
+      detectMutation.mutate();
+    },
+    onError: (e) => toast.error(`登记失败: ${e.message}`),
   });
 
   const openCreate = () => {
@@ -84,6 +126,14 @@ export function Runtimes() {
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => detectMutation.mutate()}
+              disabled={detectMutation.isPending}
+            >
+              <Search className={detectMutation.isPending ? "animate-pulse" : ""} /> 探测本机 JDK
+            </Button>
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw className={isFetching ? "animate-spin" : ""} /> 刷新
             </Button>
@@ -215,6 +265,58 @@ export function Runtimes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 本机 JDK 探测结果 */}
+      <Dialog open={detectOpen} onOpenChange={setDetectOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>本机 JDK 探测结果</DialogTitle>
+            <DialogDescription>
+              扫描 JAVA_HOME、PATH 与常见安装目录。可一键登记未注册的环境。
+            </DialogDescription>
+          </DialogHeader>
+          {detected.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">未发现可用 JDK</p>
+          ) : (
+            <div className="max-h-[400px] space-y-2 overflow-y-auto">
+              {detected.map((item, idx) => (
+                <div
+                  key={`${item.install_path}-${idx}`}
+                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {item.source}
+                      </Badge>
+                      {item.registered && (
+                        <Badge variant="success" className="gap-1 text-xs">
+                          <CheckCircle2 className="h-3 w-3" /> 已登记
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="truncate font-mono text-xs text-muted-foreground" title={item.install_path}>
+                      {item.version ? `v${item.version} · ` : ""}
+                      {item.install_path}
+                    </div>
+                  </div>
+                  {!item.registered && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={registerMutation.isPending}
+                      onClick={() => registerMutation.mutate(item)}
+                    >
+                      登记
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

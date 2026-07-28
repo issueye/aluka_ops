@@ -83,8 +83,84 @@
 - **部署失败自动回滚**:由 M4 原子替换保证——部署失败时 `install_dir` 仍是旧版本,DB 未改动,服务状态完全不变
 - 前端:版本 Tab 每个历史版本按版本号显示「升级」或「回滚」按钮,二次确认,部署失败时提示已自动回滚
 
-> 至此,原始需求"**安装、启动、重启、升级、移除**"+"**环境管理(JDK 版本)**"已**全部实现**。
-> 后续可选增强:自动崩溃拉起、监控仪表盘、配置编辑、Agent 多机纳管。
+### ✅ 服务控制台(xterm.js)
+
+**核心能力:服务详情「控制台」Tab,交互式终端风格。**
+
+- 输出:订阅日志 SSE 实时流,写入 xterm
+- 输入:行缓冲 + 回车,`POST /api/services/:id/console` 写入进程 stdin
+- 进程启动时保留 `StdinPipe`,仅本实例拉起的进程可交互
+- 前端:`@xterm/xterm` + FitAddon + WebLinksAddon
+
+### ✅ 配置在线编辑 + 崩溃自动拉起
+
+- `PUT /api/services/:id/config`:编辑 command/args/jvm/env/port/自动拉起等
+  - 运行中仅允许改 `auto_restart` / `max_restarts` / `shutdown_timeout`
+  - 启动相关字段需停服后修改
+- 进程意外退出 → 状态 `crashed` → 若开启 `auto_restart`,按 1s/2s/4s… 退避自动拉起
+  - 最多 `max_restarts` 次;用户手动 start/stop/restart 会重置计数
+  - 5 分钟无新崩溃则计数清零
+- 前端:服务详情「配置」Tab 可编辑表单
+
+### ✅ 审计日志 + 本机 JDK 探测
+
+- 写操作中间件自动落库 `audit_logs`(成功 POST/PUT/DELETE)
+- 前端「审计日志」页:筛选动作/对象、时间线列表
+- `GET /api/runtimes/detect`:扫描 JAVA_HOME / PATH / 常见安装目录
+- 环境管理页「探测本机 JDK」一键登记
+
+### ✅ 健康检查探针(HTTP/TCP)
+
+- 配置 `health_check` JSON:`{type, target, interval_sec, timeout_sec}`
+- 后台 Monitor 按间隔轮询 running 服务;status/详情接口返回 `health` 字段
+- target 可留空,自动用 `port` 推导 `127.0.0.1:port` 或 `http://127.0.0.1:port/`
+- 前端配置 Tab 可选 none/http/tcp;概览展示健康徽章与延迟
+
+### ✅ 登录鉴权(可选)
+
+- 环境变量 `ALUKA_PASSWORD` 非空时启用单管理员密码登录
+- 签发随机 Token(内存存储),默认 24h 有效;`Authorization: Bearer` 或 `?token=`(SSE)
+- 未设置密码时所有 API 开放,兼容纯内网部署
+- 前端:登录页 + AuthGate 门禁 + 顶栏退出
+
+### ✅ 服务模板
+
+- 模板 CRUD:`config_template` JSON 支持 `{{var}}` 占位
+- `POST /api/templates/:id/apply` 渲染变量并创建服务(绑定 template_id)
+- 前端「服务模板」页:编辑配方、一键创建服务并跳转详情
+
+### ✅ Agent 模式 + 中心 Controller 模式
+
+同一二进制支持三种模式:
+
+| 模式 | `ALUKA_MODE` | 说明 |
+|------|--------------|------|
+| 单机面板 | `standalone`(默认) | 本机服务治理 |
+| Agent | `agent` | 向中心上报心跳,接受远程启停 |
+| 中心 | `controller` | 接收心跳,多节点列表与远程管控 |
+
+**Agent 侧**
+- `/api/agent/status|info|services` + start/stop/restart
+- 心跳: `POST {CONTROLLER}/api/agents/heartbeat`
+- 需配置 `ALUKA_ADVERTISE_URL` 供中心回连
+
+**Controller 侧**
+- `POST /api/agents/heartbeat` 接收上报
+- `GET /api/agents` 多节点列表(在线/离线)
+- `POST /api/agents/:id/services/:sid/{start,stop,restart}` 远程代理
+- 前端「多节点」页展示 Agent 与远程操作按钮
+
+```bash
+# 中心
+ALUKA_MODE=controller ALUKA_PORT=19090 ALUKA_AGENT_TOKEN=tok ./bin/aluka_ops.exe
+
+# 节点 Agent
+ALUKA_MODE=agent ALUKA_PORT=18080 \
+ALUKA_CONTROLLER_URL=http://中心:19090 \
+ALUKA_AGENT_TOKEN=tok \
+ALUKA_ADVERTISE_URL=http://本机IP:18080 \
+./bin/aluka_ops.exe
+```
 
 ## 目录结构
 
@@ -178,15 +254,26 @@ go build -o bin/aluka_ops.exe ./cmd/server
 |------|------|------|
 | `ALUKA_PORT` | `18080` | HTTP 端口 |
 | `ALUKA_DATA_DIR` | `./data` | 数据目录(sqlite、制品、日志) |
-| `ALUKA_MODE` | `standalone` | 运行模式:`standalone` / `agent`(预留) |
+| `ALUKA_MODE` | `standalone` | `standalone` / **`agent`** |
 | `ALUKA_WEB_DIR` | (空) | 指定磁盘前端目录,优先于内嵌(开发用) |
 | `ALUKA_ALLOW_ORIGIN` | `*` | CORS 来源 |
+| `ALUKA_PASSWORD` | (空) | 管理密码;**非空则启用登录鉴权** |
+| `ALUKA_TOKEN_TTL_HOURS` | `24` | Token 有效期(小时) |
+| `ALUKA_AGENT_ID` | 主机名 | Agent 唯一标识 |
+| `ALUKA_CONTROLLER_URL` | (空) | 中心 Controller 地址(启用心跳) |
+| `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent) |
+| `ALUKA_HEARTBEAT_SEC` | `15` | 心跳间隔秒 |
+| `ALUKA_ADVERTISE_URL` | (空) | Agent 对外 API 根地址(供中心回连) |
+| `ALUKA_OFFLINE_AFTER_SEC` | `45` | Controller 判定 Agent 离线的秒数 |
 
 ## API 速览
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/health` | 健康检查(版本、模式、DB 状态) |
+| GET | `/api/health` | 健康检查(版本、模式、DB 状态,无需登录) |
+| GET | `/api/auth/status` | 鉴权是否启用 / 是否已登录 |
+| POST | `/api/auth/login` | 登录,返回 Token |
+| POST | `/api/auth/logout` | 注销 Token |
 | GET / POST | `/api/runtimes` | 运行环境 列表 / 新建 |
 | GET / PUT / DELETE | `/api/runtimes/:id` | 查 / 改 / 删 |
 | GET / POST | `/api/services` | 服务 列表 / 新建(含初始配置) |
@@ -206,9 +293,16 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | POST | `/api/services/:id/uninstall` | **卸载**:停服+清理目录+重置版本 |
 | POST | `/api/services/:id/upgrade?artifact_id=X` | **升级**:部署新版本(失败自动回滚) |
 | POST | `/api/services/:id/rollback?artifact_id=X` | **回滚**:回到历史版本 |
+| POST | `/api/services/:id/console` | **控制台**:向进程 stdin 写入(`{"input":"..."}`) |
+| GET / PUT | `/api/services/:id/config` | 获取 / **更新**运行配置(运行中仅可改自动拉起相关) |
 | GET | `/api/services/:id/operations` | 该服务的操作历史 |
-| GET | `/api/operations` `/api/operations/:id` | 全局操作历史 / 单条详情 |
-| * | `/api/artifacts` `/api/templates` ... | 占位(501),后续阶段实现 |
+| GET | `/api/operations` `/api/operations/:id` | 全局操作历史(含服务名) / 单条详情 |
+| GET | `/api/dashboard/stats` | 仪表盘统计(服务状态/环境/异常/最近操作) |
+| GET | `/api/audit-logs` `/api/audit-logs/:id` | **审计日志**列表/详情 |
+| GET | `/api/runtimes/detect` | **本机 JDK 探测** |
+| GET/POST | `/api/templates` | 服务模板列表 / 创建 |
+| GET/PUT/DELETE | `/api/templates/:id` | 模板详情 / 更新 / 删除 |
+| POST | `/api/templates/:id/apply` | **从模板创建服务**(变量渲染) |
 
 统一响应:`{ "code": 0, "message": "ok", "data": ... }`,`code=0` 为成功。
 

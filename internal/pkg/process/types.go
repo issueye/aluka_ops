@@ -8,6 +8,7 @@
 package process
 
 import (
+	"io"
 	"os/exec"
 	"sync"
 )
@@ -38,19 +39,36 @@ type ProcessInfo struct {
 	PID       int
 	Cmd       *exec.Cmd
 	LogPath   string
+	// Stdin 进程标准输入管道,供控制台向运行中进程写入。
+	// 进程退出后会被关闭,WriteStdin 需判空。
+	Stdin io.WriteCloser
 }
+
+// ExitHandler 进程意外退出时的回调(非主动 Stop)。
+// 在独立 goroutine 中调用,勿阻塞 Wait。
+type ExitHandler func(serviceID uint, pid int, waitErr error)
 
 // Manager 进程管理器单例。
 type Manager struct {
-	mu      sync.RWMutex
-	procs   map[uint]*ProcessInfo // serviceID -> info
-	stopper map[uint]chan struct{} // serviceID -> 停止信号(M2 暂未使用,预留)
+	mu              sync.RWMutex
+	procs           map[uint]*ProcessInfo // serviceID -> info
+	stopper         map[uint]chan struct{}
+	intentionalStop map[uint]bool // 标记主动停止,避免误触发崩溃回调
+	onExit          ExitHandler
 }
 
 // NewManager 构造进程管理器。
 func NewManager() *Manager {
 	return &Manager{
-		procs:   make(map[uint]*ProcessInfo),
-		stopper: make(map[uint]chan struct{}),
+		procs:           make(map[uint]*ProcessInfo),
+		stopper:         make(map[uint]chan struct{}),
+		intentionalStop: make(map[uint]bool),
 	}
+}
+
+// SetExitHandler 设置进程意外退出回调。
+func (m *Manager) SetExitHandler(h ExitHandler) {
+	m.mu.Lock()
+	m.onExit = h
+	m.mu.Unlock()
 }

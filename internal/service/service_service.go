@@ -4,19 +4,28 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/gorm"
 
 	"aluka_ops/internal/model"
 	"aluka_ops/internal/pkg/artifact"
+	"aluka_ops/internal/pkg/healthcheck"
 	"aluka_ops/internal/pkg/logstream"
 	"aluka_ops/internal/pkg/process"
 	"aluka_ops/internal/repository"
 )
+
+// restartState 连续崩溃拉起计数(内存态,进程重启后清零)。
+type restartState struct {
+	count int
+	last  time.Time
+}
 
 // ServiceService 服务业务逻辑:CRUD + 生命周期动作编排。
 //
@@ -33,7 +42,11 @@ type ServiceService struct {
 	store   *artifact.Store
 	procs   *process.Manager
 	hub     *logstream.LogHub
+	health  *healthcheck.Monitor
 	dataDir string // 用于拼接日志目录
+
+	restartMu sync.Mutex
+	restarts  map[uint]*restartState // serviceID -> 连续自动拉起次数
 }
 
 // SetLogHub 注入日志分发中心(避免循环依赖,setter 注入)。
@@ -47,6 +60,43 @@ func (s *ServiceService) SetArtifactDeps(artRepo *repository.ArtifactRepository,
 	s.store = store
 }
 
+// SetHealthMonitor 注入健康检查监视器。
+func (s *ServiceService) SetHealthMonitor(m *healthcheck.Monitor) {
+	s.health = m
+}
+
+// HealthProbeTargets 返回当前需要探测的服务配置(running + 启用探针)。
+// 供 healthcheck.Monitor 的 ConfigProvider 使用。
+func (s *ServiceService) HealthProbeTargets() map[uint]healthcheck.Config {
+	services, err := s.repo.List(repository.ListFilter{Status: string(model.StatusRunning)})
+	if err != nil {
+		return nil
+	}
+	out := make(map[uint]healthcheck.Config)
+	for _, svc := range services {
+		if !s.procs.IsAlive(svc.PID) {
+			continue
+		}
+		cfg, err := s.repo.GetCurrentConfig(svc.ID)
+		if err != nil || cfg == nil {
+			continue
+		}
+		hc := healthcheck.ParseConfig(cfg.HealthCheck)
+		// target 为空时,用 port 推导
+		if hc.Enabled() && strings.TrimSpace(hc.Target) == "" && cfg.Port > 0 {
+			if hc.Type == healthcheck.TypeTCP {
+				hc.Target = fmt.Sprintf("127.0.0.1:%d", cfg.Port)
+			} else if hc.Type == healthcheck.TypeHTTP {
+				hc.Target = fmt.Sprintf("http://127.0.0.1:%d/", cfg.Port)
+			}
+		}
+		if hc.Enabled() {
+			out[svc.ID] = hc
+		}
+	}
+	return out
+}
+
 // NewServiceService 构造。
 func NewServiceService(
 	db *gorm.DB,
@@ -55,7 +105,17 @@ func NewServiceService(
 	procs *process.Manager,
 	dataDir string,
 ) *ServiceService {
-	return &ServiceService{db: db, repo: repo, opRepo: opRepo, procs: procs, dataDir: dataDir}
+	s := &ServiceService{
+		db:       db,
+		repo:     repo,
+		opRepo:   opRepo,
+		procs:    procs,
+		dataDir:  dataDir,
+		restarts: make(map[uint]*restartState),
+	}
+	// 注册进程意外退出回调 → 崩溃检测 + 自动拉起
+	procs.SetExitHandler(s.onProcessExit)
+	return s
 }
 
 // ===== 创建/CRUD =====
@@ -156,8 +216,14 @@ func (s *ServiceService) GetDetail(id uint) (map[string]any, error) {
 			result["runtime"] = rt
 		}
 	}
-	// 附加实时存活状态
-	result["alive"] = s.procs.IsAlive(svc.PID)
+	// 附加实时存活状态与健康检查
+	alive := s.procs.IsAlive(svc.PID)
+	result["alive"] = alive
+	if st, err := s.GetStatus(id); err == nil {
+		if h, ok := st["health"]; ok {
+			result["health"] = h
+		}
+	}
 	return result, nil
 }
 
@@ -222,10 +288,118 @@ func (s *ServiceService) Delete(id uint) error {
 	return s.repo.Delete(id)
 }
 
+// UpdateConfigInput 更新运行配置入参(指针字段为 nil 表示不改)。
+type UpdateConfigInput struct {
+	Command         *string `json:"command"`
+	Args            *string `json:"args"`
+	JVMArgs         *string `json:"jvm_args"`
+	EnvVars         *string `json:"env_vars"`
+	Port            *int    `json:"port"`
+	HealthCheck     *string `json:"health_check"` // JSON: {type,target,interval_sec,timeout_sec}
+	AutoRestart     *bool   `json:"auto_restart"`
+	MaxRestarts     *int    `json:"max_restarts"`
+	ShutdownTimeout *int    `json:"shutdown_timeout"`
+}
+
+// UpdateConfig 更新当前生效配置。
+// 运行中仅允许改 auto_restart / max_restarts / shutdown_timeout / health_check;
+// 命令/参数/环境变量/端口需停服后修改。
+func (s *ServiceService) UpdateConfig(id uint, in UpdateConfigInput) (*model.ServiceConfig, error) {
+	svc, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	cfg, err := s.repo.GetCurrentConfig(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	running := svc.Status == model.StatusRunning
+	// 运行中禁止改启动相关字段
+	if running {
+		if in.Command != nil || in.Args != nil || in.JVMArgs != nil || in.EnvVars != nil || in.Port != nil {
+			return nil, ErrCannotModify
+		}
+	}
+
+	if in.Command != nil {
+		cfg.Command = *in.Command
+	}
+	if in.Args != nil {
+		cfg.Args = *in.Args
+	}
+	if in.JVMArgs != nil {
+		cfg.JVMArgs = *in.JVMArgs
+	}
+	if in.EnvVars != nil {
+		// 允许空字符串清空;若非空则校验 JSON
+		v := strings.TrimSpace(*in.EnvVars)
+		if v != "" {
+			var tmp map[string]string
+			if err := json.Unmarshal([]byte(v), &tmp); err != nil {
+				return nil, fmt.Errorf("%w: env_vars 须为 JSON 对象", ErrInvalidConfig)
+			}
+		}
+		cfg.EnvVars = v
+	}
+	if in.Port != nil {
+		cfg.Port = *in.Port
+	}
+	if in.HealthCheck != nil {
+		v := strings.TrimSpace(*in.HealthCheck)
+		if v != "" {
+			// 校验 JSON 结构
+			hc := healthcheck.ParseConfig(v)
+			if hc.Type != healthcheck.TypeNone && hc.Type != healthcheck.TypeHTTP && hc.Type != healthcheck.TypeTCP {
+				return nil, fmt.Errorf("%w: health_check.type 须为 none/http/tcp", ErrInvalidConfig)
+			}
+			// 重新序列化规范化
+			b, _ := json.Marshal(hc)
+			v = string(b)
+		}
+		cfg.HealthCheck = v
+		// 配置变更后清缓存,下次立即按新配置探测
+		if s.health != nil {
+			s.health.Clear(id)
+		}
+	}
+	if in.AutoRestart != nil {
+		cfg.AutoRestart = *in.AutoRestart
+	}
+	if in.MaxRestarts != nil {
+		if *in.MaxRestarts < 0 {
+			return nil, fmt.Errorf("%w: max_restarts 不能为负", ErrInvalidConfig)
+		}
+		cfg.MaxRestarts = *in.MaxRestarts
+	}
+	if in.ShutdownTimeout != nil {
+		if *in.ShutdownTimeout <= 0 {
+			return nil, fmt.Errorf("%w: shutdown_timeout 须为正整数", ErrInvalidConfig)
+		}
+		cfg.ShutdownTimeout = *in.ShutdownTimeout
+	}
+
+	if err := s.repo.UpdateConfig(cfg); err != nil {
+		return nil, err
+	}
+	return cfg, nil
+}
+
 // ===== 生命周期动作 =====
 
 // Start 启动服务。
 func (s *ServiceService) Start(id uint) (*model.Operation, error) {
+	return s.startInternal(id, false)
+}
+
+// startInternal 启动实现。auto=true 表示崩溃自动拉起(不重置连续计数)。
+func (s *ServiceService) startInternal(id uint, auto bool) (*model.Operation, error) {
 	svc, cfg, err := s.loadForAction(id)
 	if err != nil {
 		return nil, err
@@ -236,7 +410,11 @@ func (s *ServiceService) Start(id uint) (*model.Operation, error) {
 		return nil, ErrAlreadyRunning
 	}
 
-	op := s.beginOp(svc.ID, model.OpStart, "")
+	detail := ""
+	if auto {
+		detail = "auto_restart"
+	}
+	op := s.beginOp(svc.ID, model.OpStart, detail)
 
 	// 拼装启动命令
 	opts, err := s.buildStartOptions(svc, cfg)
@@ -256,6 +434,10 @@ func (s *ServiceService) Start(id uint) (*model.Operation, error) {
 	if err := s.repo.UpdateStatus(svc.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
 		s.finishOpFail(op, err)
 		return op, err
+	}
+	if !auto {
+		// 用户手动启动:重置连续崩溃计数
+		s.resetRestartCount(svc.ID)
 	}
 	s.finishOpOK(op, fmt.Sprintf("PID=%d, 日志=%s", info.PID, info.LogPath))
 	// 通知日志中心切换到新日志文件,使订阅者能继续收到新输出
@@ -289,6 +471,10 @@ func (s *ServiceService) Stop(id uint) (*model.Operation, error) {
 	if err := s.repo.UpdateStatus(svc.ID, model.StatusStopped, 0, asAny((*time.Time)(nil))); err != nil {
 		s.finishOpFail(op, err)
 		return op, err
+	}
+	s.resetRestartCount(svc.ID)
+	if s.health != nil {
+		s.health.Clear(svc.ID)
 	}
 	s.finishOpOK(op, "已停止")
 	return op, nil
@@ -332,16 +518,17 @@ func (s *ServiceService) Restart(id uint) (*model.Operation, error) {
 		s.finishOpFail(op, err)
 		return op, err
 	}
-	now := time.Now()
-	if err := s.repo.UpdateStatus(svc2.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
-		s.finishOpFail(op, err)
-		return op, err
+		now := time.Now()
+		if err := s.repo.UpdateStatus(svc2.ID, model.StatusRunning, info.PID, asAny(&now)); err != nil {
+			s.finishOpFail(op, err)
+			return op, err
+		}
+		s.resetRestartCount(svc2.ID)
+		s.finishOpOK(op, fmt.Sprintf("已重启, PID=%d", info.PID))
+		// 重启产生新日志文件,通知日志中心切换
+		s.NotifyLogPath(svc2.ID)
+		return op, nil
 	}
-	s.finishOpOK(op, fmt.Sprintf("已重启, PID=%d", info.PID))
-	// 重启产生新日志文件,通知日志中心切换
-	s.NotifyLogPath(svc2.ID)
-	return op, nil
-}
 
 // ===== 安装 / 卸载(M4)=====
 
@@ -551,7 +738,109 @@ func (s *ServiceService) Uninstall(serviceID uint, keepData bool) (*model.Operat
 	return op, nil
 }
 
-// GetStatus 实时状态:探测 PID 存活,返回综合状态。
+// onProcessExit 进程意外退出回调:标记 crashed,按配置尝试自动拉起。
+func (s *ServiceService) onProcessExit(serviceID uint, pid int, waitErr error) {
+	svc, err := s.repo.GetByID(serviceID)
+	if err != nil {
+		return
+	}
+	// 仅当 DB 仍认为 running 且 PID 匹配时处理(避免与主动 stop 竞态)
+	if svc.Status != model.StatusRunning {
+		return
+	}
+	if svc.PID != 0 && svc.PID != pid {
+		return
+	}
+
+	_ = s.repo.UpdateStatus(serviceID, model.StatusCrashed, pid, nil)
+	log.Printf("[auto-restart] 服务 #%d 进程退出(pid=%d, err=%v), 状态 → crashed", serviceID, pid, waitErr)
+
+	cfg, _ := s.repo.GetCurrentConfig(serviceID)
+	if cfg == nil || !cfg.AutoRestart {
+		return
+	}
+	max := cfg.MaxRestarts
+	if max <= 0 {
+		max = 3
+	}
+
+	count := s.bumpRestartCount(serviceID)
+	if count > max {
+		log.Printf("[auto-restart] 服务 #%d 已达最大拉起次数 %d, 放弃", serviceID, max)
+		return
+	}
+
+	// 指数退避:1s, 2s, 4s... 上限 30s
+	backoff := time.Duration(1<<uint(count-1)) * time.Second
+	if backoff > 30*time.Second {
+		backoff = 30 * time.Second
+	}
+	log.Printf("[auto-restart] 服务 #%d 第 %d/%d 次自动拉起, %v 后执行", serviceID, count, max, backoff)
+	time.Sleep(backoff)
+
+	// 再次确认:用户可能已手动 stop 或 start
+	svc2, err := s.repo.GetByID(serviceID)
+	if err != nil || svc2.Status == model.StatusRunning || svc2.Status == model.StatusStopping {
+		return
+	}
+	if _, err := s.startInternal(serviceID, true); err != nil {
+		log.Printf("[auto-restart] 服务 #%d 自动拉起失败: %v", serviceID, err)
+	} else {
+		log.Printf("[auto-restart] 服务 #%d 自动拉起成功", serviceID)
+	}
+}
+
+func (s *ServiceService) bumpRestartCount(id uint) int {
+	s.restartMu.Lock()
+	defer s.restartMu.Unlock()
+	st, ok := s.restarts[id]
+	if !ok {
+		st = &restartState{}
+		s.restarts[id] = st
+	}
+	// 若距上次拉起超过 5 分钟,重置计数(认为服务曾稳定运行)
+	if time.Since(st.last) > 5*time.Minute {
+		st.count = 0
+	}
+	st.count++
+	st.last = time.Now()
+	return st.count
+}
+
+func (s *ServiceService) resetRestartCount(id uint) {
+	s.restartMu.Lock()
+	delete(s.restarts, id)
+	s.restartMu.Unlock()
+}
+
+// ConsoleInput 向运行中服务的 stdin 写入控制台输入。
+// 用于 xterm 控制台交互;仅当进程由本实例 ProcessManager 拉起时可用。
+func (s *ServiceService) ConsoleInput(id uint, data string) error {
+	svc, err := s.repo.GetByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if svc.Status != model.StatusRunning {
+		return ErrNotRunning
+	}
+	// 保证以换行结尾,便于交互式程序按行读取
+	payload := data
+	if payload != "" && !strings.HasSuffix(payload, "\n") {
+		payload += "\n"
+	}
+	if err := s.procs.WriteStdin(id, []byte(payload)); err != nil {
+		if errors.Is(err, process.ErrNoStdin) {
+			return ErrNoConsole
+		}
+		return err
+	}
+	return nil
+}
+
+// GetStatus 实时状态:探测 PID 存活 + 健康检查,返回综合状态。
 // 若 DB 标 running 但进程已死 → 视为 crashed,并同步更新 DB。
 func (s *ServiceService) GetStatus(id uint) (map[string]any, error) {
 	svc, err := s.repo.GetByID(id)
@@ -569,15 +858,64 @@ func (s *ServiceService) GetStatus(id uint) (map[string]any, error) {
 	if svc.Status == model.StatusRunning && !alive {
 		_ = s.repo.UpdateStatus(svc.ID, model.StatusCrashed, svc.PID, nil)
 		status = string(model.StatusCrashed)
+		if s.health != nil {
+			s.health.Clear(svc.ID)
+		}
 	}
 
-	return map[string]any{
+	result := map[string]any{
 		"service_id": svc.ID,
 		"status":     status,
 		"pid":        svc.PID,
 		"alive":      alive,
 		"started_at": svc.StartedAt,
-	}, nil
+	}
+
+	// 健康检查(仅 running 且进程存活时)
+	var healthInfo map[string]any
+	if status == string(model.StatusRunning) && alive {
+		cfg, _ := s.repo.GetCurrentConfig(id)
+		hc := healthcheck.Config{Type: healthcheck.TypeNone}
+		if cfg != nil {
+			hc = healthcheck.ParseConfig(cfg.HealthCheck)
+			if hc.Enabled() && strings.TrimSpace(hc.Target) == "" && cfg.Port > 0 {
+				if hc.Type == healthcheck.TypeTCP {
+					hc.Target = fmt.Sprintf("127.0.0.1:%d", cfg.Port)
+				} else {
+					hc.Target = fmt.Sprintf("http://127.0.0.1:%d/", cfg.Port)
+				}
+			}
+		}
+		if hc.Enabled() {
+			var r healthcheck.Result
+			if s.health != nil {
+				// 优先用缓存;无缓存则立即探测
+				if cached, ok := s.health.Get(id); ok && cached.Checked {
+					r = cached
+				} else {
+					r = s.health.CheckNow(id, hc)
+				}
+			} else {
+				r = healthcheck.Probe(hc)
+			}
+			healthInfo = map[string]any{
+				"enabled":    true,
+				"healthy":    r.Healthy,
+				"checked":    r.Checked,
+				"message":    r.Message,
+				"latency_ms": r.LatencyMs,
+				"checked_at": r.CheckedAt,
+				"type":       r.Type,
+				"target":     r.Target,
+			}
+		} else {
+			healthInfo = map[string]any{"enabled": false, "healthy": true, "message": "未配置"}
+		}
+	} else {
+		healthInfo = map[string]any{"enabled": false, "healthy": false, "message": "服务未运行"}
+	}
+	result["health"] = healthInfo
+	return result, nil
 }
 
 // ===== 内部辅助 =====
@@ -700,6 +1038,44 @@ func (s *ServiceService) finishOpFail(op *model.Operation, e error) {
 // ListOperations 全局操作历史。
 func (s *ServiceService) ListOperations(opType, status string, limit int) ([]model.Operation, error) {
 	return s.opRepo.ListAll(opType, status, limit)
+}
+
+// ListOperationsEnriched 全局操作历史,附带服务名称(供操作中心展示)。
+func (s *ServiceService) ListOperationsEnriched(opType, status string, limit int) ([]map[string]any, error) {
+	ops, err := s.opRepo.ListAll(opType, status, limit)
+	if err != nil {
+		return nil, err
+	}
+	services, err := s.repo.List(repository.ListFilter{})
+	if err != nil {
+		return nil, err
+	}
+	nameByID := map[uint]string{}
+	codeByID := map[uint]string{}
+	for _, svc := range services {
+		nameByID[svc.ID] = svc.Name
+		codeByID[svc.ID] = svc.Code
+	}
+	out := make([]map[string]any, 0, len(ops))
+	for _, op := range ops {
+		out = append(out, map[string]any{
+			"id":           op.ID,
+			"service_id":   op.ServiceID,
+			"service_name": nameByID[op.ServiceID],
+			"service_code": codeByID[op.ServiceID],
+			"type":         op.Type,
+			"status":       op.Status,
+			"triggered_by": op.TriggeredBy,
+			"detail":       op.Detail,
+			"output_log":   op.OutputLog,
+			"error_msg":    op.ErrorMsg,
+			"started_at":   op.StartedAt,
+			"finished_at":  op.FinishedAt,
+			"created_at":   op.CreatedAt,
+			"updated_at":   op.UpdatedAt,
+		})
+	}
+	return out, nil
 }
 
 // GetOperation 单条操作详情。

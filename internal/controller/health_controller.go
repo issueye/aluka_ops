@@ -8,10 +8,11 @@ import (
 	"gorm.io/gorm"
 
 	"aluka_ops/internal/config"
+	"aluka_ops/internal/version"
 )
 
-// AppVersion 应用版本号(后续可由 ldflags 注入)。
-const AppVersion = "0.1.0-m1"
+// AppVersion 兼容旧引用,实际定义见 internal/version。
+const AppVersion = version.AppVersion
 
 // HealthController 健康检查与系统信息。
 type HealthController struct {

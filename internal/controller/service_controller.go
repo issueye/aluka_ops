@@ -187,6 +187,27 @@ func (h *ServiceController) GetConfig(c *gin.Context) {
 	OK(c, detail["config"])
 }
 
+// UpdateConfig PUT /api/services/:id/config
+// 更新当前生效配置。运行中仅允许改 auto_restart / max_restarts / shutdown_timeout。
+func (h *ServiceController) UpdateConfig(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		FailBind(c, err)
+		return
+	}
+	var in service.UpdateConfigInput
+	if err := c.ShouldBindJSON(&in); err != nil {
+		FailBind(c, err)
+		return
+	}
+	cfg, err := h.svc.UpdateConfig(id, in)
+	if err != nil {
+		respondServiceErr(c, err)
+		return
+	}
+	OK(c, cfg)
+}
+
 // Operations GET /api/services/:id/operations
 func (h *ServiceController) Operations(c *gin.Context) {
 	id, err := parseID(c)
@@ -201,6 +222,32 @@ func (h *ServiceController) Operations(c *gin.Context) {
 		return
 	}
 	OK(c, items)
+}
+
+// ConsoleInputBody 控制台输入请求体。
+type ConsoleInputBody struct {
+	// Input 要写入进程 stdin 的文本;后端会在末尾补换行(若无)。
+	Input string `json:"input" binding:"required"`
+}
+
+// ConsoleInput POST /api/services/:id/console
+// 向运行中服务的 stdin 写入数据(供 xterm 控制台使用)。
+func (h *ServiceController) ConsoleInput(c *gin.Context) {
+	id, err := parseID(c)
+	if err != nil {
+		FailBind(c, err)
+		return
+	}
+	var body ConsoleInputBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		FailBind(c, err)
+		return
+	}
+	if err := h.svc.ConsoleInput(id, body.Input); err != nil {
+		respondServiceErr(c, err)
+		return
+	}
+	OKMsg(c, "ok")
 }
 
 // respondServiceErr 统一处理 Service 层错误到 HTTP 响应。

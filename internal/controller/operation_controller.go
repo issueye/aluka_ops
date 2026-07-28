@@ -17,9 +17,10 @@ func NewOperationController(svc *service.ServiceService) *OperationController {
 }
 
 // List GET /api/operations?type=&status=&limit=
+// 返回附带 service_name / service_code 的操作记录,便于操作中心展示。
 func (h *OperationController) List(c *gin.Context) {
 	limit := atoiDefault(c.Query("limit"), 100)
-	items, err := h.svc.ListOperations(c.Query("type"), c.Query("status"), limit)
+	items, err := h.svc.ListOperationsEnriched(c.Query("type"), c.Query("status"), limit)
 	if err != nil {
 		FailServer(c, err)
 		return

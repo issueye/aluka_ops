@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Activity, FileText, Terminal, ScrollText, Package } from "lucide-react";
+import { ArrowLeft, Activity, FileText, Terminal, ScrollText, Package, TerminalSquare } from "lucide-react";
 import { serviceApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServiceStatusBadge } from "@/components/services/ServiceStatusBadge";
 import { ServiceActions } from "@/components/services/ServiceActions";
+import { ServiceConfigForm } from "@/components/services/ServiceConfigForm";
 import { LogViewer } from "@/components/services/LogViewer";
+import { ServiceConsole } from "@/components/services/ServiceConsole";
 import { ArtifactList } from "@/components/services/ArtifactList";
 import { formatTime } from "@/lib/utils";
 
@@ -60,6 +62,7 @@ export function ServiceDetail() {
   const cfg = detail?.config || {};
   const rt = detail?.runtime;
   const alive = detail?.alive;
+  const health = detail?.health;
 
   if (!svc) {
     return (
@@ -97,6 +100,7 @@ export function ServiceDetail() {
           <TabsTrigger value="config"><FileText className="mr-1.5 h-3.5 w-3.5" />配置</TabsTrigger>
           <TabsTrigger value="version"><Package className="mr-1.5 h-3.5 w-3.5" />版本</TabsTrigger>
           <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-3.5 w-3.5" />日志</TabsTrigger>
+          <TabsTrigger value="console"><TerminalSquare className="mr-1.5 h-3.5 w-3.5" />控制台</TabsTrigger>
           <TabsTrigger value="operations"><Terminal className="mr-1.5 h-3.5 w-3.5" />操作记录</TabsTrigger>
         </TabsList>
 
@@ -107,6 +111,25 @@ export function ServiceDetail() {
             <CardContent>
               <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
                 <Field label="进程状态" value={alive ? "存活" : "未运行"} />
+                <div className="space-y-1">
+                  <div className="text-xs text-muted-foreground">健康检查</div>
+                  <div className="flex items-center gap-2 text-sm">
+                    {!health?.enabled ? (
+                      <span className="text-muted-foreground">未配置</span>
+                    ) : health.healthy ? (
+                      <Badge variant="success">健康</Badge>
+                    ) : (
+                      <Badge variant="danger">异常</Badge>
+                    )}
+                    {health?.enabled && (
+                      <span className="truncate text-xs text-muted-foreground" title={health.message}>
+                        {health.type?.toUpperCase()}
+                        {health.latency_ms != null ? ` · ${health.latency_ms}ms` : ""}
+                        {health.message && health.message !== "ok" ? ` · ${health.message}` : ""}
+                      </span>
+                    )}
+                  </div>
+                </div>
                 <Field label="PID" value={svc.pid ? String(svc.pid) : "—"} mono />
                 <Field label="服务类型" value={svc.type} />
                 <Field label="当前版本" value={svc.current_version || "—"} />
@@ -125,31 +148,9 @@ export function ServiceDetail() {
           </Card>
         </TabsContent>
 
-        {/* 配置 */}
+        {/* 配置(可编辑) */}
         <TabsContent value="config">
-          <Card>
-            <CardHeader><CardTitle className="text-sm">启动配置(只读)</CardTitle></CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-                <Field label="启动命令" value={cfg.command || "—"} mono />
-                <Field label="程序参数" value={cfg.args || "—"} mono />
-                {svc.type === "jar" && (
-                  <Field label="JVM 参数" value={cfg.jvm_args || "—"} mono />
-                )}
-                <Field label="端口" value={cfg.port ? String(cfg.port) : "—"} />
-                <Field label="自动重启" value={cfg.auto_restart ? "是" : "否"} />
-                <Field label="停止超时" value={`${cfg.shutdown_timeout || 10} 秒`} />
-                {cfg.env_vars && (
-                  <div className="col-span-2 sm:col-span-3">
-                    <Field label="环境变量" value={cfg.env_vars} mono />
-                  </div>
-                )}
-              </div>
-              <p className="mt-4 text-xs text-muted-foreground">
-                配置编辑将在后续阶段(M6)提供。当前如需修改,可删除服务后重建。
-              </p>
-            </CardContent>
-          </Card>
+          <ServiceConfigForm service={svc} config={cfg} />
         </TabsContent>
 
         {/* 版本(制品) */}
@@ -160,6 +161,15 @@ export function ServiceDetail() {
         {/* 日志 */}
         <TabsContent value="logs">
           <LogViewer serviceId={svc.id} active={activeTab === "logs"} />
+        </TabsContent>
+
+        {/* 控制台(xterm.js:日志 SSE + stdin 写入) */}
+        <TabsContent value="console">
+          <ServiceConsole
+            serviceId={svc.id}
+            active={activeTab === "console"}
+            running={svc.status === "running" && !!alive}
+          />
         </TabsContent>
 
         {/* 操作记录 */}

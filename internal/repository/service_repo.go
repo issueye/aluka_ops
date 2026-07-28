@@ -112,6 +112,11 @@ func (r *ServiceRepository) CreateConfig(cfg *model.ServiceConfig) error {
 	return r.db.Create(cfg).Error
 }
 
+// UpdateConfig 保存配置全字段。
+func (r *ServiceRepository) UpdateConfig(cfg *model.ServiceConfig) error {
+	return r.db.Save(cfg).Error
+}
+
 // SetCurrentConfig 将某配置设为当前(事务:清除该服务其他 current → 标记本条)。
 func (r *ServiceRepository) SetCurrentConfig(serviceID, configID uint) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {

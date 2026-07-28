@@ -14,6 +14,7 @@ var (
 	ErrCannotModify    = errors.New("服务运行中,无法修改配置")
 	ErrConflict        = errors.New("操作冲突,请刷新后重试")
 	ErrAlreadyCurrent  = errors.New("该制品已是当前版本,无需切换")
+	ErrNoConsole       = errors.New("进程未运行或控制台不可用,请先在本实例启动服务")
 )
 
 // IsNotFound 判断是否为"未找到"类错误。
@@ -30,7 +31,8 @@ func IsClientErr(err error) bool {
 		errors.Is(err, ErrConflict),
 		errors.Is(err, ErrAlreadyRunning),
 		errors.Is(err, ErrNotRunning),
-		errors.Is(err, ErrAlreadyCurrent):
+		errors.Is(err, ErrAlreadyCurrent),
+		errors.Is(err, ErrNoConsole):
 		return true
 	}
 	return false

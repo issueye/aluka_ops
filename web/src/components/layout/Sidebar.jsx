@@ -8,14 +8,17 @@ import {
   ShieldCheck,
   Settings,
   Activity,
+  FileCode2,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// 侧边栏导航项。M1 仅"环境管理"真正可用,其余标注"待实现"。
 const navItems = [
   { to: "/", label: "仪表盘", icon: LayoutDashboard, end: true },
   { to: "/services", label: "服务管理", icon: Boxes },
+  { to: "/agents", label: "多节点", icon: Network },
   { to: "/runtimes", label: "环境管理", icon: Cpu },
+  { to: "/templates", label: "服务模板", icon: FileCode2 },
   { to: "/artifacts", label: "制品管理", icon: Package },
   { to: "/operations", label: "操作记录", icon: History },
   { to: "/audit-logs", label: "审计日志", icon: ShieldCheck },

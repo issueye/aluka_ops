@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Eraser, Pause, Play, Wifi, WifiOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { withAuthQuery } from "@/lib/auth";
 
 // 缓冲上限:超过则丢弃头部,防止长时间运行导致内存膨胀。
 const MAX_LINES = 5000;
@@ -31,7 +32,7 @@ export function LogViewer({ serviceId, active }) {
       esRef.current.close();
       esRef.current = null;
     }
-    const url = `/api/services/${serviceId}/logs/stream?lines=200`;
+    const url = withAuthQuery(`/api/services/${serviceId}/logs/stream?lines=200`);
     const es = new EventSource(url);
     esRef.current = es;
     setStatus("connecting");

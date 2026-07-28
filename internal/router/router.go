@@ -13,7 +13,11 @@ import (
 
 	"aluka_ops/internal/config"
 	"aluka_ops/internal/controller"
+	"aluka_ops/internal/middleware"
+	"aluka_ops/internal/pkg/agent"
 	"aluka_ops/internal/pkg/artifact"
+	"aluka_ops/internal/pkg/auth"
+	"aluka_ops/internal/pkg/healthcheck"
 	"aluka_ops/internal/pkg/logstream"
 	"aluka_ops/internal/pkg/process"
 	"aluka_ops/internal/repository"
@@ -21,7 +25,8 @@ import (
 )
 
 // New 构造 Gin 引擎并注册全部路由。
-func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) *gin.Engine {
+// 返回 stop 函数用于停止 Agent 心跳等后台任务。
+func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, func()) {
 	if cfg.Mode != config.ModeAgent {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -38,6 +43,7 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) *gin.Engine {
 	serviceRepo := repository.NewServiceRepository(db)
 	opRepo := repository.NewOperationRepository(db)
 	artifactRepo := repository.NewArtifactRepository(db)
+	auditRepo := repository.NewAuditRepository(db)
 	artifactStore := artifact.NewStore(cfg.DataDir)
 	serviceSvc := service.NewServiceService(db, serviceRepo, opRepo, procs, cfg.DataDir)
 	// 日志分发中心(单例),注入 service 用于启动/重启后切换日志文件
@@ -46,24 +52,59 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) *gin.Engine {
 	// 制品依赖(install/uninstall 用)
 	artifactSvc := service.NewArtifactService(db, artifactRepo, serviceRepo, artifactStore)
 	serviceSvc.SetArtifactDeps(artifactRepo, artifactStore)
+	// 健康检查后台轮询
+	healthMon := healthcheck.NewMonitor(func() map[uint]healthcheck.Config {
+		return serviceSvc.HealthProbeTargets()
+	})
+	serviceSvc.SetHealthMonitor(healthMon)
+	healthMon.Start()
+	auditSvc := service.NewAuditService(auditRepo)
 
 	serviceCtl := controller.NewServiceController(serviceSvc)
 	operationCtl := controller.NewOperationController(serviceSvc)
 	logCtl := controller.NewLogController(serviceSvc, logHub)
 	artifactCtl := controller.NewArtifactController(artifactSvc, serviceSvc)
+	dashboardSvc := service.NewDashboardService(serviceRepo, runtimeRepo, opRepo)
+	dashboardCtl := controller.NewDashboardController(dashboardSvc)
+	auditCtl := controller.NewAuditController(auditSvc)
+	templateRepo := repository.NewTemplateRepository(db)
+	templateSvc := service.NewTemplateService(db, templateRepo, serviceRepo)
+	templateCtl := controller.NewTemplateController(templateSvc)
+	agentSvc := service.NewAgentService(cfg, serviceRepo, runtimeRepo)
+	agentCtl := controller.NewAgentController(cfg, agentSvc, serviceSvc)
+	// Controller 模式:Agent 注册表
+	ctrlReg := service.NewControllerRegistry(cfg)
+	ctrlAgentsCtl := controller.NewControllerAgentsController(cfg, ctrlReg)
 
 	healthCtl := controller.NewHealthController(db, cfg)
+	// 鉴权:ALUKA_PASSWORD 非空时启用
+	authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
+	authCtl := controller.NewAuthController(authStore)
 
 	// ===== API =====
 	api := r.Group("/api")
+	// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
+	api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
+	// 写操作审计(成功后落库)
+	api.Use(middleware.AuditWrite(auditSvc))
 	{
 		api.GET("/health", healthCtl.Health)
 
-		// 运行环境(M1 垂直切片)
+		// 认证
+		authG := api.Group("/auth")
+		{
+			authG.GET("/status", authCtl.Status)
+			authG.POST("/login", authCtl.Login)
+			authG.POST("/logout", authCtl.Logout)
+		}
+
+		// 运行环境
 		rt := api.Group("/runtimes")
 		{
 			rt.GET("", runtimeCtl.List)
 			rt.GET("/", runtimeCtl.List)
+			// detect 必须在 /:id 之前注册,避免被当成 id
+			rt.GET("/detect", runtimeCtl.Detect)
 			rt.POST("", runtimeCtl.Create)
 			rt.GET("/:id", runtimeCtl.Get)
 			rt.PUT("/:id", runtimeCtl.Update)
@@ -84,9 +125,12 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) *gin.Engine {
 			svc.POST("/:id/start", serviceCtl.Start)
 			svc.POST("/:id/stop", serviceCtl.Stop)
 			svc.POST("/:id/restart", serviceCtl.Restart)
-			svc.GET("/:id/status", serviceCtl.Status)
-			svc.GET("/:id/config", serviceCtl.GetConfig)
-			svc.GET("/:id/operations", serviceCtl.Operations)
+				svc.GET("/:id/status", serviceCtl.Status)
+				svc.GET("/:id/config", serviceCtl.GetConfig)
+				svc.PUT("/:id/config", serviceCtl.UpdateConfig)
+				svc.GET("/:id/operations", serviceCtl.Operations)
+			// 控制台:向进程 stdin 写入(配合前端 xterm + 日志 SSE)
+			svc.POST("/:id/console", serviceCtl.ConsoleInput)
 
 			// 日志(M3:SSE 实时流 + 历史查询 + 下载)
 			svc.GET("/:id/logs", logCtl.History)
@@ -113,30 +157,68 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) *gin.Engine {
 			ops.GET("/:id", operationCtl.Get)
 		}
 
-		// 以下路由组仅注册占位,后续阶段填充。
-		registerPlaceholder(api, "/templates", "服务模板")
-		registerPlaceholder(api, "/audit-logs", "审计日志")
-		registerPlaceholder(api, "/dashboard", "仪表盘")
+			// 仪表盘
+			dash := api.Group("/dashboard")
+			{
+				dash.GET("/stats", dashboardCtl.Stats)
+			}
 
-		// Agent 接口预留(单机版暂不启用上报循环)。
-		agent := api.Group("/agent")
-		{
-			agent.GET("/status", func(c *gin.Context) {
-				controller.OK(c, gin.H{
-					"mode":      cfg.Mode,
-					"agent":     cfg.Mode == config.ModeAgent,
-					"enabled":   cfg.Mode == config.ModeAgent,
-					"note":      "Agent 上报循环将在多机纳管阶段启用",
-				})
-			})
+			// 审计日志
+			audit := api.Group("/audit-logs")
+			{
+				audit.GET("", auditCtl.List)
+				audit.GET("/", auditCtl.List)
+				audit.GET("/:id", auditCtl.Get)
+			}
+
+			// 服务模板
+			tpl := api.Group("/templates")
+			{
+				tpl.GET("", templateCtl.List)
+				tpl.GET("/", templateCtl.List)
+				tpl.POST("", templateCtl.Create)
+				// apply 须在 /:id 的子路径,Gin 支持
+				tpl.POST("/:id/apply", templateCtl.Apply)
+				tpl.GET("/:id", templateCtl.Get)
+				tpl.PUT("/:id", templateCtl.Update)
+				tpl.DELETE("/:id", templateCtl.Delete)
+			}
+
+			// Agent 侧 API(供中心 Controller 查询/下发启停)
+			agentG := api.Group("/agent")
+			{
+				agentG.GET("/status", agentCtl.Status)
+				agentG.GET("/info", agentCtl.Info)
+				agentG.GET("/services", agentCtl.Services)
+				agentG.POST("/services/:id/start", agentCtl.Start)
+				agentG.POST("/services/:id/stop", agentCtl.Stop)
+				agentG.POST("/services/:id/restart", agentCtl.Restart)
+			}
+
+			// 中心 Controller:接收心跳 + 多节点管控
+			agents := api.Group("/agents")
+			{
+				agents.POST("/heartbeat", ctrlAgentsCtl.Heartbeat)
+				agents.GET("", ctrlAgentsCtl.List)
+				agents.GET("/", ctrlAgentsCtl.List)
+				agents.GET("/:id", ctrlAgentsCtl.Get)
+				agents.GET("/:id/services", ctrlAgentsCtl.Services)
+				agents.POST("/:id/services/:sid/start", ctrlAgentsCtl.Start)
+				agents.POST("/:id/services/:sid/stop", ctrlAgentsCtl.Stop)
+				agents.POST("/:id/services/:sid/restart", ctrlAgentsCtl.Restart)
+			}
 		}
+
+		// ===== 静态前端(embed) =====
+		registerStatic(r)
+
+		// Agent 心跳上报
+		hb := agent.NewHeartbeatLoop(cfg, agentSvc)
+		hb.Start()
+		stop := func() { hb.Stop() }
+
+		return r, stop
 	}
-
-	// ===== 静态前端(embed) =====
-	registerStatic(r)
-
-	return r
-}
 
 // registerPlaceholder 为尚未实现的路由组注册统一占位 handler。
 // 覆盖常见 CRUD 方法,统一返回 501。
@@ -165,7 +247,7 @@ func corsMiddleware(allowOrigin string) gin.HandlerFunc {
 		}
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-Token, X-Operator")
 		c.Header("Access-Control-Allow-Credentials", "true")
 		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(http.StatusNoContent)

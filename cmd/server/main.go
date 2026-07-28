@@ -19,10 +19,10 @@ import (
 	"time"
 
 	"aluka_ops/internal/config"
-	"aluka_ops/internal/controller"
 	"aluka_ops/internal/pkg/db"
 	"aluka_ops/internal/pkg/process"
 	"aluka_ops/internal/router"
+	"aluka_ops/internal/version"
 )
 
 func main() {
@@ -41,13 +41,21 @@ func main() {
 		}
 	}()
 
-	log.Printf("Aluka Ops %s 启动中(模式: %s)", controller.AppVersion, cfg.Mode)
+	log.Printf("Aluka Ops %s 启动中(模式: %s)", version.AppVersion, cfg.Mode)
 	log.Printf("数据库: %s", cfg.DBPath)
+	if cfg.IsAgentMode() {
+		log.Printf("Agent ID: %s", cfg.AgentID)
+		if cfg.ControllerURL != "" {
+			log.Printf("Controller: %s", cfg.ControllerURL)
+		}
+	}
 
 	// 进程管理器单例:管理所有被拉起的服务进程。
 	procs := process.NewManager()
 
-	engine := router.New(gormDB, cfg, procs)
+	engine, stopAgent := router.New(gormDB, cfg, procs)
+	defer stopAgent()
+
 	srv := &http.Server{
 		Addr:              cfg.HTTPAddr(),
 		Handler:           engine,

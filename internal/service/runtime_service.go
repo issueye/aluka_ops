@@ -3,11 +3,13 @@ package service
 
 import (
 	"errors"
+	"path/filepath"
 	"strings"
 
 	"gorm.io/gorm"
 
 	"aluka_ops/internal/model"
+	"aluka_ops/internal/pkg/runtimeutil"
 	"aluka_ops/internal/repository"
 )
 
@@ -157,4 +159,50 @@ func (s *RuntimeService) Delete(id uint) error {
 		return err
 	}
 	return s.repo.Delete(id)
+}
+
+// DetectJDK 探测本机 JDK,并标记是否已在系统中登记。
+func (s *RuntimeService) DetectJDK() ([]map[string]any, error) {
+	found := runtimeutil.DetectJDK()
+	existing, err := s.repo.List()
+	if err != nil {
+		return nil, err
+	}
+	// 按 install_path 归一化比对
+	registered := map[string]uint{}
+	for _, rt := range existing {
+		if rt.Type != model.RuntimeTypeJDK {
+			continue
+		}
+		key := filepathClean(rt.InstallPath)
+		registered[key] = rt.ID
+	}
+	out := make([]map[string]any, 0, len(found))
+	for _, d := range found {
+		key := filepathClean(d.InstallPath)
+		item := map[string]any{
+			"name":         d.Name,
+			"type":         d.Type,
+			"version":      d.Version,
+			"install_path": d.InstallPath,
+			"source":       d.Source,
+			"exists":       d.Exists,
+			"registered":   false,
+			"runtime_id":   nil,
+		}
+		if id, ok := registered[key]; ok {
+			item["registered"] = true
+			item["runtime_id"] = id
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+func filepathClean(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return ""
+	}
+	return strings.ToLower(filepath.Clean(p))
 }

@@ -28,6 +28,17 @@ func (h *RuntimeController) List(c *gin.Context) {
 	OK(c, items)
 }
 
+// Detect GET /api/runtimes/detect
+// 探测本机 JDK 安装位置,返回候选列表(含是否已登记)。
+func (h *RuntimeController) Detect(c *gin.Context) {
+	items, err := h.svc.DetectJDK()
+	if err != nil {
+		FailServer(c, err)
+		return
+	}
+	OK(c, items)
+}
+
 // Create POST /api/runtimes
 func (h *RuntimeController) Create(c *gin.Context) {
 	var in service.CreateRuntimeInput
