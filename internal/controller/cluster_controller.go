@@ -21,6 +21,7 @@ func (h *ClusterController) Status(c *gin.Context) {
 }
 
 // Update PUT /api/cluster/config
+// 配置会落库;若 connect=true 且连中心失败,仍返回 200 + data, message 带失败原因。
 func (h *ClusterController) Update(c *gin.Context) {
 	var in service.ClusterConfigInput
 	if err := c.ShouldBindJSON(&in); err != nil {
@@ -29,6 +30,15 @@ func (h *ClusterController) Update(c *gin.Context) {
 	}
 	st, err := h.svc.UpdateConfig(in)
 	if err != nil {
+		// 区分「参数错误」与「连接失败」:有 status 数据时用 200 带回
+		if st != nil {
+			c.JSON(200, gin.H{
+				"code":    CodeOK,
+				"message": "配置已保存,但连接中心失败: " + err.Error(),
+				"data":    st,
+			})
+			return
+		}
 		Fail(c, 400, CodeErrBad, err.Error())
 		return
 	}
@@ -39,10 +49,23 @@ func (h *ClusterController) Update(c *gin.Context) {
 func (h *ClusterController) Connect(c *gin.Context) {
 	st, err := h.svc.ConnectNow()
 	if err != nil {
+		if st != nil {
+			c.JSON(200, gin.H{
+				"code":    CodeOK,
+				"message": err.Error(),
+				"data":    st,
+			})
+			return
+		}
 		Fail(c, 400, CodeErrBad, err.Error())
 		return
 	}
-	OK(c, st)
+	OKMsg := "已连接中心"
+	if ok, _ := st["connect_ok"].(bool); ok {
+		OK(c, st)
+		return
+	}
+	c.JSON(200, gin.H{"code": CodeOK, "message": OKMsg, "data": st})
 }
 
 // Disconnect POST /api/cluster/disconnect — 停止心跳与隧道客户端

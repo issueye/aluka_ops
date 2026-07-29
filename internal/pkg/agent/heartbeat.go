@@ -106,6 +106,25 @@ func (h *HeartbeatLoop) BeatOnce() {
 	h.beatOnce()
 }
 
+// BeatOnceResult 立即上报并返回是否成功与可读错误。
+func (h *HeartbeatLoop) BeatOnceResult() (ok bool, httpStatus int, msg string) {
+	if h == nil || h.cfg == nil || h.cfg.ControllerURL == "" {
+		return false, 0, "未配置 Controller URL"
+	}
+	return h.beatOnce()
+}
+
+// RecordFailure 将连接/探测失败写入心跳状态(供前端展示)。
+func (h *HeartbeatLoop) RecordFailure(msg string) {
+	if h == nil || h.agent == nil {
+		return
+	}
+	if msg == "" {
+		msg = "连接失败"
+	}
+	h.agent.RecordHeartbeat(false, 0, msg)
+}
+
 func (h *HeartbeatLoop) loop(stop <-chan struct{}, interval time.Duration) {
 	h.beatOnce()
 	ticker := time.NewTicker(interval)
@@ -120,27 +139,30 @@ func (h *HeartbeatLoop) loop(stop <-chan struct{}, interval time.Duration) {
 	}
 }
 
-func (h *HeartbeatLoop) beatOnce() {
+func (h *HeartbeatLoop) beatOnce() (ok bool, httpStatus int, msg string) {
 	if h.agent == nil {
-		return
+		return false, 0, "agent reporter nil"
 	}
 	if h.cfg == nil || h.cfg.ControllerURL == "" {
-		h.agent.RecordHeartbeat(false, 0, "controller_url empty")
-		return
+		msg = "未配置 Controller URL"
+		h.agent.RecordHeartbeat(false, 0, msg)
+		return false, 0, msg
 	}
 	payload := h.agent.HeartbeatPayload()
 	body, err := json.Marshal(payload)
 	if err != nil {
-		h.agent.RecordHeartbeat(false, 0, err.Error())
-		return
+		msg = friendlyNetErr(err)
+		h.agent.RecordHeartbeat(false, 0, msg)
+		return false, 0, msg
 	}
 	url := strings.TrimRight(h.cfg.ControllerURL, "/") + "/api/agents/heartbeat"
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
-		h.agent.RecordHeartbeat(false, 0, err.Error())
-		return
+		msg = friendlyNetErr(err)
+		h.agent.RecordHeartbeat(false, 0, msg)
+		return false, 0, msg
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if h.cfg.AgentToken != "" {
@@ -148,17 +170,53 @@ func (h *HeartbeatLoop) beatOnce() {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		h.agent.RecordHeartbeat(false, 0, err.Error())
-		log.Printf("[agent] 心跳失败: %v", err)
-		return
+		msg = friendlyNetErr(err)
+		h.agent.RecordHeartbeat(false, 0, msg)
+		log.Printf("[agent] 心跳失败: %s", msg)
+		return false, 0, msg
 	}
 	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, resp.Body)
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		h.agent.RecordHeartbeat(true, resp.StatusCode, "ok")
-	} else {
-		msg := fmt.Sprintf("HTTP %d", resp.StatusCode)
-		h.agent.RecordHeartbeat(false, resp.StatusCode, msg)
-		log.Printf("[agent] 心跳被拒绝: %s", msg)
+		return true, resp.StatusCode, "ok"
 	}
+	msg = fmt.Sprintf("中心拒绝心跳 HTTP %d", resp.StatusCode)
+	if resp.StatusCode == 401 || resp.StatusCode == 403 {
+		msg = "中心拒绝：Token 不匹配或无权限(HTTP " + itoa(resp.StatusCode) + ")"
+	}
+	if len(raw) > 0 && len(raw) < 200 {
+		msg = msg + " · " + string(raw)
+	}
+	h.agent.RecordHeartbeat(false, resp.StatusCode, msg)
+	log.Printf("[agent] 心跳被拒绝: %s", msg)
+	return false, resp.StatusCode, msg
+}
+
+// friendlyNetErr 将 dial/refused 等英文错误转成可读中文。
+func friendlyNetErr(err error) string {
+	if err == nil {
+		return ""
+	}
+	s := err.Error()
+	low := strings.ToLower(s)
+	switch {
+	case strings.Contains(low, "connection refused") || strings.Contains(low, "actively refused"):
+		// 从 URL 里尽量抽出地址
+		return "无法连接中心：目标端口无进程监听(connection refused)。请确认中心已启动，且 Controller URL 的 IP/端口正确（本机默认端口常为 18080，不是 19090）。"
+	case strings.Contains(low, "no such host") || strings.Contains(low, "server misbehaving"):
+		return "无法解析中心主机名：请检查 Controller URL"
+	case strings.Contains(low, "i/o timeout") || strings.Contains(low, "deadline exceeded") || strings.Contains(low, "timeout"):
+		return "连接中心超时：请检查网络/防火墙是否放行该端口"
+	case strings.Contains(low, "network is unreachable"):
+		return "网络不可达：请检查本机到中心的路由"
+	case strings.Contains(low, "tls") || strings.Contains(low, "x509"):
+		return "TLS/证书错误：" + s
+	default:
+		return s
+	}
+}
+
+func itoa(n int) string {
+	return fmt.Sprintf("%d", n)
 }

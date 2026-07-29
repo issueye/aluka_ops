@@ -1,10 +1,13 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"aluka_ops/internal/config"
 	"aluka_ops/internal/pkg/agent"
@@ -208,13 +211,16 @@ func (s *ClusterService) UpdateConfig(in ClusterConfigInput) (map[string]any, er
 		doConnect = *in.Connect
 	}
 	if doConnect && s.cfg.IsAgentMode() && s.cfg.ControllerURL != "" {
-		s.ConnectNow()
+		st, err := s.ConnectNow()
+		// 配置已保存;连接失败时仍返回 status + error 供前端提示
+		return st, err
 	}
 
 	return s.Status(), nil
 }
 
 // ConnectNow Agent 立即心跳 + 确保隧道客户端在跑。
+// 若心跳失败仍返回 status，但 error 带可读原因(前端 toast)。
 func (s *ClusterService) ConnectNow() (map[string]any, error) {
 	if s == nil || s.cfg == nil {
 		return nil, errors.New("not ready")
@@ -223,17 +229,75 @@ func (s *ClusterService) ConnectNow() (map[string]any, error) {
 		return nil, fmt.Errorf("仅 agent 模式可连接中心(当前 %s)", s.cfg.Mode)
 	}
 	if strings.TrimSpace(s.cfg.ControllerURL) == "" {
-		return nil, fmt.Errorf("请先配置 controller_url")
+		return nil, fmt.Errorf("请先配置中心 Controller URL")
 	}
-	// 确保循环在跑
+
+	// 先探测中心 /api/health，给出更清晰的端口/连通性提示
+	if err := probeControllerHealth(s.cfg.ControllerURL); err != nil {
+		// 写入心跳状态,前端「连接失败原因」可立即看到中文说明
+		if s.hb != nil {
+			s.hb.RecordFailure(err.Error())
+			s.hb.Restart()
+		}
+		s.restartTunnelClient()
+		st := s.Status()
+		st["connect_ok"] = false
+		st["connect_error"] = err.Error()
+		return st, err
+	}
+
+	// 确保循环在跑并立即打一发心跳
+	var beatErr error
 	if s.hb != nil {
 		if !s.hb.Running() {
 			s.hb.Start()
 		}
-		s.hb.BeatOnce()
+		ok, _, msg := s.hb.BeatOnceResult()
+		if !ok {
+			beatErr = fmt.Errorf("%s", msg)
+		}
 	}
 	s.restartTunnelClient()
-	return s.Status(), nil
+	st := s.Status()
+	if beatErr != nil {
+		st["connect_ok"] = false
+		st["connect_error"] = beatErr.Error()
+		return st, beatErr
+	}
+	st["connect_ok"] = true
+	return st, nil
+}
+
+// probeControllerHealth GET {base}/api/health
+func probeControllerHealth(base string) error {
+	base = strings.TrimRight(strings.TrimSpace(base), "/")
+	if base == "" {
+		return fmt.Errorf("未配置 Controller URL")
+	}
+	u := base + "/api/health"
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		// 复用 heartbeat 的友好文案逻辑（内联避免循环依赖）
+		low := strings.ToLower(err.Error())
+		if strings.Contains(low, "connection refused") || strings.Contains(low, "actively refused") {
+			return fmt.Errorf("无法连接中心 %s：端口无进程监听。请在中心机器启动 aluka_ops，并确认端口(默认 18080)。当前配置: %s", base, base)
+		}
+		if strings.Contains(low, "timeout") || strings.Contains(low, "deadline") {
+			return fmt.Errorf("连接中心超时 %s：检查网络/防火墙", base)
+		}
+		return fmt.Errorf("探测中心失败: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+	return fmt.Errorf("中心健康检查返回 HTTP %d (%s)", resp.StatusCode, u)
 }
 
 // Disconnect 停止上报与隧道客户端(不改 mode,可选)。

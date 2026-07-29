@@ -11,6 +11,7 @@ import {
   Shield,
 } from "lucide-react";
 import { healthApi, authApi, systemApi, clusterApi, api } from "@/lib/api";
+import { authHeaders } from "@/lib/auth";
 import { formatBytes } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,24 +98,53 @@ export function Settings() {
 
   const saveMut = useMutation({
     mutationFn: (body) => clusterApi.update(body),
-    onSuccess: () => {
-      toast.success("集群配置已保存并应用");
+    onSuccess: (data, vars, ctx) => {
+      // request() 只返回 data;连接失败时后端 message 在外壳 — 用 data.connect_ok 判断
       setTokenDirty(false);
       setForm((f) => ({ ...f, agent_token: "" }));
       qc.invalidateQueries({ queryKey: ["cluster-status"] });
       qc.invalidateQueries({ queryKey: ["health"] });
       qc.invalidateQueries({ queryKey: ["agent-status"] });
       qc.invalidateQueries({ queryKey: ["agents"] });
+      if (data?.connect_ok === false || data?.connect_error) {
+        toast.error(data.connect_error || "配置已保存，但连接中心失败");
+      } else if (vars?.connect && vars?.mode === "agent") {
+        toast.success("配置已保存，并已连接中心");
+      } else {
+        toast.success("集群配置已保存并应用");
+      }
     },
     onError: (e) => toast.error(e.message || "保存失败"),
   });
 
   const connectMut = useMutation({
-    mutationFn: () => clusterApi.connect(),
-    onSuccess: () => {
-      toast.success("已触发连接中心（心跳 + 隧道）");
+    mutationFn: async () => {
+      // 需要完整 message:直接 fetch
+      const resp = await fetch("/api/cluster/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+      });
+      const j = await resp.json();
+      if (j?.code !== 0 && j?.code != null) {
+        throw new Error(j.message || "连接失败");
+      }
+      return j;
+    },
+    onSuccess: (j) => {
       qc.invalidateQueries({ queryKey: ["cluster-status"] });
       qc.invalidateQueries({ queryKey: ["agent-status"] });
+      if (j?.data?.connect_ok === false || (j?.message && j.message !== "ok" && j?.data?.connect_ok !== true)) {
+        const msg = j?.data?.connect_error || j?.message || "连接失败";
+        if (j?.data?.connect_ok === false || /失败|无法|拒绝|超时|refused/i.test(msg)) {
+          toast.error(msg);
+          return;
+        }
+      }
+      if (j?.data?.connect_ok === true || j?.message === "ok") {
+        toast.success("已连接中心（心跳 + 隧道）");
+      } else {
+        toast.message(j?.message || "已发送连接请求");
+      }
     },
     onError: (e) => toast.error(e.message || "连接失败"),
   });
@@ -147,6 +177,8 @@ export function Settings() {
   const hb = agentStatus?.heartbeat || {};
   const mode = cluster?.mode || health?.mode || "standalone";
   const sessions = cluster?.tunnel_sessions || [];
+  const hbFailed = hb.enabled && hb.last_ok === false;
+  const hbMsg = hb.last_msg || "";
 
   return (
     <PageShell>
@@ -381,7 +413,7 @@ export function Settings() {
                   hb.enabled
                     ? hb.last_ok
                       ? `正常 · HTTP ${hb.last_http || "-"}`
-                      : `失败 · ${hb.last_msg || "-"}`
+                      : "失败"
                     : mode === "agent"
                       ? "未启用/未连接"
                       : "—"
@@ -390,6 +422,19 @@ export function Settings() {
               <Info label="最近心跳" value={hb.last_at || "—"} />
               <Info label="Controller" value={cluster?.controller_url || "—"} />
             </div>
+            {hbFailed && hbMsg && (
+              <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-[11px] leading-relaxed text-destructive">
+                <div className="font-medium">连接失败原因</div>
+                <div className="mt-1 break-all whitespace-pre-wrap">{hbMsg}</div>
+                {/refused|无进程监听|19090/i.test(hbMsg) && (
+                  <div className="mt-2 text-muted-foreground">
+                    排查：1) 中心机器是否已启动 aluka_ops；2) 中心实际监听端口（默认{" "}
+                    <code>18080</code>，命令行 <code>-port</code> 可改）；3) Controller URL 是否写成{" "}
+                    <code>http://中心IP:实际端口</code>；4) 防火墙是否放行该端口。
+                  </div>
+                )}
+              </div>
+            )}
             {sessions.length > 0 && (
               <div className="mt-2">
                 <span className="text-muted-foreground">本机隧道会话（作为中心时）: </span>
@@ -414,6 +459,11 @@ export function Settings() {
             </li>
             <li>
               命令行 <code>-mode</code> / 环境变量仅在首次无 DB 配置时生效；之后以本页保存为准。
+            </li>
+            <li>
+              两台机器示例：中心{" "}
+              <code>./aluka_ops.exe -mode controller -port 18080 -agent-token secret</code>
+              ；Agent 填 <code>http://中心IP:18080</code> 与相同 Token。
             </li>
           </ul>
         </CardContent>
