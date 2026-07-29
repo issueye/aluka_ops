@@ -4,17 +4,12 @@ import { cn } from "@/lib/utils";
 
 /**
  * 轻量右键菜单（无额外依赖）。
- * @param {{
- *   open: boolean,
- *   x: number,
- *   y: number,
- *   onClose: () => void,
- *   children: React.ReactNode,
- *   className?: string,
- * }} props
+ * 外部关闭必须忽略菜单内部的 pointerdown，否则菜单项 click 会因卸载而失效。
  */
 export function ContextMenu({ open, x, y, onClose, children, className }) {
   const ref = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
   const [pos, setPos] = useState({ left: x, top: y });
 
   useLayoutEffect(() => {
@@ -35,31 +30,43 @@ export function ContextMenu({ open, x, y, onClose, children, className }) {
       top = Math.max(pad, window.innerHeight - rect.height - pad);
     }
     setPos({ left, top });
-  }, [open, x, y, children]);
+  }, [open, x, y]);
 
   useEffect(() => {
     if (!open) return undefined;
-    const close = () => onClose?.();
+
+    const close = () => onCloseRef.current?.();
+
+    const onPointerDown = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      close();
+    };
     const onKey = (e) => {
       if (e.key === "Escape") close();
     };
-    // 下一帧再监听，避免本次右键冒泡立刻关掉
+    const onScroll = (e) => {
+      if (ref.current?.contains(e.target)) return;
+      close();
+    };
+
+    // 延后绑定，避免打开菜单的那次右键立刻触发关闭
     const t = window.setTimeout(() => {
-      window.addEventListener("mousedown", close, true);
-      window.addEventListener("scroll", close, true);
+      document.addEventListener("pointerdown", onPointerDown, true);
+      window.addEventListener("scroll", onScroll, true);
       window.addEventListener("resize", close);
       window.addEventListener("keydown", onKey);
       window.addEventListener("blur", close);
     }, 0);
+
     return () => {
       window.clearTimeout(t);
-      window.removeEventListener("mousedown", close, true);
-      window.removeEventListener("scroll", close, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("blur", close);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open || typeof document === "undefined") return null;
 
@@ -68,13 +75,14 @@ export function ContextMenu({ open, x, y, onClose, children, className }) {
       ref={ref}
       role="menu"
       className={cn(
-        "fixed z-[100] min-w-[11rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-        "animate-in fade-in-0 zoom-in-95",
+        "fixed z-[200] min-w-[11rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
         className
       )}
       style={{ left: pos.left, top: pos.top }}
-      onContextMenu={(e) => e.preventDefault()}
-      onMouseDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       {children}
     </div>,
@@ -85,11 +93,32 @@ export function ContextMenu({ open, x, y, onClose, children, className }) {
 export function ContextMenuItem({
   children,
   icon: Icon,
+  onSelect,
   onClick,
   disabled,
   destructive,
   className,
 }) {
+  const fired = useRef(false);
+
+  const run = (e) => {
+    if (disabled) return;
+    // 同一手势可能同时触发 pointerup + click，只执行一次
+    if (fired.current) return;
+    fired.current = true;
+    e.preventDefault();
+    e.stopPropagation();
+    const fn = onSelect || onClick;
+    try {
+      fn?.(e);
+    } finally {
+      // 若菜单未卸载（禁用项等），短暂后允许再次点
+      window.setTimeout(() => {
+        fired.current = false;
+      }, 300);
+    }
+  };
+
   return (
     <button
       type="button"
@@ -99,13 +128,13 @@ export function ContextMenuItem({
         "flex w-full select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors",
         "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
-        destructive && "text-destructive focus:text-destructive hover:text-destructive",
+        destructive &&
+          "text-destructive hover:text-destructive focus:text-destructive",
         className
       )}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (disabled) return;
-        onClick?.(e);
+      onClick={run}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") run(e);
       }}
     >
       {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}
@@ -115,7 +144,9 @@ export function ContextMenuItem({
 }
 
 export function ContextMenuSeparator({ className }) {
-  return <div role="separator" className={cn("-mx-1 my-1 h-px bg-muted", className)} />;
+  return (
+    <div role="separator" className={cn("-mx-1 my-1 h-px bg-muted", className)} />
+  );
 }
 
 export function ContextMenuLabel({ children, className }) {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -106,6 +106,22 @@ export function Files() {
       x: e.clientX,
       y: e.clientY,
       ...payload,
+    });
+  }, []);
+
+  // 切换目录时关掉菜单，避免操作已失效的 entry
+  useEffect(() => {
+    setCtxMenu(null);
+  }, [path]);
+
+  /** 执行菜单动作：先快照再关闭，避免状态被清空后读不到 entry */
+  const runCtxAction = useCallback((fn) => {
+    setCtxMenu((cur) => {
+      if (cur) {
+        // 微任务中执行，保证已拿到快照且菜单可先卸载
+        queueMicrotask(() => fn(cur));
+      }
+      return null;
     });
   }, []);
 
@@ -588,10 +604,11 @@ export function Files() {
             {ctxMenu.entry.is_dir ? (
               <ContextMenuItem
                 icon={FolderOpen}
-                onClick={() => {
-                  closeCtxMenu();
-                  go(ctxMenu.entry.path);
-                }}
+                onSelect={() =>
+                  runCtxAction((m) => {
+                    if (m.entry?.path) go(m.entry.path);
+                  })
+                }
               >
                 打开
               </ContextMenuItem>
@@ -599,19 +616,21 @@ export function Files() {
               <>
                 <ContextMenuItem
                   icon={FileEdit}
-                  onClick={() => {
-                    closeCtxMenu();
-                    openEditor(ctxMenu.entry.path);
-                  }}
+                  onSelect={() =>
+                    runCtxAction((m) => {
+                      if (m.entry?.path) openEditor(m.entry.path);
+                    })
+                  }
                 >
                   编辑
                 </ContextMenuItem>
                 <ContextMenuItem
                   icon={Download}
-                  onClick={() => {
-                    closeCtxMenu();
-                    onDownload(ctxMenu.entry);
-                  }}
+                  onSelect={() =>
+                    runCtxAction((m) => {
+                      if (m.entry) onDownload(m.entry);
+                    })
+                  }
                 >
                   下载
                 </ContextMenuItem>
@@ -619,10 +638,11 @@ export function Files() {
             )}
             <ContextMenuItem
               icon={Pencil}
-              onClick={() => {
-                closeCtxMenu();
-                openRename(ctxMenu.entry);
-              }}
+              onSelect={() =>
+                runCtxAction((m) => {
+                  if (m.entry) openRename(m.entry);
+                })
+              }
             >
               重命名
             </ContextMenuItem>
@@ -630,20 +650,22 @@ export function Files() {
             <ContextMenuItem
               icon={Trash2}
               destructive
-              onClick={() => {
-                closeCtxMenu();
-                openDelete(ctxMenu.entry);
-              }}
+              onSelect={() =>
+                runCtxAction((m) => {
+                  if (m.entry) openDelete(m.entry);
+                })
+              }
             >
               删除
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               icon={RefreshCw}
-              onClick={() => {
-                closeCtxMenu();
-                refetch();
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  refetch();
+                })
+              }
             >
               刷新
             </ContextMenuItem>
@@ -655,31 +677,34 @@ export function Files() {
             {path !== "" && (
               <ContextMenuItem
                 icon={ArrowUp}
-                onClick={() => {
-                  closeCtxMenu();
-                  go(data?.parent ?? "");
-                }}
+                onSelect={() =>
+                  runCtxAction(() => {
+                    go(data?.parent ?? "");
+                  })
+                }
               >
                 上级目录
               </ContextMenuItem>
             )}
             <ContextMenuItem
               icon={FolderPlus}
-              onClick={() => {
-                closeCtxMenu();
-                setMkdirName("");
-                setMkdirOpen(true);
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  setMkdirName("");
+                  setMkdirOpen(true);
+                })
+              }
             >
               新建目录
             </ContextMenuItem>
             <ContextMenuItem
               icon={FilePlus}
-              onClick={() => {
-                closeCtxMenu();
-                setNewFileName("");
-                setNewFileOpen(true);
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  setNewFileName("");
+                  setNewFileOpen(true);
+                })
+              }
             >
               新建文件
             </ContextMenuItem>
@@ -687,30 +712,34 @@ export function Files() {
             <ContextMenuItem
               icon={Upload}
               disabled={uploading}
-              onClick={() => {
-                closeCtxMenu();
-                fileInputRef.current?.click();
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  // 延后触发 file input，避免菜单卸载打断浏览器手势
+                  window.setTimeout(() => fileInputRef.current?.click(), 0);
+                })
+              }
             >
               上传文件
             </ContextMenuItem>
             <ContextMenuItem
               icon={FolderPlus}
               disabled={uploading}
-              onClick={() => {
-                closeCtxMenu();
-                folderInputRef.current?.click();
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  window.setTimeout(() => folderInputRef.current?.click(), 0);
+                })
+              }
             >
               上传文件夹
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               icon={RefreshCw}
-              onClick={() => {
-                closeCtxMenu();
-                refetch();
-              }}
+              onSelect={() =>
+                runCtxAction(() => {
+                  refetch();
+                })
+              }
             >
               刷新
             </ContextMenuItem>
