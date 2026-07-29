@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,8 @@ import {
   Save,
   X,
   ArrowUp,
+  FolderOpen,
+  FileEdit,
 } from "lucide-react";
 import { filesApi } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
@@ -56,6 +58,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  ContextMenu,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
 import { formatTime, formatBytes } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import { PageShell } from "@/components/ued";
@@ -86,6 +94,20 @@ export function Files() {
   const [editorPath, setEditorPath] = useState("");
   const [editorContent, setEditorContent] = useState("");
   const [editorLoading, setEditorLoading] = useState(false);
+  // 右键菜单: { x, y, target: 'blank' | 'entry', entry?: object }
+  const [ctxMenu, setCtxMenu] = useState(null);
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  const openCtxMenu = useCallback((e, payload) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({
+      x: e.clientX,
+      y: e.clientY,
+      ...payload,
+    });
+  }, []);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["files", path],
@@ -212,8 +234,20 @@ export function Files() {
       const sel = window.getSelection?.();
       sel?.removeAllRanges?.();
     }
+    closeCtxMenu();
     if (ent.is_dir) go(ent.path);
     else openEditor(ent.path);
+  };
+
+  const openRename = (ent) => {
+    setSelected(ent);
+    setRenameName(ent.name);
+    setRenameOpen(true);
+  };
+
+  const openDelete = (ent) => {
+    setSelected(ent);
+    setDeleteOpen(true);
   };
 
   const onDownload = (ent) => {
@@ -389,7 +423,14 @@ export function Files() {
             </div>
           )}
 
-          <div className="rounded-md border">
+          <div
+            className="rounded-md border"
+            onContextMenu={(e) => {
+              // 空白区域右键：新建/上传/刷新
+              if (e.target.closest("tr[data-file-row]")) return;
+              openCtxMenu(e, { target: "blank" });
+            }}
+          >
             <Table>
               <TableHeader>
                 <TableRow>
@@ -409,20 +450,25 @@ export function Files() {
                 ) : entries.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-muted-foreground">
-                      空目录
+                      空目录 · 右键可新建或上传
                     </TableCell>
                   </TableRow>
                 ) : (
                   pg.pageItems.map((ent) => (
                     <TableRow
                       key={ent.path}
+                      data-file-row
                       className={
-                        selected?.path === ent.path
+                        selected?.path === ent.path || ctxMenu?.entry?.path === ent.path
                           ? "cursor-pointer select-none bg-primary/5"
                           : "cursor-pointer select-none"
                       }
                       onClick={() => setSelected(ent)}
                       onDoubleClick={(e) => onRowDoubleClick(e, ent)}
+                      onContextMenu={(e) => {
+                        setSelected(ent);
+                        openCtxMenu(e, { target: "entry", entry: ent });
+                      }}
                       onMouseDown={(e) => {
                         // detail>1 为双击的第二次按下，阻止默认选中
                         if (e.detail > 1) e.preventDefault();
@@ -521,10 +567,156 @@ export function Files() {
               )}
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            双击目录进入；双击文件打开文本编辑。删除非空目录会递归删除。
+            双击目录进入；双击文件打开文本编辑。右键打开菜单。删除非空目录会递归删除。
           </p>
         </CardContent>
       </Card>
+
+      {/* 右键菜单 */}
+      <ContextMenu
+        open={!!ctxMenu}
+        x={ctxMenu?.x || 0}
+        y={ctxMenu?.y || 0}
+        onClose={closeCtxMenu}
+      >
+        {ctxMenu?.target === "entry" && ctxMenu.entry ? (
+          <>
+            <ContextMenuLabel className="max-w-[220px] truncate font-mono">
+              {ctxMenu.entry.name}
+            </ContextMenuLabel>
+            <ContextMenuSeparator />
+            {ctxMenu.entry.is_dir ? (
+              <ContextMenuItem
+                icon={FolderOpen}
+                onClick={() => {
+                  closeCtxMenu();
+                  go(ctxMenu.entry.path);
+                }}
+              >
+                打开
+              </ContextMenuItem>
+            ) : (
+              <>
+                <ContextMenuItem
+                  icon={FileEdit}
+                  onClick={() => {
+                    closeCtxMenu();
+                    openEditor(ctxMenu.entry.path);
+                  }}
+                >
+                  编辑
+                </ContextMenuItem>
+                <ContextMenuItem
+                  icon={Download}
+                  onClick={() => {
+                    closeCtxMenu();
+                    onDownload(ctxMenu.entry);
+                  }}
+                >
+                  下载
+                </ContextMenuItem>
+              </>
+            )}
+            <ContextMenuItem
+              icon={Pencil}
+              onClick={() => {
+                closeCtxMenu();
+                openRename(ctxMenu.entry);
+              }}
+            >
+              重命名
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              icon={Trash2}
+              destructive
+              onClick={() => {
+                closeCtxMenu();
+                openDelete(ctxMenu.entry);
+              }}
+            >
+              删除
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              icon={RefreshCw}
+              onClick={() => {
+                closeCtxMenu();
+                refetch();
+              }}
+            >
+              刷新
+            </ContextMenuItem>
+          </>
+        ) : (
+          <>
+            <ContextMenuLabel>当前目录</ContextMenuLabel>
+            <ContextMenuSeparator />
+            {path !== "" && (
+              <ContextMenuItem
+                icon={ArrowUp}
+                onClick={() => {
+                  closeCtxMenu();
+                  go(data?.parent ?? "");
+                }}
+              >
+                上级目录
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem
+              icon={FolderPlus}
+              onClick={() => {
+                closeCtxMenu();
+                setMkdirName("");
+                setMkdirOpen(true);
+              }}
+            >
+              新建目录
+            </ContextMenuItem>
+            <ContextMenuItem
+              icon={FilePlus}
+              onClick={() => {
+                closeCtxMenu();
+                setNewFileName("");
+                setNewFileOpen(true);
+              }}
+            >
+              新建文件
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              icon={Upload}
+              disabled={uploading}
+              onClick={() => {
+                closeCtxMenu();
+                fileInputRef.current?.click();
+              }}
+            >
+              上传文件
+            </ContextMenuItem>
+            <ContextMenuItem
+              icon={FolderPlus}
+              disabled={uploading}
+              onClick={() => {
+                closeCtxMenu();
+                folderInputRef.current?.click();
+              }}
+            >
+              上传文件夹
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              icon={RefreshCw}
+              onClick={() => {
+                closeCtxMenu();
+                refetch();
+              }}
+            >
+              刷新
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenu>
 
       {/* 新建目录 */}
       <Dialog open={mkdirOpen} onOpenChange={setMkdirOpen}>
