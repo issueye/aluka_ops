@@ -12,7 +12,7 @@ import {
   Power,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, getScopeAgent } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -184,8 +184,14 @@ export function TerminalPage() {
     const cols = term.cols || 120;
     const rows = term.rows || 30;
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    // 远程 Agent 走专用 WS 代理路由;本机走直连 /api/shell/ws
+    const ag = getScopeAgent();
+    const shellPath =
+      ag && ag !== "local"
+        ? `/api/agents/${ag}/shell/ws`
+        : "/api/shell/ws";
     const url = withAuthQuery(
-      `${proto}//${window.location.host}/api/shell/ws?shell=${encodeURIComponent(sh)}&cols=${cols}&rows=${rows}`
+      `${proto}//${window.location.host}${shellPath}?shell=${encodeURIComponent(sh)}&cols=${cols}&rows=${rows}`
     );
 
     setConn("connecting");

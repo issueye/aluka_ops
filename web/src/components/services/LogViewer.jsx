@@ -3,6 +3,7 @@ import { Eraser, Pause, Play, Wifi, WifiOff, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { withAuthQuery } from "@/lib/auth";
+import { scope } from "@/lib/api";
 import { IconTooltip } from "@/components/ued";
 
 // 缓冲上限:超过则丢弃头部,防止长时间运行导致内存膨胀。
@@ -33,7 +34,7 @@ export function LogViewer({ serviceId, active }) {
       esRef.current.close();
       esRef.current = null;
     }
-    const url = withAuthQuery(`/api/services/${serviceId}/logs/stream?lines=200`);
+    const url = withAuthQuery(scope(`/api/services/${serviceId}/logs/stream?lines=200`));
     const es = new EventSource(url);
     esRef.current = es;
     setStatus("connecting");

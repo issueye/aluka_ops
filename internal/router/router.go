@@ -106,6 +106,8 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 
 	// 流量隧道 Hub(中心中继);Agent 侧由 ClusterService 管理 Client
 	tunnelHub := tunnel.NewHub(cfg.AgentToken, cfg.AllowOrigin)
+	// 注入隧道 Hub:Controller 回连 Agent 时,若该 Agent 有隧道会话则优先走隧道
+	ctrlReg.SetTunnel(tunnelHub)
 	tunnelRepo := repository.NewTunnelRepository(db)
 	tunnelSvc := service.NewTunnelService(tunnelRepo, portRepo, tunnelHub)
 	tunnelCtl := controller.NewTunnelController(tunnelSvc, tunnelHub)
@@ -349,6 +351,12 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			agents.POST("/:id/services/:sid/start", ctrlAgentsCtl.Start)
 			agents.POST("/:id/services/:sid/stop", ctrlAgentsCtl.Stop)
 			agents.POST("/:id/services/:sid/restart", ctrlAgentsCtl.Restart)
+
+			// 通用透传代理:切换到指定 Agent 后远程管控 服务/站点/文件 等。
+			// /api/agents/:id/proxy<rest> → Agent <rest>;隧道优先,直连兜底。
+			// shell 控制台 WS 单独路由(需 WS 升级)。
+			agents.Any("/:id/proxy/*rest", ctrlAgentsCtl.ProxyHTTP)
+			agents.GET("/:id/shell/ws", ctrlAgentsCtl.ProxyShellWS)
 		}
 
 		// 流量隧道(反向 TCP)

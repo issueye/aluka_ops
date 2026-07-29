@@ -30,7 +30,7 @@ async function request(path, options = {}) {
 
   let resp;
   try {
-    resp = await fetch(path, opts);
+    resp = await fetch(scope(path), opts);
   } catch (e) {
     throw new ApiError(-1, `网络错误: ${e.message}`, 0);
   }
@@ -71,11 +71,28 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  get: (p) => request(p, { method: "GET" }),
-  post: (p, body) => request(p, { method: "POST", body }),
-  put: (p, body) => request(p, { method: "PUT", body }),
-  del: (p) => request(p, { method: "DELETE" }),
+  get: (p) => request(scope(p), { method: "GET" }),
+  post: (p, body) => request(scope(p), { method: "POST", body }),
+  put: (p, body) => request(scope(p), { method: "PUT", body }),
+  del: (p) => request(scope(p), { method: "DELETE" }),
 };
+
+// ===== 当前管控 Agent 作用域 =====
+// 由 AgentProvider 同步写入:agent !== "local" 时,所有 /api/... 请求
+// 自动改写为 /api/agents/:id/proxy/api/...(隧道优先,直连兜底)。
+// 仅作用于业务路径 /api/,不动 ws 与登录等。
+let _scopeAgent = "local";
+export function setScopeAgent(agentID) {
+  _scopeAgent = !agentID || agentID === "local" ? "local" : agentID;
+}
+export function getScopeAgent() {
+  return _scopeAgent;
+}
+export function scope(path) {
+  if (_scopeAgent === "local" || !path || typeof path !== "string") return path;
+  if (!path.startsWith("/api/")) return path;
+  return `/api/agents/${_scopeAgent}/proxy${path}`;
+}
 
 // ===== 业务 API(按模块组织,随阶段扩充)=====
 
@@ -103,7 +120,7 @@ export const filesApi = {
       `/api/files?path=${encodeURIComponent(path)}&recursive=${recursive ? "1" : "0"}`
     ),
   downloadUrl: (path) =>
-    `/api/files/download?path=${encodeURIComponent(path)}`,
+    scope(`/api/files/download?path=${encodeURIComponent(path)}`),
   // name 可为多层相对路径(文件夹上传时传 webkitRelativePath)
   upload: async (parentPath, file, name) => {
     const fd = new FormData();
@@ -276,7 +293,7 @@ export const artifactApi = {
   remove: (serviceId, aid) =>
     api.del(`/api/services/${serviceId}/artifacts/${aid}`),
   downloadURL: (serviceId, aid) =>
-    `/api/services/${serviceId}/artifacts/${aid}/download`,
+    scope(`/api/services/${serviceId}/artifacts/${aid}/download`),
 };
 
 // 操作记录

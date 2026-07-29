@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { AuthGate } from "@/components/AuthGate";
+import { AgentProvider } from "@/lib/agentContext";
 import { Dashboard } from "@/pages/Dashboard";
 import { Services } from "@/pages/Services";
 import { ServiceDetail } from "@/pages/ServiceDetail";
@@ -18,6 +19,7 @@ import { Login } from "@/pages/Login";
 
 export default function App() {
   return (
+    <AgentProvider>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -47,5 +49,6 @@ export default function App() {
         <Route path="*" element={<Dashboard />} />
       </Route>
     </Routes>
+    </AgentProvider>
   );
 }

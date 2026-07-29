@@ -5,7 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import { Eraser, Wifi, WifiOff, TerminalSquare } from "lucide-react";
 import { toast } from "sonner";
-import { serviceApi } from "@/lib/api";
+import { serviceApi, scope } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { IconTooltip } from "@/components/ued";
@@ -162,7 +162,7 @@ export function ServiceConsole({ serviceId, active, running }) {
       esRef.current = null;
     }
     setConn("connecting");
-    const es = new EventSource(withAuthQuery(`/api/services/${serviceId}/logs/stream?lines=200`));
+    const es = new EventSource(withAuthQuery(scope(`/api/services/${serviceId}/logs/stream?lines=200`)));
     esRef.current = es;
 
     es.onopen = () => setConn("connected");

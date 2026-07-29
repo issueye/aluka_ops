@@ -6,6 +6,7 @@ import { healthApi, authApi } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AgentSwitcher } from "@/components/layout/AgentSwitcher";
 import { IconTooltip, StatusBadge } from "@/components/ued";
 
 export function Topbar({ title, description }) {
@@ -53,6 +54,7 @@ export function Topbar({ title, description }) {
             后端 v{data.version}
           </span>
         )}
+        <AgentSwitcher />
         <ThemeToggle />
         <StatusBadge tone={status.tone} label={status.text} />
         {authStatus?.auth_enabled && getToken() && (
