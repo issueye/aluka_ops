@@ -155,11 +155,38 @@
 ALUKA_MODE=controller ALUKA_PORT=19090 ALUKA_AGENT_TOKEN=tok ./bin/aluka_ops.exe
 
 # 节点 Agent
-ALUKA_MODE=agent ALUKA_PORT=18080 \
-ALUKA_CONTROLLER_URL=http://中心:19090 \
-ALUKA_AGENT_TOKEN=tok \
-ALUKA_ADVERTISE_URL=http://本机IP:18080 \
-	./bin/aluka_ops.exe
+	ALUKA_MODE=agent ALUKA_PORT=18080 \
+	ALUKA_CONTROLLER_URL=http://中心:19090 \
+	ALUKA_AGENT_TOKEN=tok \
+	ALUKA_ADVERTISE_URL=http://本机IP:18080 \
+		./bin/aluka_ops.exe
+		```
+
+	### ✅ 流量隧道(反向 TCP · 中心中继)
+
+	内网 Agent **主动**连中心 WebSocket,中心按规则在本地 `listen_port` 接受连接,经隧道转发到 Agent 侧 `remote_host:remote_port`(类似 `ssh -R`)。适配 NAT:无需中心回拨 Agent。
+
+	| 能力 | 说明 |
+	|------|------|
+	| 数据面 | `/api/tunnel/ws` + 自研二进制多路复用帧 |
+	| 规则 | `reverse_tcp`:中心听 → Agent 拨远端(默认仅 loopback/私网) |
+	| 管理 API | `GET/POST /api/tunnels`、`PUT/DELETE /:id`、`POST /:id/enable`、`GET /sessions` |
+	| 前端 | 侧边栏「流量隧道」:规则 CRUD、会话状态、活跃连接数 |
+
+	```bash
+	# 中心(或 standalone 也可承载隧道)
+	./bin/aluka_ops.exe -mode controller -port 19090 -agent-token secret
+
+	# 内网 Agent
+	./bin/aluka_ops.exe -mode agent -port 18080 \
+	  -controller-url http://中心:19090 -agent-token secret -agent-id office-1
+
+	# 在中心 UI 或 API 创建规则: listen_port=18090 → office-1 的 127.0.0.1:8080
+	# 外网访问 http://中心:18090 → 内网服务
+	curl -X POST http://中心:19090/api/tunnels -H 'Content-Type: application/json' -d '{
+	  "code":"office-web","name":"办公网 Web","agent_id":"office-1",
+	  "listen_port":18090,"remote_host":"127.0.0.1","remote_port":8080,"enabled":true
+	}'
 	```
 
 	### ✅ 本机主机信息定时采集
