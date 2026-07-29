@@ -3,9 +3,13 @@
 // Aluka Ops 既可作为独立的面板运行(standalone),
 // 也可在未来作为 Agent 被中心 Controller 纳管(agent)。
 // 运行模式由 ALUKA_MODE 控制,影响是否启用 Agent 上报循环。
+//
+// 配置优先级:命令行参数 > 环境变量 > 默认值。
+// 例如: aluka_ops.exe -port 8080
 package config
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -105,8 +109,16 @@ func (c *Config) HeartbeatEnabled() bool {
 }
 
 // Load 加载配置并对数据目录进行规范化(转为绝对路径 + 自动创建)。
+// 会解析 os.Args 中的命令行参数(见 applyFlags)。
 func Load() (*Config, error) {
 	c := Default()
+	if err := applyFlags(c, os.Args[1:]); err != nil {
+		return nil, err
+	}
+	if c.HTTPPort <= 0 || c.HTTPPort > 65535 {
+		return nil, fmt.Errorf("无效端口: %d(有效范围 1-65535)", c.HTTPPort)
+	}
+
 	abs, err := filepath.Abs(c.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("解析数据目录绝对路径失败: %w", err)
@@ -124,6 +136,89 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("创建日志目录失败: %w", err)
 	}
 	return c, nil
+}
+
+// applyFlags 解析命令行参数并覆盖配置。
+// 未显式传入的项保持环境变量/默认值。
+//
+// 支持:
+//
+//	-port / -p          HTTP 监听端口
+//	-data-dir           数据目录
+//	-mode               standalone|agent|controller
+//	-password           管理密码(启用鉴权)
+//	-allow-origin       CORS
+//	-controller-url     Agent 中心地址
+//	-agent-id           Agent ID
+//	-agent-token        Agent 共享密钥
+//	-advertise-url      Agent 对外 API 地址
+//	-h / -help          打印帮助
+func applyFlags(c *Config, args []string) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+	fs := flag.NewFlagSet("aluka_ops", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Aluka Ops · 服务治理系统\n\n")
+		fmt.Fprintf(os.Stderr, "用法:\n  %s [选项]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "选项:\n")
+		fs.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\n环境变量(命令行优先):\n")
+		fmt.Fprintf(os.Stderr, "  ALUKA_PORT ALUKA_DATA_DIR ALUKA_MODE ALUKA_PASSWORD ...\n")
+		fmt.Fprintf(os.Stderr, "\n示例:\n")
+		fmt.Fprintf(os.Stderr, "  %s -port 8080\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "  %s -p 19090 -data-dir D:\\aluka_data\n", os.Args[0])
+	}
+
+	port := fs.Int("port", 0, "HTTP 监听端口(默认 18080 或 ALUKA_PORT)")
+	portShort := fs.Int("p", 0, "HTTP 监听端口(同 -port)")
+	dataDir := fs.String("data-dir", "", "数据目录(默认 ./data 或 ALUKA_DATA_DIR)")
+	mode := fs.String("mode", "", "运行模式: standalone|agent|controller")
+	password := fs.String("password", "", "管理密码;非空则启用登录鉴权")
+	allowOrigin := fs.String("allow-origin", "", "CORS 允许来源(默认 *)")
+	controllerURL := fs.String("controller-url", "", "Agent 模式:中心 Controller 根地址")
+	agentID := fs.String("agent-id", "", "Agent 唯一标识")
+	agentToken := fs.String("agent-token", "", "Agent/Controller 共享密钥")
+	advertiseURL := fs.String("advertise-url", "", "Agent 对外可访问的 API 根地址")
+
+	if err := fs.Parse(args); err != nil {
+		// flag.ErrHelp 在 -h 时返回,上层应退出 0
+		return err
+	}
+
+	if *portShort > 0 {
+		c.HTTPPort = *portShort
+	}
+	if *port > 0 {
+		c.HTTPPort = *port // -port 覆盖 -p
+	}
+	if strings.TrimSpace(*dataDir) != "" {
+		c.DataDir = strings.TrimSpace(*dataDir)
+		c.DBPath = filepath.Join(c.DataDir, "aluka_ops.db")
+	}
+	if m := strings.TrimSpace(*mode); m != "" {
+		c.Mode = Mode(m)
+	}
+	if p := *password; p != "" {
+		c.AuthPassword = p
+	}
+	if o := strings.TrimSpace(*allowOrigin); o != "" {
+		c.AllowOrigin = o
+	}
+	if u := strings.TrimSpace(*controllerURL); u != "" {
+		c.ControllerURL = strings.TrimRight(u, "/")
+	}
+	if id := strings.TrimSpace(*agentID); id != "" {
+		c.AgentID = id
+	}
+	if t := *agentToken; t != "" {
+		c.AgentToken = t
+	}
+	if u := strings.TrimSpace(*advertiseURL); u != "" {
+		c.AdvertiseURL = strings.TrimRight(u, "/")
+	}
+	return nil
 }
 
 // HTTPAddr 返回 HTTP 监听地址。

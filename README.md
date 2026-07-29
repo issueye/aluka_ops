@@ -274,17 +274,38 @@ cd web && npm install && npm run build && cd ..
 # 2. 构建后端(自动嵌入 web/dist)
 go build -o bin/aluka_ops.exe ./cmd/server
 
-# 3. 运行
-./bin/aluka_ops.exe
-```
+# 3. 运行(默认端口 18080)
+	./bin/aluka_ops.exe
 
-打开 http://localhost:18080。
-
-### 配置项(环境变量)
-
-| 变量 | 默认 | 说明 |
-|------|------|------|
-| `ALUKA_PORT` | `18080` | HTTP 端口 |
+	# 指定端口(命令行优先于环境变量 ALUKA_PORT)
+	./bin/aluka_ops.exe -port 8080
+	./bin/aluka_ops.exe -p 19090
+	./bin/aluka_ops.exe -port 8080 -data-dir D:\aluka_data
+	./bin/aluka_ops.exe -h   # 查看全部命令行选项
+	```
+	
+	打开 http://localhost:18080(或你指定的端口)。
+	
+	### 命令行参数(优先于环境变量)
+	
+	| 参数 | 说明 |
+	|------|------|
+	| `-port` / `-p` | HTTP 监听端口(默认 `18080`) |
+	| `-data-dir` | 数据目录(默认 `./data`) |
+	| `-mode` | `standalone` / `agent` / `controller` |
+	| `-password` | 管理密码(非空启用登录鉴权) |
+	| `-allow-origin` | CORS 来源 |
+	| `-controller-url` | Agent 模式:中心地址 |
+	| `-agent-id` | Agent 标识 |
+	| `-agent-token` | Agent/Controller 共享密钥 |
+	| `-advertise-url` | Agent 对外 API 根地址 |
+	| `-h` / `-help` | 打印帮助 |
+	
+	### 配置项(环境变量)
+	
+	| 变量 | 默认 | 说明 |
+	|------|------|------|
+	| `ALUKA_PORT` | `18080` | HTTP 端口(可被 `-port` 覆盖) |
 | `ALUKA_DATA_DIR` | `./data` | 数据目录(sqlite、制品、日志) |
 | `ALUKA_MODE` | `standalone` | `standalone` / **`agent`** |
 | `ALUKA_WEB_DIR` | (空) | 指定磁盘前端目录,优先于内嵌(开发用) |

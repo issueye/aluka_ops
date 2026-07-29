@@ -4,13 +4,18 @@
 //
 // 运行:
 //
-//	go run cmd/server/main.go
+//	go run ./cmd/server
+//	./bin/aluka_ops.exe -port 8080
+//	./bin/aluka_ops.exe -p 19090 -data-dir ./data
 //
-// 可用环境变量见 internal/config/config.go(ALUKA_PORT / ALUKA_DATA_DIR / ALUKA_MODE)。
+// 配置优先级:命令行 > 环境变量 > 默认值。
+// 环境变量见 internal/config(ALUKA_PORT / ALUKA_DATA_DIR / ALUKA_MODE 等)。
 package main
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -28,6 +33,9 @@ import (
 func main() {
 	cfg, err := config.Load()
 	if err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			os.Exit(0)
+		}
 		log.Fatalf("加载配置失败: %v", err)
 	}
 
