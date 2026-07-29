@@ -184,6 +184,14 @@ export const tunnelApi = {
   reload: () => api.post("/api/tunnels/reload"),
 };
 
+// 集群角色与中心连接(可前端切换 mode / 主动连接)
+export const clusterApi = {
+  status: () => api.get("/api/cluster/status"),
+  update: (data) => api.put("/api/cluster/config", data),
+  connect: () => api.post("/api/cluster/connect"),
+  disconnect: () => api.post("/api/cluster/disconnect"),
+};
+
 // 认证
 export const authApi = {
   status: () => api.get("/api/auth/status"),

@@ -86,6 +86,26 @@ func NewHub(agentToken string, allowOrigin string) *Hub {
 // SetAllowRemoteAny 配置 SSRF 策略(透传给 Agent 侧,中心仅记录)。
 func (h *Hub) SetAllowRemoteAny(v bool) { h.allowRemoteAny = v }
 
+// SetToken 运行时更新 Agent 共享密钥(前端改配置后同步)。
+func (h *Hub) SetToken(token string) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.token = token
+	h.mu.Unlock()
+}
+
+// Token 当前密钥(可能为空表示不校验)。
+func (h *Hub) Token() string {
+	if h == nil {
+		return ""
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.token
+}
+
 // HandleWS Gin/HTTP 入口:Agent 拨号升级。
 // Query/Header: agent_id, token(X-Agent-Token 或 agent_token)。
 func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
@@ -97,7 +117,8 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	if token == "" {
 		token = strings.TrimSpace(r.URL.Query().Get("token"))
 	}
-	if h.token != "" && token != h.token {
+	want := h.Token()
+	if want != "" && token != want {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -128,11 +149,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			if hp.AgentID != "" {
 				agentID = hp.AgentID
 			}
-			if h.token != "" && hp.Token != "" && hp.Token != h.token {
-				_ = conn.WriteMessage(websocket.BinaryMessage, encodeFrame(TypeOpenFail, 0, marshalJSON(FailPayload{Reason: "bad token"})))
-				_ = conn.Close()
-				return
-			}
+if want != "" && hp.Token != "" && hp.Token != want {
+					_ = conn.WriteMessage(websocket.BinaryMessage, encodeFrame(TypeOpenFail, 0, marshalJSON(FailPayload{Reason: "bad token"})))
+					_ = conn.Close()
+					return
+				}
 		}
 	}
 

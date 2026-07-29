@@ -104,17 +104,11 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	scriptRepo := repository.NewPortScriptRepository(db)
 	gatewayRepo := repository.NewGatewayRepository(db)
 
-	// 流量隧道 Hub(中心中继);Agent 侧另起 Client 拨号
+	// 流量隧道 Hub(中心中继);Agent 侧由 ClusterService 管理 Client
 	tunnelHub := tunnel.NewHub(cfg.AgentToken, cfg.AllowOrigin)
 	tunnelRepo := repository.NewTunnelRepository(db)
 	tunnelSvc := service.NewTunnelService(tunnelRepo, portRepo, tunnelHub)
 	tunnelCtl := controller.NewTunnelController(tunnelSvc, tunnelHub)
-	// standalone / controller 均可作为中心承载隧道监听
-	if cfg.IsControllerMode() || cfg.Mode == config.ModeStandalone {
-		if err := tunnelSvc.Reload(); err != nil {
-			_ = err
-		}
-	}
 
 	appGwSvc := service.NewAppGatewayService(portRepo, appRepo, proxyRepo, scriptRepo, gwMgr, cfg.DataDir)
 	appGwSvc.SetLegacyRepo(gatewayRepo)
@@ -133,10 +127,26 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	shellMgr := shell.NewManager(cfg.DataDir, 4)
 	shellCtl := controller.NewShellController(shellMgr, cfg.AllowOrigin)
 
+	// 集群角色/连接(可前端改 mode 并主动连中心)
+	settingRepo := repository.NewSettingRepository(db)
+	hb := agent.NewHeartbeatLoop(cfg, agentSvc)
+	clusterSvc := service.NewClusterService(cfg, settingRepo, hb, tunnelHub)
+	clusterSvc.SetOnBecomeHub(func() {
+		_ = tunnelSvc.Reload()
+	})
+	clusterSvc.LoadPersisted()
+	// 加载 DB 后:若为 controller/standalone 则加载隧道规则
+	if cfg.IsControllerMode() || cfg.Mode == config.ModeStandalone {
+		if err := tunnelSvc.Reload(); err != nil {
+			_ = err
+		}
+	}
+	clusterCtl := controller.NewClusterController(clusterSvc)
+
 	// ===== API =====
 	api := r.Group("/api")
-	// 鉴权(未配置密码时自动放行;Agent Token 可访问 /api/agent/*)
-	api.Use(middleware.AuthRequired(authStore, cfg.AgentToken))
+	// 鉴权(未配置密码时自动放行;Agent Token 动态读取 cfg,前端改配置立即生效)
+	api.Use(middleware.AuthRequiredFn(authStore, func() string { return cfg.AgentToken }))
 	// 写操作审计(成功后落库)
 	api.Use(middleware.AuditWrite(auditSvc))
 	{
@@ -356,27 +366,25 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			tg.DELETE("/:id", tunnelCtl.Delete)
 			tg.POST("/:id/enable", tunnelCtl.Enable)
 		}
+
+		// 集群角色:standalone / agent / controller + 主动连接中心
+		cl := api.Group("/cluster")
+		{
+			cl.GET("/status", clusterCtl.Status)
+			cl.PUT("/config", clusterCtl.Update)
+			cl.POST("/connect", clusterCtl.Connect)
+			cl.POST("/disconnect", clusterCtl.Disconnect)
+		}
 	}
 
 	// ===== 静态前端(embed) =====
 	registerStatic(r)
 
-	// Agent 心跳上报
-	hb := agent.NewHeartbeatLoop(cfg, agentSvc)
-	hb.Start()
-
-	// Agent 模式:主动连接中心隧道
-	var tunnelClient *tunnel.AgentClient
-	if cfg.IsAgentMode() && cfg.ControllerURL != "" {
-		tunnelClient = tunnel.NewAgentClient(cfg.ControllerURL, cfg.AgentID, cfg.AgentToken, false)
-		tunnelClient.Start()
-	}
+	// 按当前角色启动心跳/隧道客户端(可被 /api/cluster 热切换)
+	clusterSvc.StartBackground()
 
 	stop := func() {
-		hb.Stop()
-		if tunnelClient != nil {
-			tunnelClient.Stop()
-		}
+		clusterSvc.StopBackground()
 		tunnelHub.Close()
 		gwMgr.Close()
 		shellMgr.CloseAll()
