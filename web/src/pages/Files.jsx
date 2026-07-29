@@ -205,7 +205,13 @@ export function Files() {
     }
   };
 
-  const onRowDoubleClick = (ent) => {
+  const onRowDoubleClick = (e, ent) => {
+    // 避免双击时浏览器默认选中文字
+    e?.preventDefault?.();
+    if (typeof window !== "undefined") {
+      const sel = window.getSelection?.();
+      sel?.removeAllRanges?.();
+    }
     if (ent.is_dir) go(ent.path);
     else openEditor(ent.path);
   };
@@ -412,11 +418,15 @@ export function Files() {
                       key={ent.path}
                       className={
                         selected?.path === ent.path
-                          ? "bg-primary/5"
-                          : "cursor-pointer"
+                          ? "cursor-pointer select-none bg-primary/5"
+                          : "cursor-pointer select-none"
                       }
                       onClick={() => setSelected(ent)}
-                      onDoubleClick={() => onRowDoubleClick(ent)}
+                      onDoubleClick={(e) => onRowDoubleClick(e, ent)}
+                      onMouseDown={(e) => {
+                        // detail>1 为双击的第二次按下，阻止默认选中
+                        if (e.detail > 1) e.preventDefault();
+                      }}
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -425,7 +435,7 @@ export function Files() {
                           ) : (
                             <File className="h-4 w-4 shrink-0 text-muted-foreground" />
                           )}
-                          <span className="font-mono text-sm">{ent.name}</span>
+                          <span className="select-none font-mono text-sm">{ent.name}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
