@@ -172,6 +172,18 @@ export const gatewayApi = {
   getScriptTemplate: (id) => api.get(`/api/gateway/script-templates/${id}`),
 };
 
+// 流量隧道(反向 TCP:中心端口 → Agent 本机服务)
+export const tunnelApi = {
+  list: () => api.get("/api/tunnels"),
+  sessions: () => api.get("/api/tunnels/sessions"),
+  get: (id) => api.get(`/api/tunnels/${id}`),
+  create: (data) => api.post("/api/tunnels", data),
+  update: (id, data) => api.put(`/api/tunnels/${id}`, data),
+  remove: (id) => api.del(`/api/tunnels/${id}`),
+  enable: (id, enabled) => api.post(`/api/tunnels/${id}/enable`, { enabled }),
+  reload: () => api.post("/api/tunnels/reload"),
+};
+
 // 认证
 export const authApi = {
   status: () => api.get("/api/auth/status"),
@@ -275,12 +287,3 @@ export const dashboardApi = {
   stats: () => api.get("/api/dashboard/stats"),
 };
 
-// 服务模板
-export const templateApi = {
-  list: () => api.get("/api/templates"),
-  get: (id) => api.get(`/api/templates/${id}`),
-  create: (data) => api.post("/api/templates", data),
-  update: (id, data) => api.put(`/api/templates/${id}`, data),
-  remove: (id) => api.del(`/api/templates/${id}`),
-  apply: (id, data) => api.post(`/api/templates/${id}/apply`, data),
-};

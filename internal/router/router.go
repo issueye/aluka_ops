@@ -25,6 +25,7 @@ import (
 	"aluka_ops/internal/pkg/logstream"
 	"aluka_ops/internal/pkg/process"
 	"aluka_ops/internal/pkg/shell"
+	"aluka_ops/internal/pkg/tunnel"
 	"aluka_ops/internal/repository"
 	"aluka_ops/internal/service"
 )
@@ -102,6 +103,19 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	proxyRepo := repository.NewPortProxyRepository(db)
 	scriptRepo := repository.NewPortScriptRepository(db)
 	gatewayRepo := repository.NewGatewayRepository(db)
+
+	// 流量隧道 Hub(中心中继);Agent 侧另起 Client 拨号
+	tunnelHub := tunnel.NewHub(cfg.AgentToken, cfg.AllowOrigin)
+	tunnelRepo := repository.NewTunnelRepository(db)
+	tunnelSvc := service.NewTunnelService(tunnelRepo, portRepo, tunnelHub)
+	tunnelCtl := controller.NewTunnelController(tunnelSvc, tunnelHub)
+	// standalone / controller 均可作为中心承载隧道监听
+	if cfg.IsControllerMode() || cfg.Mode == config.ModeStandalone {
+		if err := tunnelSvc.Reload(); err != nil {
+			_ = err
+		}
+	}
+
 	appGwSvc := service.NewAppGatewayService(portRepo, appRepo, proxyRepo, scriptRepo, gwMgr, cfg.DataDir)
 	appGwSvc.SetLegacyRepo(gatewayRepo)
 	gatewaySvc := service.NewGatewayService(gatewayRepo, gwMgr)
@@ -326,6 +340,22 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			agents.POST("/:id/services/:sid/stop", ctrlAgentsCtl.Stop)
 			agents.POST("/:id/services/:sid/restart", ctrlAgentsCtl.Restart)
 		}
+
+		// 流量隧道(反向 TCP)
+		// Agent 用 X-Agent-Token 访问 /api/tunnel/ws
+		api.GET("/tunnel/ws", tunnelCtl.WS)
+		tg := api.Group("/tunnels")
+		{
+			tg.GET("", tunnelCtl.List)
+			tg.GET("/", tunnelCtl.List)
+			tg.GET("/sessions", tunnelCtl.Sessions)
+			tg.POST("/reload", tunnelCtl.Reload)
+			tg.POST("", tunnelCtl.Create)
+			tg.GET("/:id", tunnelCtl.Get)
+			tg.PUT("/:id", tunnelCtl.Update)
+			tg.DELETE("/:id", tunnelCtl.Delete)
+			tg.POST("/:id/enable", tunnelCtl.Enable)
+		}
 	}
 
 	// ===== 静态前端(embed) =====
@@ -334,8 +364,20 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	// Agent 心跳上报
 	hb := agent.NewHeartbeatLoop(cfg, agentSvc)
 	hb.Start()
+
+	// Agent 模式:主动连接中心隧道
+	var tunnelClient *tunnel.AgentClient
+	if cfg.IsAgentMode() && cfg.ControllerURL != "" {
+		tunnelClient = tunnel.NewAgentClient(cfg.ControllerURL, cfg.AgentID, cfg.AgentToken, false)
+		tunnelClient.Start()
+	}
+
 	stop := func() {
 		hb.Stop()
+		if tunnelClient != nil {
+			tunnelClient.Stop()
+		}
+		tunnelHub.Close()
 		gwMgr.Close()
 		shellMgr.CloseAll()
 	}

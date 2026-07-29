@@ -63,10 +63,11 @@ func allModels() []any {
 			&model.GatewayRule{}, // 旧扁平规则表,保留兼容
 			&model.GatewayPort{},
 			&model.App{},
-			&model.PortProxyRule{},
-			&model.PortRouteScript{},
-		}
-}
+&model.PortProxyRule{},
+				&model.PortRouteScript{},
+				&model.TunnelRule{},
+			}
+	}
 
 func autoMigrate(gormDB *gorm.DB) error {
 	return gormDB.AutoMigrate(allModels()...)

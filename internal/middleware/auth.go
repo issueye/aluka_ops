@@ -17,25 +17,25 @@ import (
 func AuthRequired(store *auth.Store, agentToken string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		// 白名单:登录与健康检查、Agent 心跳上报
-		if path == "/api/health" || path == "/api/auth/login" || path == "/api/auth/status" ||
-			path == "/api/agents/heartbeat" {
-			c.Next()
-			return
-		}
-		// Agent Token 访问 /api/agent/* 或 /api/agents/*
-		if agentToken != "" && (strings.HasPrefix(path, "/api/agent/") || path == "/api/agent" ||
-			strings.HasPrefix(path, "/api/agents/")) {
-			got := c.GetHeader("X-Agent-Token")
-			if got == "" {
-				got = c.Query("agent_token")
-			}
-			if subtle.ConstantTimeCompare([]byte(got), []byte(agentToken)) == 1 {
-				c.Set("operator", "controller")
+// 白名单:登录、健康检查、Agent 心跳、隧道 WS(由 Hub 校验 token)
+			if path == "/api/health" || path == "/api/auth/login" || path == "/api/auth/status" ||
+				path == "/api/agents/heartbeat" || path == "/api/tunnel/ws" {
 				c.Next()
 				return
 			}
-		}
+			// Agent Token 访问 /api/agent/* 或 /api/agents/*
+			if agentToken != "" && (strings.HasPrefix(path, "/api/agent/") || path == "/api/agent" ||
+				strings.HasPrefix(path, "/api/agents/")) {
+				got := c.GetHeader("X-Agent-Token")
+				if got == "" {
+					got = c.Query("agent_token")
+				}
+				if subtle.ConstantTimeCompare([]byte(got), []byte(agentToken)) == 1 {
+					c.Set("operator", "agent")
+					c.Next()
+					return
+				}
+			}
 
 		if store == nil || !store.Enabled() {
 			c.Next()
