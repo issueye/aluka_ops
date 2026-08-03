@@ -28,9 +28,9 @@ type Session struct {
 	nextID    atomic.Uint32
 
 	// onClose 会话断开回调
-	onClose func(agentID string)
+	onClose func(agentID string, session *Session)
 
-	closed   chan struct{}
+	closed    chan struct{}
 	closeOnce sync.Once
 
 	// 等待 open 结果
@@ -44,7 +44,7 @@ type openResult struct {
 }
 
 // NewSession 从已 Upgrade 的 WS 构造会话。
-func NewSession(agentID string, conn *websocket.Conn, onClose func(string)) *Session {
+func NewSession(agentID string, conn *websocket.Conn, onClose func(string, *Session)) *Session {
 	s := &Session{
 		AgentID:   agentID,
 		Connected: time.Now(),
@@ -244,14 +244,19 @@ func (s *Session) Close() {
 	s.closeOnce.Do(func() {
 		close(s.closed)
 		s.streamsMu.Lock()
-		for id, p := range s.streams {
-			p.closeOnce.Do(func() { close(p.closed) })
-			delete(s.streams, id)
+		streams := make([]*streamPipe, 0, len(s.streams))
+		for _, p := range s.streams {
+			streams = append(streams, p)
 		}
+		s.streams = make(map[uint32]*streamPipe)
 		s.streamsMu.Unlock()
+		// stream Close 回调会访问 streamsMu，必须在锁外触发。
+		for _, p := range streams {
+			p.closeOnce.Do(func() { close(p.closed) })
+		}
 		_ = s.conn.Close()
 		if s.onClose != nil {
-			s.onClose(s.AgentID)
+			s.onClose(s.AgentID, s)
 		}
 	})
 }
@@ -402,11 +407,16 @@ func (a *AgentSession) Close() {
 	a.closeOnce.Do(func() {
 		close(a.closed)
 		a.streamsMu.Lock()
-		for id, p := range a.streams {
-			p.closeOnce.Do(func() { close(p.closed) })
-			delete(a.streams, id)
+		streams := make([]*streamPipe, 0, len(a.streams))
+		for _, p := range a.streams {
+			streams = append(streams, p)
 		}
+		a.streams = make(map[uint32]*streamPipe)
 		a.streamsMu.Unlock()
+		// stream Close 回调会访问 streamsMu，必须在锁外触发。
+		for _, p := range streams {
+			p.closeOnce.Do(func() { close(p.closed) })
+		}
 		_ = a.conn.Close()
 	})
 }

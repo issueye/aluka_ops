@@ -54,13 +54,13 @@ type Hub struct {
 }
 
 type ruleListener struct {
-	rule     model.TunnelRule
-	ln       net.Listener
-	stop     chan struct{}
-	active   atomic.Int64
-	total    atomic.Int64
-	lastErr  string
-	running  bool
+	rule    model.TunnelRule
+	ln      net.Listener
+	stop    chan struct{}
+	active  atomic.Int64
+	total   atomic.Int64
+	lastErr string
+	running bool
 }
 
 // NewHub 构造。
@@ -149,28 +149,30 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			if hp.AgentID != "" {
 				agentID = hp.AgentID
 			}
-if want != "" && hp.Token != "" && hp.Token != want {
-					_ = conn.WriteMessage(websocket.BinaryMessage, encodeFrame(TypeOpenFail, 0, marshalJSON(FailPayload{Reason: "bad token"})))
-					_ = conn.Close()
-					return
-				}
+			if want != "" && hp.Token != "" && hp.Token != want {
+				_ = conn.WriteMessage(websocket.BinaryMessage, encodeFrame(TypeOpenFail, 0, marshalJSON(FailPayload{Reason: "bad token"})))
+				_ = conn.Close()
+				return
+			}
 		}
 	}
 
 	// hello_ack
 	_ = conn.WriteMessage(websocket.BinaryMessage, encodeFrame(TypeHelloAck, 0, marshalJSON(map[string]any{
-		"ok":      true,
-		"server":  "aluka_ops",
+		"ok":       true,
+		"server":   "aluka_ops",
 		"agent_id": agentID,
 	})))
 
 	sess := NewSession(agentID, conn, h.onSessionClose)
 	h.mu.Lock()
-	if old, ok := h.sessions[agentID]; ok {
-		old.Close()
-	}
+	old := h.sessions[agentID]
 	h.sessions[agentID] = sess
 	h.mu.Unlock()
+	// Session.Close 会回调 Hub，必须在释放 h.mu 后关闭旧会话。
+	if old != nil {
+		old.Close()
+	}
 
 	log.Printf("[tunnel] agent connected: %s", agentID)
 	// 该 Agent 的规则补 Listen
@@ -179,11 +181,10 @@ if want != "" && hp.Token != "" && hp.Token != want {
 	sess.Run() // 阻塞直到断开
 }
 
-func (h *Hub) onSessionClose(agentID string) {
+func (h *Hub) onSessionClose(agentID string, session *Session) {
 	h.mu.Lock()
-	if cur, ok := h.sessions[agentID]; ok {
-		// 仅当仍是当前 session 时删除
-		_ = cur
+	if cur, ok := h.sessions[agentID]; ok && cur == session {
+		// 旧连接被新连接替换时，不得删除刚注册的新 session。
 		delete(h.sessions, agentID)
 	}
 	// 不停 listener,标记 waiting;已有连接会因 session 关闭失败
@@ -378,10 +379,10 @@ func (h *Hub) handleIncoming(rule model.TunnelRule, client net.Conn) {
 		log.Printf("[tunnel] open remote %s:%d via %s: %v", remoteHost, rule.RemotePort, rule.AgentID, err)
 		return
 	}
-	// 空闲超时可选:简单不设 deadline,或设置
+	// 空闲超时为滑动窗口；任一方向有数据都会续期，适配 WebSocket 长连接。
 	if rule.IdleTimeoutSec > 0 {
 		d := time.Duration(rule.IdleTimeoutSec) * time.Second
-		_ = client.SetDeadline(time.Now().Add(d))
+		client = newIdleTimeoutConn(client, d)
 	}
 	Bridge(client, pipe)
 }
@@ -430,13 +431,19 @@ func (h *Hub) Close() {
 		close(h.closed)
 	}
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	for _, rl := range h.listeners {
 		h.stopListenerLocked(rl)
 	}
 	h.listeners = map[uint]*ruleListener{}
-	for id, s := range h.sessions {
+	sessions := make([]*Session, 0, len(h.sessions))
+	for _, s := range h.sessions {
+		sessions = append(sessions, s)
+	}
+	h.sessions = map[string]*Session{}
+	h.mu.Unlock()
+
+	// Session.Close 会回调 Hub，不能在持有 h.mu 时调用。
+	for _, s := range sessions {
 		s.Close()
-		delete(h.sessions, id)
 	}
 }
