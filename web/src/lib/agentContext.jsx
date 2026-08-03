@@ -1,4 +1,5 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
@@ -7,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { clusterApi, setScopeAgent } from "@/lib/api";
 
 // 当前管控目标:
@@ -27,6 +29,7 @@ const STORAGE_KEY = "aluka_ops_current_agent";
 
 export function AgentProvider({ children }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [agent, setAgentState] = useState(() => {
     if (typeof localStorage !== "undefined") {
       return localStorage.getItem(STORAGE_KEY) || "local";
@@ -61,15 +64,19 @@ export function AgentProvider({ children }) {
     };
   }, []);
 
-  const setAgent = (next) => {
+  const setAgent = useCallback((next) => {
     setAgentState(next);
+    // 导航发生在 effect 前，先同步作用域，避免仪表盘首个请求仍命中旧节点。
+    setScopeAgent(mode === "controller" && next !== "local" ? next : "local");
     try {
       if (next === "local") localStorage.removeItem(STORAGE_KEY);
       else localStorage.setItem(STORAGE_KEY, next);
     } catch {
       /* localStorage 不可用时忽略 */
     }
-  };
+    // 节点上下文改变后不保留旧节点详情页，统一从目标节点仪表盘开始。
+    navigate("/", { replace: true });
+  }, [mode, navigate]);
 
   // 非 controller 模式强制 local,避免残留远程选择
   const effective = mode === "controller" ? agent : "local";
@@ -93,7 +100,7 @@ export function AgentProvider({ children }) {
       mode,
       isController: mode === "controller",
     }),
-    [effective, mode]
+    [effective, mode, setAgent]
   );
 
   return (

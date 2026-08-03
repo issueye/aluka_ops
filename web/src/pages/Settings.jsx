@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Link2,
@@ -12,7 +13,7 @@ import {
 } from "lucide-react";
 import { healthApi, authApi, systemApi, clusterApi, api } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
-import { formatBytes } from "@/lib/utils";
+import { cn, formatBytes } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,8 +40,36 @@ const MODE_LABEL = {
   controller: "Controller（中心）",
 };
 
+const SETTINGS_SECTIONS = [
+  {
+    id: "system",
+    label: "系统信息",
+    description: "版本、主机与资源状态",
+    icon: Server,
+  },
+  {
+    id: "cluster",
+    label: "节点与集群",
+    description: "运行角色、心跳与中心连接",
+    icon: Network,
+  },
+  {
+    id: "security",
+    label: "安全与鉴权",
+    description: "登录保护与 Token 策略",
+    icon: Shield,
+  },
+];
+
+const SETTINGS_SECTION_IDS = new Set(SETTINGS_SECTIONS.map((section) => section.id));
+
 export function Settings() {
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSection = searchParams.get("section");
+  const activeSection = SETTINGS_SECTION_IDS.has(requestedSection)
+    ? requestedSection
+    : "system";
   const [form, setForm] = useState({
     mode: "standalone",
     controller_url: "",
@@ -182,6 +211,48 @@ export function Settings() {
 
   return (
     <PageShell>
+      <div className="grid items-start gap-5 xl:grid-cols-[220px_minmax(0,1fr)]">
+        <nav
+          aria-label="设置分类"
+          className="flex gap-2 overflow-x-auto border-b pb-3 xl:sticky xl:top-0 xl:block xl:space-y-1 xl:overflow-visible xl:border-b-0 xl:border-r xl:pb-0 xl:pr-5"
+        >
+          <div className="mb-3 hidden px-3 xl:block">
+            <div className="text-sm font-semibold">设置分类</div>
+            <div className="mt-1 text-xs leading-5 text-muted-foreground">
+              按配置域查看和维护当前节点
+            </div>
+          </div>
+          {SETTINGS_SECTIONS.map((section) => {
+            const active = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                aria-current={active ? "page" : undefined}
+                onClick={() =>
+                  setSearchParams({ section: section.id }, { replace: true })
+                }
+                className={cn(
+                  "flex min-w-fit items-center gap-3 rounded-md px-3 py-2 text-left transition-colors xl:w-full",
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <section.icon className="h-4 w-4 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{section.label}</span>
+                  <span className="hidden truncate text-[11px] text-muted-foreground xl:block">
+                    {section.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="min-w-0">
+      {activeSection === "system" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -232,7 +303,9 @@ export function Settings() {
           <Info label="时间" value={health?.timestamp || "-"} />
         </CardContent>
       </Card>
+      )}
 
+      {activeSection === "cluster" && (
       <Card>
         <CardHeader className="flex-row items-start justify-between space-y-0">
           <div>
@@ -468,7 +541,9 @@ export function Settings() {
           </ul>
         </CardContent>
       </Card>
+      )}
 
+      {activeSection === "security" && (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -504,6 +579,9 @@ export function Settings() {
           </ul>
         </CardContent>
       </Card>
+      )}
+        </div>
+      </div>
     </PageShell>
   );
 }
