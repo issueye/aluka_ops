@@ -31,10 +31,12 @@ func AuthRequiredFn(store *auth.Store, agentTokenFn func() string) gin.HandlerFu
 			c.Next()
 			return
 		}
-		// Agent Token 访问 /api/agent/* 或 /api/agents/*
+		// Agent Token:机器间共享密钥,代表受信任的中心/Agent 通信。
+		// 对任意路径放行——中心 Controller 代理管控 Agent 时,会把此 token
+		// 注入到 /api/dashboard、/api/system 等普通业务请求(经 ProxyHTTP 透传),
+		// 这些路径不在 /api/agent/* 范围内,因此此处统一认可,而非仅限 /api/agent/*。
 		agentToken := agentTokenFn()
-		if agentToken != "" && (strings.HasPrefix(path, "/api/agent/") || path == "/api/agent" ||
-			strings.HasPrefix(path, "/api/agents/")) {
+		if agentToken != "" {
 			got := c.GetHeader("X-Agent-Token")
 			if got == "" {
 				got = c.Query("agent_token")

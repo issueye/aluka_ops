@@ -71,26 +71,59 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  get: (p) => request(scope(p), { method: "GET" }),
-  post: (p, body) => request(scope(p), { method: "POST", body }),
-  put: (p, body) => request(scope(p), { method: "PUT", body }),
-  del: (p) => request(scope(p), { method: "DELETE" }),
+  get: (p) => request(p, { method: "GET" }),
+  post: (p, body) => request(p, { method: "POST", body }),
+  put: (p, body) => request(p, { method: "PUT", body }),
+  del: (p) => request(p, { method: "DELETE" }),
 };
 
 // ===== 当前管控 Agent 作用域 =====
 // 由 AgentProvider 同步写入:agent !== "local" 时,所有 /api/... 请求
 // 自动改写为 /api/agents/:id/proxy/api/...(隧道优先,直连兜底)。
 // 仅作用于业务路径 /api/,不动 ws 与登录等。
+// 初始值从 localStorage 读取,与 AgentProvider 的 useState 初始值保持一致,
+// 避免刷新后首批请求(scope=local)与实际选中 agent 不同步。
+const SCOPE_STORAGE_KEY = "aluka_ops_current_agent";
 let _scopeAgent = "local";
+try {
+  if (typeof localStorage !== "undefined") {
+    const saved = localStorage.getItem(SCOPE_STORAGE_KEY);
+    if (saved && saved !== "local") _scopeAgent = saved;
+  }
+} catch {
+  /* localStorage 不可用时保持 local */
+}
 export function setScopeAgent(agentID) {
   _scopeAgent = !agentID || agentID === "local" ? "local" : agentID;
 }
 export function getScopeAgent() {
   return _scopeAgent;
 }
+
+// Controller 控制面必须始终访问当前页面所在的中心节点，不能随远程
+// Agent 作用域改写。边界匹配同时保证已生成的 Agent 代理路径不会重复包装。
+const CONTROLLER_API_PREFIXES = [
+  "/api/auth",
+  "/api/cluster",
+  "/api/agent",
+  "/api/agents",
+  "/api/tunnel",
+  "/api/tunnels",
+];
+
+function isControllerAPI(path) {
+  return CONTROLLER_API_PREFIXES.some(
+    (prefix) =>
+      path === prefix ||
+      path.startsWith(`${prefix}/`) ||
+      path.startsWith(`${prefix}?`)
+  );
+}
+
 export function scope(path) {
   if (_scopeAgent === "local" || !path || typeof path !== "string") return path;
   if (!path.startsWith("/api/")) return path;
+  if (isControllerAPI(path)) return path;
   return `/api/agents/${_scopeAgent}/proxy${path}`;
 }
 
@@ -311,4 +344,3 @@ export const operationApi = {
 export const dashboardApi = {
   stats: () => api.get("/api/dashboard/stats"),
 };
-
