@@ -116,11 +116,12 @@
 - target 可留空,自动用 `port` 推导 `127.0.0.1:port` 或 `http://127.0.0.1:port/`
 - 前端配置 Tab 可选 none/http/tcp;概览展示健康徽章与延迟
 
-### ✅ 登录鉴权(可选)
+### ✅ 登录鉴权
 
-- 环境变量 `ALUKA_PASSWORD` 非空时启用单管理员密码登录(仅空白字符视为空)
+- 默认必须配置管理密码:环境变量 `ALUKA_PASSWORD` 或命令行 `-password`
+- 未配置管理密码时服务拒绝启动;仅本地开发/受控测试可显式设置 `ALUKA_ALLOW_NO_AUTH=true` 或 `-allow-no-auth` 放行
 - 签发随机 Token(内存存储),默认 24h 有效;`Authorization: Bearer` 或 `?token=`(SSE/WebSocket)
-- 未设置密码时所有 API 开放,兼容纯内网部署；生产环境建议始终设置密码并限制监听网络
+- Agent/Controller 模式默认必须配置 `ALUKA_AGENT_TOKEN`;仅本地开发/受控测试可显式设置 `ALUKA_ALLOW_EMPTY_AGENT_TOKEN=true` 或 `-allow-empty-agent-token` 放行
 - 前端:登录页 + AuthGate 门禁 + 顶栏退出
 
 ### ✅ 服务模板
@@ -276,7 +277,8 @@ aluka_ops/
 
 ```bash
 # 终端 1:后端(默认 :18080)
-go run cmd/server/main.go
+# 默认需要管理密码;本地开发如需无鉴权,显式加 -allow-no-auth
+go run cmd/server/main.go -password dev-password
 
 # 终端 2:前端(默认 :5173,/api 自动代理到 18080)
 cd web
@@ -288,7 +290,7 @@ npm run dev
 
 > 开发期若想让后端直接读取磁盘上的最新 `web/dist`(避免每次改前端都重新 `go build`):
 > ```bash
-> ALUKA_WEB_DIR=./web/dist go run cmd/server/main.go
+> ALUKA_WEB_DIR=./web/dist go run cmd/server/main.go -password dev-password
 > ```
 > 然后访问 http://localhost:18080,后端会优先从磁盘读取前端文件。
 
@@ -302,30 +304,34 @@ cd web && npm install && npm run build && cd ..
 go build -o bin/aluka_ops.exe ./cmd/server
 
 # 3. 运行(默认端口 18080)
-	./bin/aluka_ops.exe
+./bin/aluka_ops.exe -password your-strong-password
 
-	# 指定端口(命令行优先于环境变量 ALUKA_PORT)
-	./bin/aluka_ops.exe -port 8080
-	./bin/aluka_ops.exe -p 19090
-	./bin/aluka_ops.exe -port 8080 -data-dir D:\aluka_data
-	./bin/aluka_ops.exe -h   # 查看全部命令行选项
-	```
-	
-	打开 http://localhost:18080(或你指定的端口)。
-	
-	### 命令行参数(优先于环境变量)
+# 指定端口(命令行优先于环境变量 ALUKA_PORT)
+./bin/aluka_ops.exe -port 8080 -password your-strong-password
+./bin/aluka_ops.exe -p 19090 -password your-strong-password
+./bin/aluka_ops.exe -port 8080 -data-dir D:\aluka_data -password your-strong-password
+./bin/aluka_ops.exe -h   # 查看全部命令行选项
+```
+
+打开 http://localhost:18080(或你指定的端口)。
+
+生产环境必须设置 `ALUKA_PASSWORD` 或 `-password`。本地开发/受控测试如需无鉴权,需显式设置 `ALUKA_ALLOW_NO_AUTH=true` 或 `-allow-no-auth`。
+
+### 命令行参数(优先于环境变量)
 	
 	| 参数 | 说明 |
 	|------|------|
 	| `-port` / `-p` | HTTP 监听端口(默认 `18080`) |
 	| `-data-dir` | 数据目录(默认 `./data`) |
 	| `-mode` | `standalone` / `agent` / `controller` |
-	| `-password` | 管理密码(非空启用登录鉴权) |
-	| `-allow-origin` | CORS 来源 |
+	| `-password` | 管理密码(生产运行必须配置) |
+| `-allow-no-auth` | 显式允许空管理密码(仅本地开发/受控测试) |
+| `-allow-origin` | CORS 来源 |
 	| `-controller-url` | Agent 模式:中心地址 |
 	| `-agent-id` | Agent 标识 |
 	| `-agent-token` | Agent/Controller 共享密钥 |
-	| `-advertise-url` | Agent 对外 API 根地址 |
+| `-allow-empty-agent-token` | 显式允许 Agent/Controller 空共享密钥(仅本地开发/受控测试) |
+| `-advertise-url` | Agent 对外 API 根地址 |
 	| `-h` / `-help` | 打印帮助 |
 	
 	### 配置项(环境变量)
@@ -334,15 +340,17 @@ go build -o bin/aluka_ops.exe ./cmd/server
 	|------|------|------|
 	| `ALUKA_PORT` | `18080` | HTTP 端口(可被 `-port` 覆盖) |
 | `ALUKA_DATA_DIR` | `./data` | 数据目录(sqlite、制品、日志) |
-| `ALUKA_MODE` | `standalone` | `standalone` / **`agent`** |
+| `ALUKA_MODE` | `standalone` | `standalone` / `agent` / `controller` |
 | `ALUKA_WEB_DIR` | (空) | 指定磁盘前端目录,优先于内嵌(开发用) |
 | `ALUKA_ALLOW_ORIGIN` | `*` | CORS 来源；`*` 返回通配来源且不启用 credentials，生产环境建议配置控制台的精确 Origin |
 | `ALUKA_TRUSTED_PROXIES` | (空) | 可信反向代理 IP/CIDR；为空时忽略客户端 `X-Forwarded-For`/`X-Real-IP`，前置代理需清理客户端转发头 |
-| `ALUKA_PASSWORD` | (空) | 管理密码;**非空则启用登录鉴权**(仅空白字符视为空) |
+| `ALUKA_PASSWORD` | (空) | 管理密码;生产运行必须配置(仅空白字符视为空) |
+| `ALUKA_ALLOW_NO_AUTH` | `false` | 显式允许空管理密码,仅用于本地开发/受控测试 |
 | `ALUKA_TOKEN_TTL_HOURS` | `24` | Token 有效期(小时) |
 | `ALUKA_AGENT_ID` | 主机名 | Agent 唯一标识 |
 | `ALUKA_CONTROLLER_URL` | (空) | 中心 Controller 地址(启用心跳) |
-| `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent)；跨源浏览器请求需允许 `X-Agent-Token` |
+| `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent);`agent`/`controller` 模式生产运行必须配置,跨源浏览器请求需允许 `X-Agent-Token` |
+| `ALUKA_ALLOW_EMPTY_AGENT_TOKEN` | `false` | 显式允许 Agent/Controller 空共享密钥,仅用于本地开发/受控测试 |
 | `ALUKA_HEARTBEAT_SEC` | `15` | 心跳间隔秒 |
 | `ALUKA_ADVERTISE_URL` | (空) | Agent 对外 API 根地址(供中心回连) |
 | `ALUKA_OFFLINE_AFTER_SEC` | `45` | Controller 判定 Agent 离线的秒数 |

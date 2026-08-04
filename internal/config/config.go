@@ -35,9 +35,11 @@ type Config struct {
 	AllowOrigin string // CORS 允许来源(开发期跨域)
 	// TrustedProxies 可信反向代理 IP/CIDR 列表;为空时忽略转发头。
 	TrustedProxies string
-	// AuthPassword 管理密码;为空则关闭鉴权(兼容内网裸奔)。
+	// AuthPassword 管理密码;生产运行必须配置。仅在 AllowNoAuth=true 时允许为空。
 	// 设置后所有 /api/*(除 /api/health 与 /api/auth/login)需 Bearer Token。
 	AuthPassword string
+	// AllowNoAuth 显式允许空管理密码,仅用于本地开发或受控测试环境。
+	AllowNoAuth bool
 	// AuthTokenTTLHours Token 有效期(小时),默认 24。
 	AuthTokenTTLHours int
 
@@ -45,7 +47,9 @@ type Config struct {
 	AgentID       string // 本 Agent 唯一标识,默认主机名
 	ControllerURL string // 中心 Controller 根地址,如 http://ctrl:19090
 	AgentToken    string // Agent 与 Controller 共享密钥(上报与 /api/agent 访问)
-	HeartbeatSec  int    // 心跳间隔秒,默认 15
+	// AllowEmptyAgentToken 显式允许 agent/controller 模式空共享密钥,仅用于本地开发。
+	AllowEmptyAgentToken bool
+	HeartbeatSec         int // 心跳间隔秒,默认 15
 	// AdvertiseURL Agent 对外可访问的 API 根地址(供 Controller 回连),如 http://10.0.0.2:18080
 	AdvertiseURL string
 	// OfflineAfterSec Controller 判定 Agent 离线的秒数,默认 45(约 3 次心跳)
@@ -60,20 +64,22 @@ func Default() *Config {
 		host = "local"
 	}
 	return &Config{
-		HTTPPort:          envIntOr("ALUKA_PORT", 18080),
-		DataDir:           dataDir,
-		DBPath:            filepath.Join(dataDir, "aluka_ops.db"),
-		Mode:              Mode(envOr("ALUKA_MODE", string(ModeStandalone))),
-		AllowOrigin:       envOr("ALUKA_ALLOW_ORIGIN", "*"),
-		TrustedProxies:    envOr("ALUKA_TRUSTED_PROXIES", ""),
-		AuthPassword:      envOr("ALUKA_PASSWORD", ""),
-		AuthTokenTTLHours: envIntOr("ALUKA_TOKEN_TTL_HOURS", 24),
-		AgentID:           envOr("ALUKA_AGENT_ID", host),
-		ControllerURL:     strings.TrimRight(envOr("ALUKA_CONTROLLER_URL", ""), "/"),
-		AgentToken:        envOr("ALUKA_AGENT_TOKEN", ""),
-		HeartbeatSec:      envIntOr("ALUKA_HEARTBEAT_SEC", 15),
-		AdvertiseURL:      strings.TrimRight(envOr("ALUKA_ADVERTISE_URL", ""), "/"),
-		OfflineAfterSec:   envIntOr("ALUKA_OFFLINE_AFTER_SEC", 45),
+		HTTPPort:             envIntOr("ALUKA_PORT", 18080),
+		DataDir:              dataDir,
+		DBPath:               filepath.Join(dataDir, "aluka_ops.db"),
+		Mode:                 Mode(envOr("ALUKA_MODE", string(ModeStandalone))),
+		AllowOrigin:          envOr("ALUKA_ALLOW_ORIGIN", "*"),
+		TrustedProxies:       envOr("ALUKA_TRUSTED_PROXIES", ""),
+		AuthPassword:         envOr("ALUKA_PASSWORD", ""),
+		AllowNoAuth:          envBoolOr("ALUKA_ALLOW_NO_AUTH", false),
+		AuthTokenTTLHours:    envIntOr("ALUKA_TOKEN_TTL_HOURS", 24),
+		AgentID:              envOr("ALUKA_AGENT_ID", host),
+		ControllerURL:        strings.TrimRight(envOr("ALUKA_CONTROLLER_URL", ""), "/"),
+		AgentToken:           envOr("ALUKA_AGENT_TOKEN", ""),
+		AllowEmptyAgentToken: envBoolOr("ALUKA_ALLOW_EMPTY_AGENT_TOKEN", false),
+		HeartbeatSec:         envIntOr("ALUKA_HEARTBEAT_SEC", 15),
+		AdvertiseURL:         strings.TrimRight(envOr("ALUKA_ADVERTISE_URL", ""), "/"),
+		OfflineAfterSec:      envIntOr("ALUKA_OFFLINE_AFTER_SEC", 45),
 	}
 }
 
@@ -108,6 +114,23 @@ func (c *Config) HeartbeatEnabled() bool {
 	return c != nil && c.IsAgentMode() && c.ControllerURL != ""
 }
 
+// Validate 校验启动安全边界和基础配置。
+func (c *Config) Validate() error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+	if c.HTTPPort <= 0 || c.HTTPPort > 65535 {
+		return fmt.Errorf("无效端口: %d(有效范围 1-65535)", c.HTTPPort)
+	}
+	if strings.TrimSpace(c.AuthPassword) == "" && !c.AllowNoAuth {
+		return fmt.Errorf("未配置管理密码: 请设置 ALUKA_PASSWORD 或 -password; 本地开发如需无鉴权请显式设置 ALUKA_ALLOW_NO_AUTH=true 或 -allow-no-auth")
+	}
+	if (c.IsAgentMode() || c.IsControllerMode()) && strings.TrimSpace(c.AgentToken) == "" && !c.AllowEmptyAgentToken {
+		return fmt.Errorf("%s 模式未配置 Agent 共享密钥: 请设置 ALUKA_AGENT_TOKEN 或 -agent-token; 本地开发如需空密钥请显式设置 ALUKA_ALLOW_EMPTY_AGENT_TOKEN=true 或 -allow-empty-agent-token", c.Mode)
+	}
+	return nil
+}
+
 // Load 加载配置并对数据目录进行规范化(转为绝对路径 + 自动创建)。
 // 会解析 os.Args 中的命令行参数(见 applyFlags)。
 func Load() (*Config, error) {
@@ -115,8 +138,8 @@ func Load() (*Config, error) {
 	if err := applyFlags(c, os.Args[1:]); err != nil {
 		return nil, err
 	}
-	if c.HTTPPort <= 0 || c.HTTPPort > 65535 {
-		return nil, fmt.Errorf("无效端口: %d(有效范围 1-65535)", c.HTTPPort)
+	if err := c.Validate(); err != nil {
+		return nil, err
 	}
 
 	abs, err := filepath.Abs(c.DataDir)
@@ -146,11 +169,13 @@ func Load() (*Config, error) {
 //	-port / -p          HTTP 监听端口
 //	-data-dir           数据目录
 //	-mode               standalone|agent|controller
-//	-password           管理密码(启用鉴权)
+//	-password           管理密码(生产运行必须配置)
+//	-allow-no-auth      显式允许空管理密码(仅开发/测试)
 //	-allow-origin       CORS
 //	-controller-url     Agent 中心地址
 //	-agent-id           Agent ID
 //	-agent-token        Agent 共享密钥
+//	-allow-empty-agent-token 显式允许 agent/controller 空共享密钥(仅开发/测试)
 //	-advertise-url      Agent 对外 API 地址
 //	-h / -help          打印帮助
 func applyFlags(c *Config, args []string) error {
@@ -165,7 +190,7 @@ func applyFlags(c *Config, args []string) error {
 		fmt.Fprintf(os.Stderr, "选项:\n")
 		fs.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n环境变量(命令行优先):\n")
-		fmt.Fprintf(os.Stderr, "  ALUKA_PORT ALUKA_DATA_DIR ALUKA_MODE ALUKA_PASSWORD ...\n")
+		fmt.Fprintf(os.Stderr, "  ALUKA_PORT ALUKA_DATA_DIR ALUKA_MODE ALUKA_PASSWORD ALUKA_ALLOW_NO_AUTH ...\n")
 		fmt.Fprintf(os.Stderr, "\n示例:\n")
 		fmt.Fprintf(os.Stderr, "  %s -port 8080\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -p 19090 -data-dir D:\\aluka_data\n", os.Args[0])
@@ -175,11 +200,13 @@ func applyFlags(c *Config, args []string) error {
 	portShort := fs.Int("p", 0, "HTTP 监听端口(同 -port)")
 	dataDir := fs.String("data-dir", "", "数据目录(默认 ./data 或 ALUKA_DATA_DIR)")
 	mode := fs.String("mode", "", "运行模式: standalone|agent|controller")
-	password := fs.String("password", "", "管理密码;非空则启用登录鉴权")
+	password := fs.String("password", "", "管理密码;生产运行必须配置")
+	allowNoAuth := fs.Bool("allow-no-auth", c.AllowNoAuth, "显式允许空管理密码(仅本地开发/受控测试)")
 	allowOrigin := fs.String("allow-origin", "", "CORS 允许来源(默认 *)")
 	controllerURL := fs.String("controller-url", "", "Agent 模式:中心 Controller 根地址")
 	agentID := fs.String("agent-id", "", "Agent 唯一标识")
 	agentToken := fs.String("agent-token", "", "Agent/Controller 共享密钥")
+	allowEmptyAgentToken := fs.Bool("allow-empty-agent-token", c.AllowEmptyAgentToken, "显式允许 agent/controller 空共享密钥(仅本地开发/受控测试)")
 	advertiseURL := fs.String("advertise-url", "", "Agent 对外可访问的 API 根地址")
 
 	if err := fs.Parse(args); err != nil {
@@ -203,6 +230,7 @@ func applyFlags(c *Config, args []string) error {
 	if p := *password; p != "" {
 		c.AuthPassword = p
 	}
+	c.AllowNoAuth = *allowNoAuth
 	if o := strings.TrimSpace(*allowOrigin); o != "" {
 		c.AllowOrigin = o
 	}
@@ -215,6 +243,7 @@ func applyFlags(c *Config, args []string) error {
 	if t := *agentToken; t != "" {
 		c.AgentToken = t
 	}
+	c.AllowEmptyAgentToken = *allowEmptyAgentToken
 	if u := strings.TrimSpace(*advertiseURL); u != "" {
 		c.AdvertiseURL = strings.TrimRight(u, "/")
 	}
@@ -235,6 +264,15 @@ func envIntOr(key string, def int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			return n
+		}
+	}
+	return def
+}
+
+func envBoolOr(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
 		}
 	}
 	return def
