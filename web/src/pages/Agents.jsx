@@ -14,10 +14,6 @@ import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
-import {
   Table,
   TableBody,
   TableCell,
@@ -25,16 +21,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationBar } from "@/components/ui/pagination";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
+  PageTemplate,
   EmptyState,
   IconTooltip,
-  InlineAlert,
-  ListPageHeader,
-  PageShell,
-  RefreshButton,
   RowActions,
 } from "@/components/ued";
 
@@ -77,195 +69,192 @@ export function Agents() {
   const onlineCount = agents.filter((a) => a.online).length;
 
   return (
-    <PageShell>
-      <Card>
-        <ListPageHeader
-          icon={Network}
-          title="多节点 Agent"
-          description={`中心模式(ALUKA_MODE=controller)下展示已上报的 Agent。在线 ${onlineCount} / 共 ${agents.length}。`}
-          actions={<RefreshButton onClick={() => refetch()} loading={isFetching} />}
+    <PageTemplate
+      card
+      cardIcon={Network}
+      cardTitle="多节点 Agent"
+      cardDescription={`中心模式（ALUKA_MODE=controller）下展示已上报的 Agent。在线 ${onlineCount} / 共 ${agents.length}。`}
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      error={isError ? "加载失败。请确认以 controller 模式运行，或后端服务已启动。" : null}
+      cardContentClassName="p-6"
+      pagination={
+        !isLoading && agents.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
+      {isLoading ? (
+        <p className="py-6 text-center text-sm text-muted-foreground animate-pulse">加载中...</p>
+      ) : agents.length === 0 ? (
+        <EmptyState
+          icon={Server}
+          title="暂无 Agent 上报"
+          description={
+            <>
+              中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
+              <br />
+              Agent:{" "}
+              <code>
+                ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
+                ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
+              </code>
+            </>
+          }
         />
-        <CardContent>
-          {isError ? (
-            <InlineAlert variant="error">
-              加载失败。请确认以 controller 模式运行,或后端已启动。
-            </InlineAlert>
-          ) : isLoading ? (
-            <p className="text-sm text-muted-foreground">加载中...</p>
-          ) : agents.length === 0 ? (
-            <EmptyState
-              icon={Server}
-              title="暂无 Agent 上报"
-              description={
-                <>
-                  中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
-                  <br />
-                  Agent:{" "}
-                  <code>
-                    ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
-                    ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
-                  </code>
-                </>
-              }
-            />
-          ) : (
-            <div className="space-y-3">
-              {pg.pageItems.map((a) => (
-                <div key={a.agent_id} className="rounded-lg border border-border/60">
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/30"
-                    onClick={() => toggle(a.agent_id)}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      {expanded[a.agent_id] ? (
-                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">{a.agent_id}</span>
-                          <Badge variant={a.online ? "success" : "danger"}>
-                            {a.online ? "在线" : "离线"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {a.host} · {a.os}/{a.arch} · v{a.version || "-"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          服务 {a.services_total ?? 0}(运行 {a.services_running ?? 0} / 异常{" "}
-                          {a.services_crashed ?? 0}) · 最近心跳 {formatTime(a.last_seen_at)}
-                        </div>
-                      </div>
+      ) : (
+        <div className="space-y-3">
+          {pg.pageItems.map((a) => (
+            <div key={a.agent_id} className="rounded-xl border border-border/60 overflow-hidden">
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                onClick={() => toggle(a.agent_id)}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  {expanded[a.agent_id] ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-sm">{a.agent_id}</span>
+                      <Badge variant={a.online ? "success" : "danger"}>
+                        {a.online ? "在线" : "离线"}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {a.host} · {a.os}/{a.arch} · v{a.version || "-"}
+                      </span>
                     </div>
-                    <code className="hidden max-w-[240px] truncate text-xs text-muted-foreground sm:block">
-                      {a.api_base || "-"}
-                    </code>
-                  </button>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      服务 {a.services_total ?? 0} (运行 {a.services_running ?? 0} / 异常{" "}
+                      {a.services_crashed ?? 0}) · 最近心跳 {formatTime(a.last_seen_at)}
+                    </div>
+                  </div>
+                </div>
+                <code className="hidden max-w-[240px] truncate font-mono text-xs text-muted-foreground sm:block">
+                  {a.api_base || "-"}
+                </code>
+              </button>
 
-                  {expanded[a.agent_id] && (
-                    <div className="border-t border-border/60 px-4 py-3">
-                      {(a.services || []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
-                          心跳未携带服务明细,可点刷新从 Agent 实时拉取。
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>服务</TableHead>
-                              <TableHead className="w-[80px]">类型</TableHead>
-                              <TableHead className="w-[100px]">状态</TableHead>
-                              <TableHead className="w-[80px]">PID</TableHead>
-                              <TableHead className="w-[140px] text-right">远程操作</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {a.services.map((s) => (
-                              <TableRow key={`${a.agent_id}-${s.id}`}>
-                                <TableCell>
-                                  <div className="text-sm font-medium">{s.name}</div>
-                                  <div className="font-mono text-xs text-muted-foreground">
-                                    {s.code}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="uppercase text-xs">{s.type}</TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={
-                                      s.status === "running"
-                                        ? "success"
-                                        : s.status === "crashed"
-                                        ? "danger"
-                                        : "secondary"
+              {expanded[a.agent_id] && (
+                <div className="border-t border-border/60 bg-muted/10 px-4 py-3">
+                  {(a.services || []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      心跳未携带服务明细，可点刷新从 Agent 实时拉取。
+                    </p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>服务</TableHead>
+                          <TableHead className="w-[80px]">类型</TableHead>
+                          <TableHead className="w-[100px]">状态</TableHead>
+                          <TableHead className="w-[80px]">PID</TableHead>
+                          <TableHead className="w-[140px] text-right">远程操作</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {a.services.map((s) => (
+                          <TableRow key={`${a.agent_id}-${s.id}`}>
+                            <TableCell>
+                              <div className="text-sm font-medium">{s.name}</div>
+                              <div className="font-mono text-xs text-muted-foreground">
+                                {s.code}
+                              </div>
+                            </TableCell>
+                            <TableCell className="uppercase text-xs">{s.type}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  s.status === "running"
+                                    ? "success"
+                                    : s.status === "crashed"
+                                    ? "danger"
+                                    : "secondary"
+                                }
+                              >
+                                {s.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {s.pid || "—"}
+                            </TableCell>
+                            <TableCell>
+                              <RowActions>
+                                <IconTooltip label="启动">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label="启动"
+                                    disabled={!a.online || actionMut.isPending}
+                                    onClick={() =>
+                                      actionMut.mutate({
+                                        agentId: a.agent_id,
+                                        sid: s.id,
+                                        action: "start",
+                                      })
                                     }
                                   >
-                                    {s.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {s.pid || "—"}
-                                </TableCell>
-                                <TableCell>
-                                  <RowActions>
-                                    <IconTooltip label="启动">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label="启动"
-                                        disabled={!a.online || actionMut.isPending}
-                                        onClick={() =>
-                                          actionMut.mutate({
-                                            agentId: a.agent_id,
-                                            sid: s.id,
-                                            action: "start",
-                                          })
-                                        }
-                                      >
-                                        <Play className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </IconTooltip>
-                                    <IconTooltip label="停止">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label="停止"
-                                        disabled={!a.online || actionMut.isPending}
-                                        onClick={() =>
-                                          actionMut.mutate({
-                                            agentId: a.agent_id,
-                                            sid: s.id,
-                                            action: "stop",
-                                          })
-                                        }
-                                      >
-                                        <Square className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </IconTooltip>
-                                    <IconTooltip label="重启">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        aria-label="重启"
-                                        disabled={!a.online || actionMut.isPending}
-                                        onClick={() =>
-                                          actionMut.mutate({
-                                            agentId: a.agent_id,
-                                            sid: s.id,
-                                            action: "restart",
-                                          })
-                                        }
-                                      >
-                                        <RotateCw className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </IconTooltip>
-                                  </RowActions>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </div>
+                                    <Play className="h-3.5 w-3.5" />
+                                  </Button>
+                                </IconTooltip>
+                                <IconTooltip label="停止">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label="停止"
+                                    disabled={!a.online || actionMut.isPending}
+                                    onClick={() =>
+                                      actionMut.mutate({
+                                        agentId: a.agent_id,
+                                        sid: s.id,
+                                        action: "stop",
+                                      })
+                                    }
+                                  >
+                                    <Square className="h-3.5 w-3.5" />
+                                  </Button>
+                                </IconTooltip>
+                                <IconTooltip label="重启">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    aria-label="重启"
+                                    disabled={!a.online || actionMut.isPending}
+                                    onClick={() =>
+                                      actionMut.mutate({
+                                        agentId: a.agent_id,
+                                        sid: s.id,
+                                        action: "restart",
+                                      })
+                                    }
+                                  >
+                                    <RotateCw className="h-3.5 w-3.5" />
+                                  </Button>
+                                </IconTooltip>
+                              </RowActions>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   )}
                 </div>
-              ))}
-              {agents.length > 0 && (
-                <PaginationBar
-                  page={pg.page}
-                  totalPages={pg.totalPages}
-                  total={pg.total}
-                  from={pg.from}
-                  to={pg.to}
-                  pageSize={pg.pageSize}
-                  onPageChange={pg.setPage}
-                />
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </PageShell>
+          ))}
+        </div>
+      )}
+    </PageTemplate>
   );
 }

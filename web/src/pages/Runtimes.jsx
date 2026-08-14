@@ -24,11 +24,8 @@ import { RuntimeDialog } from "@/components/runtimes/RuntimeDialog";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
-  PageShell,
-  DataTableCard,
+  PageTemplate,
   TableStateRow,
-  InlineAlert,
-  RefreshButton,
   ConfirmDialog,
   TypeChip,
   RowActions,
@@ -91,7 +88,6 @@ export function Runtimes() {
     onSuccess: () => {
       toast.success("已登记运行环境");
       queryClient.invalidateQueries({ queryKey: ["runtimes"] });
-      // 刷新探测列表中的 registered 状态
       detectMutation.mutate();
     },
     onError: (e) => toast.error(`登记失败: ${e.message}`),
@@ -107,134 +103,125 @@ export function Runtimes() {
   };
 
   return (
-    <PageShell>
-      <DataTableCard
-        icon={Cpu}
-        title="运行环境列表"
-        description="管理服务可绑定的运行环境(如 JDK)。每个类型仅可有一个默认环境。"
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => detectMutation.mutate()}
-              disabled={detectMutation.isPending}
-            >
-              <Search className={detectMutation.isPending ? "animate-pulse" : ""} /> 探测本机 JDK
-            </Button>
-            <RefreshButton onClick={() => refetch()} loading={isFetching} />
-            <Button size="sm" onClick={openCreate}>
-              <Plus /> 新增环境
-            </Button>
-          </>
-        }
-        pagination={
-          !isLoading && runtimes.length > 0
-            ? {
-                page: pg.page,
-                totalPages: pg.totalPages,
-                total: pg.total,
-                from: pg.from,
-                to: pg.to,
-                pageSize: pg.pageSize,
-                setPage: pg.setPage,
-              }
-            : null
-        }
-      >
-        {isError ? (
-          <div className="m-6">
-            <InlineAlert variant="error">加载失败,请确认后端服务已启动。</InlineAlert>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[60px]">默认</TableHead>
-                <TableHead>名称</TableHead>
-                <TableHead className="w-[100px]">类型</TableHead>
-                <TableHead className="w-[120px]">版本</TableHead>
-                <TableHead>安装路径</TableHead>
-                <TableHead className="w-[160px]">创建时间</TableHead>
-                <TableHead className="w-[120px] text-right">操作</TableHead>
+    <PageTemplate
+      card
+      cardIcon={Cpu}
+      cardTitle="运行环境列表"
+      cardDescription="管理服务可绑定的运行环境（如 JDK）。每个类型仅可设置一个默认环境。"
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      error={isError ? "加载运行环境失败，请确认后端服务已启动。" : null}
+      cardActions={
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => detectMutation.mutate()}
+            disabled={detectMutation.isPending}
+          >
+            <Search className={detectMutation.isPending ? "animate-pulse mr-1" : "mr-1"} /> 探测本机 JDK
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="mr-1" /> 新增环境
+          </Button>
+        </>
+      }
+      pagination={
+        !isLoading && runtimes.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>名称</TableHead>
+            <TableHead className="w-[80px]">类型</TableHead>
+            <TableHead className="w-[100px]">版本</TableHead>
+            <TableHead>安装路径</TableHead>
+            <TableHead className="w-[80px] text-center">默认</TableHead>
+            <TableHead className="w-[150px]">更新时间</TableHead>
+            <TableHead className="text-right">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableStateRow colSpan={7}>加载中...</TableStateRow>
+          ) : runtimes.length === 0 ? (
+            <TableStateRow colSpan={7}>
+              暂无运行环境，点击右上角「新增环境」或「探测本机 JDK」快速登记。
+            </TableStateRow>
+          ) : (
+            pg.pageItems.map((rt) => (
+              <TableRow key={rt.id}>
+                <TableCell className="font-medium">
+                  <div>{rt.name}</div>
+                  {rt.description && (
+                    <div className="text-xs text-muted-foreground">{rt.description}</div>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <TypeChip tone={TYPE_TONE[rt.type]}>{TYPE_LABEL[rt.type] || rt.type}</TypeChip>
+                </TableCell>
+                <TableCell className="text-xs">{rt.version || "—"}</TableCell>
+                <TableCell>
+                  <PathText>{rt.install_path}</PathText>
+                </TableCell>
+                <TableCell className="text-center">
+                  {rt.is_default ? (
+                    <IconTooltip label="默认环境">
+                      <Star className="inline-block h-4 w-4 fill-amber-400 text-amber-400" />
+                    </IconTooltip>
+                  ) : (
+                    <span className="text-muted-foreground/30">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatTime(rt.updated_at || rt.created_at)}
+                </TableCell>
+                <TableCell>
+                  <RowActions>
+                    <IconTooltip label="编辑">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(rt)}
+                        aria-label="编辑"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </IconTooltip>
+                    <IconTooltip label="删除">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleting(rt)}
+                        aria-label="删除"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </IconTooltip>
+                  </RowActions>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableStateRow colSpan={7}>加载中...</TableStateRow>
-              ) : runtimes.length === 0 ? (
-                <TableStateRow colSpan={7}>
-                  暂无运行环境,点击右上角&quot;新增环境&quot;创建。
-                </TableStateRow>
-              ) : (
-                pg.pageItems.map((rt) => (
-                  <TableRow key={rt.id}>
-                    <TableCell>
-                      {rt.is_default ? (
-                        <Star className="h-4 w-4 fill-warning text-warning" />
-                      ) : (
-                        <span className="text-muted-foreground/30">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {rt.name}
-                      {rt.description && (
-                        <div className="line-clamp-1 text-xs font-normal text-muted-foreground">
-                          {rt.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <TypeChip tone={TYPE_TONE[rt.type] || "muted"}>
-                        {TYPE_LABEL[rt.type] || rt.type}
-                      </TypeChip>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {rt.version || "—"}
-                    </TableCell>
-                    <TableCell className="max-w-[280px] truncate">
-                      <PathText>{rt.install_path || "—"}</PathText>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatTime(rt.created_at)}
-                    </TableCell>
-                    <TableCell>
-                      <RowActions>
-                        <IconTooltip label="编辑">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(rt)}
-                            aria-label="编辑"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="删除">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => setDeleting(rt)}
-                            aria-label="删除"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </IconTooltip>
-                      </RowActions>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </DataTableCard>
+            ))
+          )}
+        </TableBody>
+      </Table>
 
       <RuntimeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        editing={editing}
+        runtime={editing}
       />
 
       <ConfirmDialog
@@ -246,7 +233,7 @@ export function Runtimes() {
             <>
               将删除「
               <span className="font-medium text-foreground">{deleting.name}</span>
-              」(版本 {deleting.version || "—"})。若该环境正被服务引用,可能影响启动,请谨慎操作。
+              」(版本 {deleting.version || "—"})。若该环境正被服务引用，可能影响启动，请谨慎操作。
             </>
           ) : null
         }
@@ -255,7 +242,7 @@ export function Runtimes() {
         onConfirm={() => deleteMutation.mutate(deleting.id)}
       />
 
-      {/* 本机 JDK 探测结果 */}
+      {/* 本机 JDK 探测结果弹窗 */}
       <Dialog open={detectOpen} onOpenChange={setDetectOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -271,7 +258,7 @@ export function Runtimes() {
               {detected.map((item, idx) => (
                 <div
                   key={`${item.install_path}-${idx}`}
-                  className="flex items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-3"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -285,7 +272,7 @@ export function Runtimes() {
                         </Badge>
                       )}
                     </div>
-                    <div className="truncate">
+                    <div className="truncate mt-1">
                       <PathText>
                         {item.version ? `v${item.version} · ` : ""}
                         {item.install_path}
@@ -308,6 +295,6 @@ export function Runtimes() {
           )}
         </DialogContent>
       </Dialog>
-    </PageShell>
+    </PageTemplate>
   );
 }

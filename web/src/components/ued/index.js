@@ -1,4 +1,5 @@
 export { PageShell } from "./PageShell";
+export { PageTemplate } from "./PageTemplate";
 export { ListPageHeader } from "./ListPageHeader";
 export { DetailHeader } from "./DetailHeader";
 export { DataTableCard } from "./DataTableCard";

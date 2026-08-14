@@ -39,7 +39,9 @@ export function AppLayout() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <Topbar title={meta.title} description={meta.desc} />
           <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-background p-6">
-            <Outlet />
+            <div key={pathname} className="animate-fade-in">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>

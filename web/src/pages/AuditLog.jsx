@@ -21,11 +21,8 @@ import {
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
-  PageShell,
-  DataTableCard,
+  PageTemplate,
   TableStateRow,
-  InlineAlert,
-  RefreshButton,
 } from "@/components/ued";
 
 const ACTIONS = [
@@ -68,107 +65,102 @@ export function AuditLog() {
   const pg = usePagination(logs, 10);
 
   return (
-    <PageShell>
-      <DataTableCard
-        icon={ShieldCheck}
-        title="审计日志"
-        description={`记录成功的写操作(创建/修改/删除/启停/安装升级等)。共 ${logs.length} 条(最多 100)。`}
-        filters={
-          <>
-            <Select value={action} onValueChange={setAction}>
-              <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="动作" />
-              </SelectTrigger>
-              <SelectContent>
-                {ACTIONS.map((a) => (
-                  <SelectItem key={a.value} value={a.value}>
-                    {a.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={targetType} onValueChange={setTargetType}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="对象" />
-              </SelectTrigger>
-              <SelectContent>
-                {TARGETS.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        }
-        actions={<RefreshButton onClick={() => refetch()} loading={isFetching} />}
-        pagination={
-          !isLoading && logs.length > 0
-            ? {
-                page: pg.page,
-                totalPages: pg.totalPages,
-                total: pg.total,
-                from: pg.from,
-                to: pg.to,
-                pageSize: pg.pageSize,
-                setPage: pg.setPage,
-              }
-            : null
-        }
-      >
-        {isError ? (
-          <div className="m-6">
-            <InlineAlert variant="error">加载失败,请确认后端服务已启动。</InlineAlert>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[60px]">#</TableHead>
-                <TableHead className="w-[120px]">动作</TableHead>
-                <TableHead className="w-[100px]">对象</TableHead>
-                <TableHead className="w-[80px]">对象ID</TableHead>
-                <TableHead className="w-[100px]">操作人</TableHead>
-                <TableHead>详情</TableHead>
-                <TableHead className="w-[160px]">时间</TableHead>
+    <PageTemplate
+      card
+      cardIcon={ShieldCheck}
+      cardTitle="审计日志"
+      cardDescription={`记录系统写操作（创建/修改/删除/启停/安装升级等）。共 ${logs.length} 条记录（最多 100 条）。`}
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      error={isError ? "加载审计日志失败，请确认后端服务已启动。" : null}
+      cardFilters={
+        <>
+          <Select value={action} onValueChange={setAction}>
+            <SelectTrigger className="w-[150px]">
+              <SelectValue placeholder="动作" />
+            </SelectTrigger>
+            <SelectContent>
+              {ACTIONS.map((a) => (
+                <SelectItem key={a.value} value={a.value}>
+                  {a.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={targetType} onValueChange={setTargetType}>
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="对象" />
+            </SelectTrigger>
+            <SelectContent>
+              {TARGETS.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </>
+      }
+      pagination={
+        !isLoading && logs.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[60px]">#</TableHead>
+            <TableHead className="w-[120px]">动作</TableHead>
+            <TableHead className="w-[100px]">对象</TableHead>
+            <TableHead className="w-[80px]">对象ID</TableHead>
+            <TableHead className="w-[100px]">操作人</TableHead>
+            <TableHead>详情</TableHead>
+            <TableHead className="w-[160px]">时间</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableStateRow colSpan={7}>加载中...</TableStateRow>
+          ) : logs.length === 0 ? (
+            <TableStateRow colSpan={7}>
+              暂无审计记录。执行创建/启停/配置修改等写操作后会在此展示。
+            </TableStateRow>
+          ) : (
+            pg.pageItems.map((log) => (
+              <TableRow key={log.id}>
+                <TableCell className="text-muted-foreground font-mono">{log.id}</TableCell>
+                <TableCell>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {log.action}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm">{log.target_type || "—"}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {log.target_id || "—"}
+                </TableCell>
+                <TableCell className="text-sm">{log.operator || "system"}</TableCell>
+                <TableCell className="max-w-[360px]">
+                  <div className="truncate font-mono text-xs text-muted-foreground">
+                    {log.detail || "—"}
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {formatTime(log.created_at)}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableStateRow colSpan={7}>加载中...</TableStateRow>
-              ) : logs.length === 0 ? (
-                <TableStateRow colSpan={7}>
-                  暂无审计记录。执行创建/启停/配置修改等写操作后会出现在此。
-                </TableStateRow>
-              ) : (
-                pg.pageItems.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-muted-foreground">{log.id}</TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-mono text-xs">
-                        {log.action}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{log.target_type || "—"}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {log.target_id || "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">{log.operator || "system"}</TableCell>
-                    <TableCell className="max-w-[360px]">
-                      <div className="truncate font-mono text-xs text-muted-foreground">
-                        {log.detail || "—"}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {formatTime(log.created_at)}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
-      </DataTableCard>
-    </PageShell>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </PageTemplate>
   );
 }

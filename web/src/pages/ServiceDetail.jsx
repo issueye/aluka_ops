@@ -27,7 +27,7 @@ import { LogViewer } from "@/components/services/LogViewer";
 import { ServiceConsole } from "@/components/services/ServiceConsole";
 import { ArtifactList } from "@/components/services/ArtifactList";
 import { formatTime } from "@/lib/utils";
-import { PageShell, MetaField } from "@/components/ued";
+import { PageTemplate, MetaField } from "@/components/ued";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -56,7 +56,7 @@ export function ServiceDetail() {
   });
 
   if (isLoading) {
-    return <div className="text-muted-foreground">加载中...</div>;
+    return <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">加载服务详情中...</div>;
   }
 
   const svc = detail?.service;
@@ -67,35 +67,22 @@ export function ServiceDetail() {
 
   if (!svc) {
     return (
-      <PageShell>
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/services"><ArrowLeft /> 返回列表</Link>
-        </Button>
+      <PageTemplate backTo="/services" backLabel="返回服务列表">
         <Card><CardContent className="p-6 text-muted-foreground">服务不存在或已删除。</CardContent></Card>
-      </PageShell>
+      </PageTemplate>
     );
   }
 
   return (
-    <PageShell className="mx-auto w-full max-w-6xl pb-2">
-      {/* 头部 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" asChild className="shrink-0" aria-label="返回服务列表">
-            <Link to="/services"><ArrowLeft className="h-4 w-4" /></Link>
-          </Button>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-lg font-semibold">{svc.name}</h2>
-              <ServiceStatusBadge status={svc.status} />
-            </div>
-            <p className="truncate font-mono text-xs text-muted-foreground">{svc.code}</p>
-          </div>
-        </div>
-        <div className="shrink-0">
-          <ServiceActions service={svc} />
-        </div>
-      </div>
+    <PageTemplate
+      maxWidth="max-w-6xl mx-auto"
+      backTo="/services"
+      backLabel="返回服务列表"
+      title={svc.name}
+      description={svc.code}
+      badge={<ServiceStatusBadge status={svc.status} />}
+      actions={<ServiceActions service={svc} />}
+    >
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:w-auto">
@@ -223,7 +210,7 @@ export function ServiceDetail() {
           </Card>
         </TabsContent>
       </Tabs>
-    </PageShell>
+    </PageTemplate>
   );
 }
 

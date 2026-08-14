@@ -41,11 +41,9 @@ import {
 } from "@/components/ui/dialog";
 import {
   ConfirmDialog,
-  DataTableCard,
   FormField,
   IconTooltip,
-  PageShell,
-  RefreshButton,
+  PageTemplate,
   RowActions,
   TableStateRow,
 } from "@/components/ued";
@@ -138,62 +136,63 @@ export function Sites() {
   };
 
   return (
-    <PageShell>
-      <DataTableCard
-        icon={Globe}
-        title="站点管理"
-        description="每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。"
-        actions={
-          <>
-            <RefreshButton onClick={() => refetch()} loading={isFetching} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                gatewayApi
-                  .reload()
-                  .then(() => {
-                    toast.success("已重载监听");
-                    invalidate();
-                  })
-                  .catch((e) => toast.error(e.message))
-              }
-            >
-              重载监听
-            </Button>
-            <Button size="sm" onClick={openCreate}>
-              <Plus /> 新建站点
-            </Button>
-          </>
-        }
-        pagination={
-          !isLoading && sites.length > 0
-            ? {
-                page: pg.page,
-                totalPages: pg.totalPages,
-                total: pg.total,
-                from: pg.from,
-                to: pg.to,
-                pageSize: pg.pageSize,
-                setPage: pg.setPage,
-              }
-            : null
-        }
-      >
-        {runtime.length === 0 ? (
-          <div className="border-b px-6 py-3 text-xs text-muted-foreground">
-            当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2 border-b px-6 py-3">
-            {runtime.map((r) => (
-              <Badge key={r.port} variant="secondary" className="font-mono">
-                :{r.port} · {r.rule_count || 0} 规则
-                {r.script_count ? ` · ${r.script_count} 脚本` : ""}
-              </Badge>
-            ))}
-          </div>
-        )}
+    <PageTemplate
+      card
+      cardIcon={Globe}
+      cardTitle="站点管理"
+      cardDescription="每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。"
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      cardActions={
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              gatewayApi
+                .reload()
+                .then(() => {
+                  toast.success("已重载监听");
+                  invalidate();
+                })
+                .catch((e) => toast.error(e.message))
+            }
+          >
+            重载监听
+          </Button>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="mr-1" /> 新建站点
+          </Button>
+        </>
+      }
+      pagination={
+        !isLoading && sites.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
+      {runtime.length === 0 ? (
+        <div className="border-b px-6 py-3 text-xs text-muted-foreground">
+          当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-2 border-b px-6 py-3">
+          {runtime.map((r) => (
+            <Badge key={r.port} variant="secondary" className="font-mono">
+              :{r.port} · {r.rule_count || 0} 规则
+              {r.script_count ? ` · ${r.script_count} 脚本` : ""}
+            </Badge>
+          ))}
+        </div>
+      )}
 
         <Table>
           <TableHeader>
@@ -343,7 +342,6 @@ export function Sites() {
             )}
           </TableBody>
         </Table>
-      </DataTableCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -449,6 +447,6 @@ export function Sites() {
         loading={delMut.isPending}
         onConfirm={() => delMut.mutate({ id: deleting.id, force: true })}
       />
-    </PageShell>
+    </PageTemplate>
   );
 }

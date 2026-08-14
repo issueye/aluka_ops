@@ -41,22 +41,26 @@ export function Topbar({ title, description }) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background/80 px-6 backdrop-blur">
+    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background/85 px-6 backdrop-blur-md">
       <div>
-        <h1 className="text-base font-semibold">{title}</h1>
+        <h1 className="text-base font-semibold tracking-tight">{title}</h1>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         {data?.version && (
-          <span className="hidden text-xs text-muted-foreground sm:inline">
+          <span className="hidden text-xs font-mono text-muted-foreground sm:inline">
             后端 v{data.version}
           </span>
         )}
         <AgentSwitcher />
         <ThemeToggle />
-        <StatusBadge tone={status.tone} label={status.text} />
+        <StatusBadge
+          tone={status.tone}
+          label={status.text}
+          pulse={status.tone === "success"}
+        />
         {authStatus?.auth_enabled && getToken() && (
           <IconTooltip label="退出登录">
             <Button

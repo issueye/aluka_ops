@@ -49,12 +49,10 @@ import { formatTime, formatBytes } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   ConfirmDialog,
-  DataTableCard,
   FormField,
   IconTooltip,
   InlineAlert,
-  PageShell,
-  RefreshButton,
+  PageTemplate,
   RowActions,
   TableStateRow,
 } from "@/components/ued";
@@ -282,27 +280,28 @@ export function Files() {
   const pg = usePagination(entries, 15);
 
   return (
-    <PageShell>
-      <DataTableCard
-        icon={Folder}
-        title="文件管理"
-        description={
-          <>
-            仅可管理数据目录内文件
-            {data?.root ? (
-              <span className="ml-1 font-mono text-[11px] text-muted-foreground">
-                ({data.root})
-              </span>
-            ) : null}
-          </>
-        }
-        actions={
-          <>
-            <RefreshButton onClick={() => refetch()} loading={isFetching} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
+    <PageTemplate
+      card
+      cardIcon={Folder}
+      cardTitle="文件管理"
+      cardDescription={
+        <>
+          仅可管理数据目录内文件
+          {data?.root ? (
+            <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+              ({data.root})
+            </span>
+          ) : null}
+        </>
+      }
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      cardActions={
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
                 setMkdirName("");
                 setMkdirOpen(true);
               }}
@@ -557,7 +556,6 @@ export function Files() {
             </Table>
           </div>
         )}
-      </DataTableCard>
 
       {/* 右键菜单 */}
       <ContextMenu
@@ -867,6 +865,6 @@ export function Files() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageShell>
+    </PageTemplate>
   );
 }

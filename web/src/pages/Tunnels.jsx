@@ -42,12 +42,10 @@ import {
 } from "@/components/ui/select";
 import {
   ConfirmDialog,
-  DataTableCard,
   FormField,
   FormGrid,
   IconTooltip,
-  PageShell,
-  RefreshButton,
+  PageTemplate,
   RowActions,
   TableStateRow,
 } from "@/components/ued";
@@ -218,40 +216,39 @@ export function Tunnels() {
   }, [agents, form.agent_id]);
 
   return (
-    <PageShell>
-      <DataTableCard
-        icon={Cable}
-        title="流量隧道"
-        description="反向 TCP：中心监听端口 → 经 Agent 隧道转发到内网服务（类似 SSH -R）。Agent 需主动连接中心（mode=agent + controller-url）。"
-        actions={
-          <>
-            <RefreshButton onClick={() => refetch()} loading={isFetching} />
-            <Button size="sm" onClick={openCreate}>
-              <Plus /> 新建规则
-            </Button>
-          </>
-        }
-        footer={
-          <p className="border-t px-6 py-3 text-[11px] text-muted-foreground">
-            示例：中心 -mode controller -port 19090 -agent-token secret；Agent -mode agent
-            -controller-url http://中心:19090 -agent-token secret。规则 listen=18090 →
-            agent 上 127.0.0.1:8080 后，访问中心:18090 即打到内网服务。
-          </p>
-        }
-        pagination={
-          !isLoading && rules.length > 0
-            ? {
-                page: pg.page,
-                totalPages: pg.totalPages,
-                total: pg.total,
-                from: pg.from,
-                to: pg.to,
-                pageSize: pg.pageSize,
-                setPage: pg.setPage,
-              }
-            : null
-        }
-      >
+    <PageTemplate
+      card
+      cardIcon={Cable}
+      cardTitle="流量隧道"
+      cardDescription="反向 TCP：中心监听端口 → 经 Agent 隧道转发到内网服务（类似 SSH -R）。Agent 需主动连接中心（mode=agent + controller-url）。"
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      cardActions={
+        <Button size="sm" onClick={openCreate}>
+          <Plus className="mr-1" /> 新建规则
+        </Button>
+      }
+      footer={
+        <p className="border-t px-6 py-3 text-[11px] text-muted-foreground">
+          示例：中心 -mode controller -port 19090 -agent-token secret；Agent -mode agent
+          -controller-url http://中心:19090 -agent-token secret。规则 listen=18090 →
+          agent 上 127.0.0.1:8080 后，访问中心:18090 即打到内网服务。
+        </p>
+      }
+      pagination={
+        !isLoading && rules.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
         {/* 在线会话 */}
         <div className="border-b px-6 py-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
@@ -380,7 +377,6 @@ export function Tunnels() {
             )}
           </TableBody>
         </Table>
-      </DataTableCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -531,6 +527,6 @@ export function Tunnels() {
         loading={delMut.isPending}
         onConfirm={() => delMut.mutate(deleting.id)}
       />
-    </PageShell>
+    </PageTemplate>
   );
 }

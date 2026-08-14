@@ -53,7 +53,7 @@ import {
   FormField,
   FormGrid,
   IconTooltip,
-  PageShell,
+  PageTemplate,
   RefreshButton,
   RowActions,
   TableStateRow,
@@ -368,66 +368,61 @@ export function SiteDetail() {
   };
 
   if (isLoading) {
-    return <div className="text-muted-foreground">加载中…</div>;
+    return <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">加载站点详情中…</div>;
   }
   if (isError || !site) {
     return (
-      <div className="space-y-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/sites">
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" /> 返回站点列表
-          </Link>
-        </Button>
+      <PageTemplate backTo="/sites" backLabel="返回站点列表">
         <Card>
           <CardContent className="p-6 text-muted-foreground">站点不存在或已删除。</CardContent>
         </Card>
-      </div>
+      </PageTemplate>
     );
   }
 
   return (
-    <PageShell>
-      {/* 头部 */}
-      <DetailHeader
-        backTo="/sites"
-        title={site.name}
-        badges={
-          <>
-            <Badge variant={site.enabled ? "success" : "secondary"}>
-              {site.enabled ? "启用" : "停用"}
+    <PageTemplate
+      backTo="/sites"
+      backLabel="返回站点列表"
+      title={site.name}
+      badge={
+        <>
+          <Badge variant={site.enabled ? "success" : "secondary"}>
+            {site.enabled ? "启用" : "停用"}
+          </Badge>
+          {site.enabled && listening.has(site.port) && (
+            <Badge variant="outline" className="font-mono text-[10px] text-success">
+              :{site.port} LISTEN
             </Badge>
-            {site.enabled && listening.has(site.port) && (
-              <Badge variant="outline" className="font-mono text-[10px] text-success">
-                :{site.port} LISTEN
-              </Badge>
-            )}
-          </>
-        }
-        subtitle={`端口 :${site.port}${site.description ? ` · ${site.description}` : ""}`}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <RefreshButton onClick={() => refetch()} loading={isFetching} />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setAccessForm({
-                  ip_whitelist: site.ip_whitelist || "",
-                  ip_blacklist: site.ip_blacklist || "",
-                });
-                setAccessOpen(true);
-              }}
-            >
-              <Shield /> IP 访问控制
-            </Button>
-            <Button variant="outline" size="sm" asChild>
-              <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
-                <ExternalLink /> 打开站点
-              </a>
-            </Button>
-          </div>
-        }
-      />
+          )}
+        </>
+      }
+      description={`端口 :${site.port}${site.description ? ` · ${site.description}` : ""}`}
+      onRefresh={() => refetch()}
+      isRefreshing={isFetching}
+      actions={
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setAccessForm({
+                ip_whitelist: site.ip_whitelist || "",
+                ip_blacklist: site.ip_blacklist || "",
+              });
+              setAccessOpen(true);
+            }}
+          >
+            <Shield className="h-3.5 w-3.5 mr-1" /> IP 访问控制
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-3.5 w-3.5 mr-1" /> 打开站点
+            </a>
+          </Button>
+        </div>
+      }
+    >
 
       {(site.ip_whitelist?.trim() || site.ip_blacklist?.trim()) && (
         <Card>
@@ -1182,6 +1177,6 @@ export function SiteDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageShell>
+    </PageTemplate>
   );
 }

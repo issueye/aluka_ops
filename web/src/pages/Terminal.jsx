@@ -31,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageShell } from "@/components/ued";
+import { PageTemplate } from "@/components/ued";
 
 /**
  * 服务器级 Web 控制台。
@@ -286,73 +286,86 @@ export function TerminalPage() {
   };
 
   return (
-    <PageShell>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <TerminalSquare className="h-4 w-4" /> 服务器控制台
-              </CardTitle>
-              <CardDescription>
-                系统级伪终端：Linux/macOS 使用 PTY，Windows 使用 ConPTY。
-                {sessionId ? (
-                  <span className="ml-2 font-mono text-[11px]">
-                    session={sessionId}
-                  </span>
-                ) : null}
-              </CardDescription>
+    <PageTemplate
+      card
+      cardIcon={TerminalSquare}
+      cardTitle="服务器控制台"
+      cardDescription={
+        <>
+          系统级伪终端：Linux/macOS 使用 PTY，Windows 使用 ConPTY。
+          {sessionId ? (
+            <span className="ml-2 font-mono text-[11px]">
+              session={sessionId}
+            </span>
+          ) : null}
+        </>
+      }
+      cardActions={
+        <div className="flex flex-wrap items-center gap-2">
+          {connBadge()}
+          <Select
+            value={shellType || defaultShell || "powershell_noprofile"}
+            onValueChange={setShellType}
+            disabled={conn === "connected" || conn === "connecting"}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Shell" />
+            </SelectTrigger>
+            <SelectContent>
+              {(shells.length
+                ? shells
+                : [
+                    { id: "powershell_noprofile", name: "PowerShell (无配置)" },
+                    { id: "powershell", name: "PowerShell" },
+                    { id: "cmd", name: "CMD" },
+                  ]
+              ).map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {conn === "connected" || conn === "connecting" ? (
+            <Button variant="outline" size="sm" onClick={disconnect}>
+              <Power className="mr-1.5 h-3.5 w-3.5" />
+              断开
+            </Button>
+          ) : (
+            <Button size="sm" onClick={connect}>
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              连接
+            </Button>
+          )}
+        </div>
+      }
+      cardContentClassName="p-6 space-y-2"
+    >
+          <div className="overflow-hidden rounded-lg border border-border/70 shadow-inner bg-log">
+            {/* 终端仿窗体顶栏 */}
+            <div className="flex h-8 items-center justify-between border-b border-border/40 bg-muted/40 px-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-destructive/60" />
+                <span className="h-2.5 w-2.5 rounded-full bg-warning/60" />
+                <span className="h-2.5 w-2.5 rounded-full bg-success/60" />
+                <span className="ml-2 font-mono text-[11px] opacity-75">
+                  aluka-console ~ {shellType || defaultShell || "powershell"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 font-mono text-[10px]">
+                {sessionId ? <span className="opacity-60">session:{sessionId.slice(0, 8)}</span> : null}
+                <span className="opacity-75">{backend || "local"}</span>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {connBadge()}
-              <Select
-                value={shellType || defaultShell || "powershell_noprofile"}
-                onValueChange={setShellType}
-                disabled={conn === "connected" || conn === "connecting"}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Shell" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(shells.length
-                    ? shells
-                    : [
-                        { id: "powershell_noprofile", name: "PowerShell (无配置)" },
-                        { id: "powershell", name: "PowerShell" },
-                        { id: "cmd", name: "CMD" },
-                      ]
-                  ).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {conn === "connected" || conn === "connecting" ? (
-                <Button variant="outline" size="sm" onClick={disconnect}>
-                  <Power className="mr-1.5 h-3.5 w-3.5" />
-                  断开
-                </Button>
-              ) : (
-                <Button size="sm" onClick={connect}>
-                  <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-                  连接
-                </Button>
-              )}
-            </div>
+            <div
+              ref={hostRef}
+              className="h-[min(65vh,600px)] w-full p-2"
+            />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div
-            ref={hostRef}
-            className="h-[min(70vh,640px)] w-full overflow-hidden rounded-md border border-border/60 bg-log p-2"
-          />
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            后端：{backend || info?.backend || "…"}。权限与 aluka_ops
-            进程相同，请谨慎操作。完整交互终端（方向键、Tab 补全、颜色、resize）已启用。
+          <p className="text-[11px] text-muted-foreground flex items-center justify-between">
+            <span>后端执行环境：{backend || info?.backend || "本机 PTY"}。支持完整交互按键、快捷键与颜色。</span>
+            <span className="font-mono text-[10px] opacity-60">xterm.js + fit-addon</span>
           </p>
-        </CardContent>
-      </Card>
-    </PageShell>
+    </PageTemplate>
   );
 }

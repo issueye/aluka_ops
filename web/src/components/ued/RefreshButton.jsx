@@ -16,10 +16,15 @@ export function RefreshButton({
       size="sm"
       onClick={onClick}
       disabled={loading || props.disabled}
-      className={className}
+      className={cn("group transition-all duration-150 active:scale-95", className)}
       {...props}
     >
-      <RefreshCw className={cn(loading && "animate-spin")} />
+      <RefreshCw
+        className={cn(
+          "h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-180",
+          loading && "animate-spin"
+        )}
+      />
       {label}
     </Button>
   );

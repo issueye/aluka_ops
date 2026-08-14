@@ -2,10 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const TONE_DOT = {
-  success: "bg-success",
-  warning: "bg-warning",
-  danger: "bg-danger",
-  default: "bg-primary",
+  success: "bg-success shadow-[0_0_8px_hsl(var(--success)/0.6)]",
+  warning: "bg-warning shadow-[0_0_8px_hsl(var(--warning)/0.6)]",
+  danger: "bg-danger shadow-[0_0_8px_hsl(var(--danger)/0.6)]",
+  default: "bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.6)]",
   secondary: "bg-muted-foreground",
   outline: "bg-muted-foreground",
 };
@@ -15,7 +15,7 @@ export function StatusDot({ tone = "secondary", pulse = false, className }) {
   return (
     <span
       className={cn(
-        "inline-block h-1.5 w-1.5 shrink-0 rounded-full",
+        "inline-block h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-200",
         TONE_DOT[tone] || TONE_DOT.secondary,
         pulse && "animate-pulse",
         className
@@ -45,7 +45,7 @@ export function StatusBadge({
           : "secondary";
 
   return (
-    <Badge variant={variant} className={cn("gap-1.5", className)}>
+    <Badge variant={variant} className={cn("gap-1.5 font-medium transition-all duration-150", className)}>
       {showDot ? <StatusDot tone={tone} pulse={pulse} /> : null}
       {label}
     </Badge>
