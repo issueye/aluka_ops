@@ -7,6 +7,7 @@ import { Eraser, Wifi, WifiOff, TerminalSquare } from "lucide-react";
 import { toast } from "sonner";
 import { serviceApi, scope } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
+import { attachTerminalTheme, getTerminalTheme } from "@/lib/terminalTheme";
 import { Button } from "@/components/ui/button";
 import { IconTooltip } from "@/components/ued";
 import { Badge } from "@/components/ui/badge";
@@ -63,17 +64,7 @@ export function ServiceConsole({ serviceId, active, running }) {
       cursorBlink: true,
       fontSize: 13,
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-      theme: {
-        background: "#0b0f17",
-        foreground: "#d1d5db",
-        cursor: "#38bdf8",
-        selectionBackground: "#1e3a5f",
-        black: "#0b0f17",
-        brightGreen: "#4ade80",
-        brightYellow: "#fbbf24",
-        brightRed: "#f87171",
-        brightBlue: "#38bdf8",
-      },
+      theme: getTerminalTheme(),
       convertEol: true,
       scrollback: 5000,
       allowProposedApi: true,
@@ -133,6 +124,9 @@ export function ServiceConsole({ serviceId, active, running }) {
     termRef.current = term;
     fitRef.current = fit;
 
+    // 主题切换时热更新终端配色
+    const unsubscribeTheme = attachTerminalTheme(term);
+
     const onResize = () => {
       try {
         fit.fit();
@@ -143,6 +137,7 @@ export function ServiceConsole({ serviceId, active, running }) {
     window.addEventListener("resize", onResize);
 
     return () => {
+      unsubscribeTheme();
       window.removeEventListener("resize", onResize);
       if (esRef.current) {
         esRef.current.close();
@@ -258,7 +253,7 @@ export function ServiceConsole({ serviceId, active, running }) {
   const StatusIcon = statusMeta.icon;
 
   return (
-    <div className="flex h-[560px] flex-col overflow-hidden rounded-lg border border-border bg-[#0b0f17]">
+    <div className="flex h-[min(70vh,640px)] flex-col overflow-hidden rounded-lg border border-border bg-log">
       {/* 工具栏 */}
       <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
         <div className="flex items-center gap-2">

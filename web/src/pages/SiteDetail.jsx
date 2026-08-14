@@ -7,12 +7,10 @@ import {
   Plus,
   Pencil,
   Trash2,
-  RefreshCw,
   ExternalLink,
   FolderTree,
   ArrowRightLeft,
   ScrollText,
-  Globe,
   Shield,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
@@ -21,16 +19,9 @@ import { usePagination } from "@/hooks/usePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -39,7 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -49,16 +39,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -66,6 +46,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ConfirmDialog,
+  DataTableCard,
+  DetailHeader,
+  FormField,
+  FormGrid,
+  IconTooltip,
+  PageShell,
+  RefreshButton,
+  RowActions,
+  TableStateRow,
+} from "@/components/ued";
 
 const EMPTY_APP = {
   code: "",
@@ -118,6 +110,18 @@ const CATEGORY_LABEL = {
   static: "静态",
   combo: "组合",
 };
+
+/** Switch 行:Label 文案 + 开关,用于表单内的布尔字段 */
+function SwitchRow({ label, checked, onCheckedChange, className }) {
+  return (
+    <div
+      className={`flex items-center justify-between rounded-md border px-3 py-2 ${className || ""}`}
+    >
+      <span className="text-sm font-medium">{label}</span>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
+    </div>
+  );
+}
 
 export function SiteDetail() {
   const { id } = useParams();
@@ -382,63 +386,48 @@ export function SiteDetail() {
   }
 
   return (
-    <div className="space-y-4">
+    <PageShell>
       {/* 头部 */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to="/sites">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                {site.name}
-              </h2>
-              <Badge variant={site.enabled ? "success" : "secondary"}>
-                {site.enabled ? "启用" : "停用"}
+      <DetailHeader
+        backTo="/sites"
+        title={site.name}
+        badges={
+          <>
+            <Badge variant={site.enabled ? "success" : "secondary"}>
+              {site.enabled ? "启用" : "停用"}
+            </Badge>
+            {site.enabled && listening.has(site.port) && (
+              <Badge variant="outline" className="font-mono text-[10px] text-success">
+                :{site.port} LISTEN
               </Badge>
-              {site.enabled && listening.has(site.port) && (
-                <Badge variant="outline" className="font-mono text-[10px] text-success">
-                  :{site.port} LISTEN
-                </Badge>
-              )}
-            </div>
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-              端口 :{site.port}
-              {site.description ? ` · ${site.description}` : ""}
-            </p>
+            )}
+          </>
+        }
+        subtitle={`端口 :${site.port}${site.description ? ` · ${site.description}` : ""}`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <RefreshButton onClick={() => refetch()} loading={isFetching} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAccessForm({
+                  ip_whitelist: site.ip_whitelist || "",
+                  ip_blacklist: site.ip_blacklist || "",
+                });
+                setAccessOpen(true);
+              }}
+            >
+              <Shield /> IP 访问控制
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
+                <ExternalLink /> 打开站点
+              </a>
+            </Button>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setAccessForm({
-                ip_whitelist: site.ip_whitelist || "",
-                ip_blacklist: site.ip_blacklist || "",
-              });
-              setAccessOpen(true);
-            }}
-          >
-            <Shield className="mr-1.5 h-3.5 w-3.5" />
-            IP 访问控制
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
-              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-              打开站点
-            </a>
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {(site.ip_whitelist?.trim() || site.ip_blacklist?.trim()) && (
         <Card>
@@ -462,227 +451,228 @@ export function SiteDetail() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="apps">
-            <FolderTree className="mr-1.5 h-3.5 w-3.5" />
-            APP ({apps.length})
+            <FolderTree className="mr-1.5 h-3.5 w-3.5" /> APP ({apps.length})
           </TabsTrigger>
           <TabsTrigger value="proxies">
-            <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" />
-            反代 ({proxies.length})
+            <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" /> 反代 ({proxies.length})
           </TabsTrigger>
           <TabsTrigger value="scripts">
-            <ScrollText className="mr-1.5 h-3.5 w-3.5" />
-            路由脚本 ({scripts.length})
+            <ScrollText className="mr-1.5 h-3.5 w-3.5" /> 路由脚本 ({scripts.length})
           </TabsTrigger>
         </TabsList>
 
         {/* ===== APP Tab ===== */}
         <TabsContent value="apps" className="space-y-3">
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
-              <div>
-                <CardTitle className="text-sm">静态 APP</CardTitle>
-                <CardDescription>
-                  绑定本站点端口的前端静态资源（路径 + 目录 + SPA）
-                </CardDescription>
-              </div>
+          <DataTableCard
+            title="静态 APP"
+            description="绑定本站点端口的前端静态资源（路径 + 目录 + SPA）"
+            actions={
               <Button size="sm" onClick={openCreateApp}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                新建 APP
+                <Plus /> 新建 APP
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>应用</TableHead>
-                      <TableHead>路径</TableHead>
-                      <TableHead>目录</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {apps.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-muted-foreground">
-                          暂无 APP。可将构建产物放到 data/apps/&lt;code&gt; 后在此挂载。
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      appsPg.pageItems.map((app) => (
-                        <TableRow key={app.id}>
-                          <TableCell>
-                            <div className="font-medium">{app.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              {app.code}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{app.path_prefix}</TableCell>
-                          <TableCell
-                            className="max-w-[180px] truncate font-mono text-xs"
-                            title={app.root_dir}
-                          >
-                            {app.root_dir || `apps/${app.code}`}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={app.enabled ? "success" : "secondary"}>
-                              {app.enabled ? "启用" : "停用"}
-                            </Badge>
-                            {app.spa_fallback && (
-                              <Badge variant="outline" className="ml-1">
-                                SPA
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              {appUrl(app) && (
-                                <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                  <a href={appUrl(app)} target="_blank" rel="noreferrer">
-                                    <ExternalLink className="h-3.5 w-3.5" />
-                                  </a>
-                                </Button>
-                              )}
+            }
+            pagination={
+              apps.length > 0
+                ? {
+                    page: appsPg.page,
+                    totalPages: appsPg.totalPages,
+                    total: appsPg.total,
+                    from: appsPg.from,
+                    to: appsPg.to,
+                    pageSize: appsPg.pageSize,
+                    setPage: appsPg.setPage,
+                  }
+                : null
+            }
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>应用</TableHead>
+                  <TableHead>路径</TableHead>
+                  <TableHead>目录</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {apps.length === 0 ? (
+                  <TableStateRow colSpan={5}>
+                    暂无 APP。可将构建产物放到 data/apps/&lt;code&gt; 后在此挂载。
+                  </TableStateRow>
+                ) : (
+                  appsPg.pageItems.map((app) => (
+                    <TableRow key={app.id}>
+                      <TableCell>
+                        <div className="font-medium">{app.name}</div>
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {app.code}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{app.path_prefix}</TableCell>
+                      <TableCell
+                        className="max-w-[180px] truncate font-mono text-xs"
+                        title={app.root_dir}
+                      >
+                        {app.root_dir || `apps/${app.code}`}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={app.enabled ? "success" : "secondary"}>
+                          {app.enabled ? "启用" : "停用"}
+                        </Badge>
+                        {app.spa_fallback && (
+                          <Badge variant="outline" className="ml-1">
+                            SPA
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RowActions>
+                          {appUrl(app) && (
+                            <IconTooltip label="打开 APP">
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => openEditApp(app)}
+                                asChild
+                                aria-label="打开 APP"
                               >
-                                <Pencil className="h-3.5 w-3.5" />
+                                <a href={appUrl(app)} target="_blank" rel="noreferrer">
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </a>
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => setDeletingApp(app)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-                  {apps.length > 0 && (
-                    <PaginationBar
-                      page={appsPg.page}
-                      totalPages={appsPg.totalPages}
-                      total={appsPg.total}
-                      from={appsPg.from}
-                      to={appsPg.to}
-                      pageSize={appsPg.pageSize}
-                      onPageChange={appsPg.setPage}
-                    />
-                  )}
-              </div>
-            </CardContent>
-          </Card>
+                            </IconTooltip>
+                          )}
+                          <IconTooltip label="编辑">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label="编辑 APP"
+                              onClick={() => openEditApp(app)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                          <IconTooltip label="删除">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              aria-label="删除 APP"
+                              onClick={() => setDeletingApp(app)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                        </RowActions>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DataTableCard>
         </TabsContent>
 
         {/* ===== Proxy Tab ===== */}
         <TabsContent value="proxies" className="space-y-3">
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
-              <div>
-                <CardTitle className="text-sm">反代规则</CardTitle>
-                <CardDescription>
-                  路径前缀 → 上游；同站点内最长前缀优先。上传建议 body/IO 超时设为 0。
-                </CardDescription>
-              </div>
+          <DataTableCard
+            title="反代规则"
+            description="路径前缀 → 上游；同站点内最长前缀优先。上传建议 body/IO 超时设为 0。"
+            actions={
               <Button size="sm" onClick={openCreateProxy}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                添加反代
+                <Plus /> 添加反代
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>名称</TableHead>
-                      <TableHead>路径</TableHead>
-                      <TableHead>上游</TableHead>
-                      <TableHead>上传</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+            }
+            pagination={
+              proxies.length > 0
+                ? {
+                    page: proxiesPg.page,
+                    totalPages: proxiesPg.totalPages,
+                    total: proxiesPg.total,
+                    from: proxiesPg.from,
+                    to: proxiesPg.to,
+                    pageSize: proxiesPg.pageSize,
+                    setPage: proxiesPg.setPage,
+                  }
+                : null
+            }
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>名称</TableHead>
+                  <TableHead>路径</TableHead>
+                  <TableHead>上游</TableHead>
+                  <TableHead>上传</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {proxies.length === 0 ? (
+                  <TableStateRow colSpan={6}>
+                    暂无反代。例如 path=/api → http://127.0.0.1:8080
+                  </TableStateRow>
+                ) : (
+                  proxiesPg.pageItems.map((px) => (
+                    <TableRow key={px.id}>
+                      <TableCell>
+                        <div className="font-medium">{px.name}</div>
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {px.code}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{px.path_prefix}</TableCell>
+                      <TableCell
+                        className="max-w-[200px] truncate font-mono text-xs"
+                        title={px.upstream}
+                      >
+                        {px.upstream}
+                      </TableCell>
+                      <TableCell className="text-[11px] text-muted-foreground">
+                        body {px.max_body_bytes ? px.max_body_bytes : "不限"}
+                        <br />
+                        io {px.io_timeout_sec ? `${px.io_timeout_sec}s` : "不限"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={px.enabled ? "success" : "secondary"}>
+                          {px.enabled ? "启用" : "停用"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RowActions>
+                          <IconTooltip label="编辑">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label="编辑反代"
+                              onClick={() => openEditProxy(px)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                          <IconTooltip label="删除">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              aria-label="删除反代"
+                              onClick={() => setDeletingProxy(px)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                        </RowActions>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {proxies.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-muted-foreground">
-                          暂无反代。例如 path=/api → http://127.0.0.1:8080
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      proxiesPg.pageItems.map((px) => (
-                        <TableRow key={px.id}>
-                          <TableCell>
-                            <div className="font-medium">{px.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              {px.code}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">{px.path_prefix}</TableCell>
-                          <TableCell
-                            className="max-w-[200px] truncate font-mono text-xs"
-                            title={px.upstream}
-                          >
-                            {px.upstream}
-                          </TableCell>
-                          <TableCell className="text-[11px] text-muted-foreground">
-                            body {px.max_body_bytes ? px.max_body_bytes : "不限"}
-                            <br />
-                            io {px.io_timeout_sec ? `${px.io_timeout_sec}s` : "不限"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={px.enabled ? "success" : "secondary"}>
-                              {px.enabled ? "启用" : "停用"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditProxy(px)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => setDeletingProxy(px)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-                  {proxies.length > 0 && (
-                    <PaginationBar
-                      page={proxiesPg.page}
-                      totalPages={proxiesPg.totalPages}
-                      total={proxiesPg.total}
-                      from={proxiesPg.from}
-                      to={proxiesPg.to}
-                      pageSize={proxiesPg.pageSize}
-                      onPageChange={proxiesPg.setPage}
-                    />
-                  )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DataTableCard>
         </TabsContent>
 
         {/* ===== Scripts Tab ===== */}
@@ -709,97 +699,93 @@ export function SiteDetail() {
               ))}
             </div>
           )}
-          <Card>
-            <CardHeader className="flex-row items-center justify-between space-y-0 pb-3">
-              <div>
-                <CardTitle className="text-sm">路由脚本</CardTitle>
-                <CardDescription>
-                  优先于 APP/反代执行；支持 rewrite / redirect / deny / proxy / static
-                </CardDescription>
-              </div>
+          <DataTableCard
+            title="路由脚本"
+            description="优先于 APP/反代执行；支持 rewrite / redirect / deny / proxy / static"
+            actions={
               <Button size="sm" onClick={() => openCreateScript()}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                自定义脚本
+                <Plus /> 自定义脚本
               </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>名称</TableHead>
-                      <TableHead>作用域</TableHead>
-                      <TableHead>优先级</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead className="text-right">操作</TableHead>
+            }
+            pagination={
+              scripts.length > 0
+                ? {
+                    page: scriptsPg.page,
+                    totalPages: scriptsPg.totalPages,
+                    total: scriptsPg.total,
+                    from: scriptsPg.from,
+                    to: scriptsPg.to,
+                    pageSize: scriptsPg.pageSize,
+                    setPage: scriptsPg.setPage,
+                  }
+                : null
+            }
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>名称</TableHead>
+                  <TableHead>作用域</TableHead>
+                  <TableHead>优先级</TableHead>
+                  <TableHead>状态</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scripts.length === 0 ? (
+                  <TableStateRow colSpan={5}>暂无脚本。可点上方模板一键创建。</TableStateRow>
+                ) : (
+                  scriptsPg.pageItems.map((sc) => (
+                    <TableRow key={sc.id}>
+                      <TableCell>
+                        <div className="font-medium">{sc.name}</div>
+                        <div className="font-mono text-[11px] text-muted-foreground">
+                          {sc.code}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {sc.path_prefix || "/"}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {sc.priority ?? 100}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={sc.enabled ? "success" : "secondary"}>
+                          {sc.enabled ? "启用" : "停用"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RowActions>
+                          <IconTooltip label="编辑">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label="编辑脚本"
+                              onClick={() => openEditScript(sc)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                          <IconTooltip label="删除">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                              aria-label="删除脚本"
+                              onClick={() => setDeletingScript(sc)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                        </RowActions>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scripts.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-muted-foreground">
-                          暂无脚本。可点上方模板一键创建。
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      scriptsPg.pageItems.map((sc) => (
-                        <TableRow key={sc.id}>
-                          <TableCell>
-                            <div className="font-medium">{sc.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">
-                              {sc.code}
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {sc.path_prefix || "/"}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {sc.priority ?? 100}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={sc.enabled ? "success" : "secondary"}>
-                              {sc.enabled ? "启用" : "停用"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => openEditScript(sc)}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => setDeletingScript(sc)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-                  {scripts.length > 0 && (
-                    <PaginationBar
-                      page={scriptsPg.page}
-                      totalPages={scriptsPg.totalPages}
-                      total={scriptsPg.total}
-                      from={scriptsPg.from}
-                      to={scriptsPg.to}
-                      pageSize={scriptsPg.pageSize}
-                      onPageChange={scriptsPg.setPage}
-                    />
-                  )}
-              </div>
-            </CardContent>
-          </Card>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DataTableCard>
         </TabsContent>
       </Tabs>
 
@@ -810,62 +796,53 @@ export function SiteDetail() {
             <DialogTitle>{editingApp ? "编辑 APP" : "新建 APP"}</DialogTitle>
             <DialogDescription>静态前端：路径 + 目录（相对 data）</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>名称</Label>
+          <FormGrid cols={2} className="gap-3">
+            <FormField label="名称">
               <Input
                 value={appForm.name}
                 onChange={(e) => setAppForm((f) => ({ ...f, name: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>编码</Label>
+            </FormField>
+            <FormField label="编码">
               <Input
                 className="font-mono"
                 disabled={!!editingApp}
                 value={appForm.code}
                 onChange={(e) => setAppForm((f) => ({ ...f, code: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>访问路径</Label>
+            </FormField>
+            <FormField label="访问路径">
               <Input
                 className="font-mono"
                 value={appForm.path_prefix}
                 onChange={(e) => setAppForm((f) => ({ ...f, path_prefix: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>静态目录 root_dir</Label>
+            </FormField>
+            <FormField label="静态目录 root_dir" className="sm:col-span-1">
               <Input
                 className="font-mono"
                 value={appForm.root_dir}
                 onChange={(e) => setAppForm((f) => ({ ...f, root_dir: e.target.value }))}
                 placeholder="apps/webapp"
               />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>去掉路径前缀</Label>
-              <Switch
-                checked={appForm.strip_prefix}
-                onCheckedChange={(v) => setAppForm((f) => ({ ...f, strip_prefix: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>SPA fallback</Label>
-              <Switch
-                checked={appForm.spa_fallback}
-                onCheckedChange={(v) => setAppForm((f) => ({ ...f, spa_fallback: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
-              <Label>启用</Label>
-              <Switch
-                checked={appForm.enabled}
-                onCheckedChange={(v) => setAppForm((f) => ({ ...f, enabled: v }))}
-              />
-            </div>
-          </div>
+            </FormField>
+            <SwitchRow
+              label="去掉路径前缀"
+              checked={appForm.strip_prefix}
+              onCheckedChange={(v) => setAppForm((f) => ({ ...f, strip_prefix: v }))}
+            />
+            <SwitchRow
+              label="SPA fallback"
+              checked={appForm.spa_fallback}
+              onCheckedChange={(v) => setAppForm((f) => ({ ...f, spa_fallback: v }))}
+            />
+            <SwitchRow
+              label="启用"
+              className="sm:col-span-2"
+              checked={appForm.enabled}
+              onCheckedChange={(v) => setAppForm((f) => ({ ...f, enabled: v }))}
+            />
+          </FormGrid>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAppOpen(false)}>
               取消
@@ -899,48 +876,41 @@ export function SiteDetail() {
           <DialogHeader>
             <DialogTitle>{editingProxy ? "编辑反代" : "添加反代"}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>编码</Label>
+          <FormGrid cols={2} className="gap-3">
+            <FormField label="编码">
               <Input
                 className="font-mono"
                 disabled={!!editingProxy}
                 value={proxyForm.code}
                 onChange={(e) => setProxyForm((f) => ({ ...f, code: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>名称</Label>
+            </FormField>
+            <FormField label="名称">
               <Input
                 value={proxyForm.name}
                 onChange={(e) => setProxyForm((f) => ({ ...f, name: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>路径前缀</Label>
+            </FormField>
+            <FormField label="路径前缀">
               <Input
                 className="font-mono"
                 value={proxyForm.path_prefix}
                 onChange={(e) => setProxyForm((f) => ({ ...f, path_prefix: e.target.value }))}
               />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>去掉前缀</Label>
-              <Switch
-                checked={proxyForm.strip_prefix}
-                onCheckedChange={(v) => setProxyForm((f) => ({ ...f, strip_prefix: v }))}
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>上游 upstream</Label>
+            </FormField>
+            <SwitchRow
+              label="去掉前缀"
+              checked={proxyForm.strip_prefix}
+              onCheckedChange={(v) => setProxyForm((f) => ({ ...f, strip_prefix: v }))}
+            />
+            <FormField label="上游 upstream" className="sm:col-span-2">
               <Input
                 className="font-mono"
                 value={proxyForm.upstream}
                 onChange={(e) => setProxyForm((f) => ({ ...f, upstream: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Body 上限(0=不限)</Label>
+            </FormField>
+            <FormField label="Body 上限(0=不限)">
               <Input
                 type="number"
                 value={proxyForm.max_body_bytes}
@@ -948,9 +918,8 @@ export function SiteDetail() {
                   setProxyForm((f) => ({ ...f, max_body_bytes: Number(e.target.value) }))
                 }
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>IO 超时秒(0=不限)</Label>
+            </FormField>
+            <FormField label="IO 超时秒(0=不限)">
               <Input
                 type="number"
                 value={proxyForm.io_timeout_sec}
@@ -958,24 +927,20 @@ export function SiteDetail() {
                   setProxyForm((f) => ({ ...f, io_timeout_sec: Number(e.target.value) }))
                 }
               />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>启用</Label>
-              <Switch
-                checked={proxyForm.enabled}
-                onCheckedChange={(v) => setProxyForm((f) => ({ ...f, enabled: v }))}
-              />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>WebSocket</Label>
-              <Switch
-                checked={proxyForm.enable_websocket}
-                onCheckedChange={(v) =>
-                  setProxyForm((f) => ({ ...f, enable_websocket: v }))
-                }
-              />
-            </div>
-          </div>
+            </FormField>
+            <SwitchRow
+              label="启用"
+              checked={proxyForm.enabled}
+              onCheckedChange={(v) => setProxyForm((f) => ({ ...f, enabled: v }))}
+            />
+            <SwitchRow
+              label="WebSocket"
+              checked={proxyForm.enable_websocket}
+              onCheckedChange={(v) =>
+                setProxyForm((f) => ({ ...f, enable_websocket: v }))
+              }
+            />
+          </FormGrid>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProxyOpen(false)}>
               取消
@@ -1016,10 +981,9 @@ export function SiteDetail() {
             <DialogTitle>{editingScript ? "编辑路由脚本" : "添加路由脚本"}</DialogTitle>
             <DialogDescription>JSON 规则数组；priority 越小越先执行。</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <FormGrid cols={2} className="gap-3">
             {!editingScript && templates.length > 0 && (
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label>套用模板</Label>
+              <FormField label="套用模板" className="sm:col-span-2">
                 <Select
                   value={scriptForm.template_id || "__none__"}
                   onValueChange={(tid) => {
@@ -1053,34 +1017,30 @@ export function SiteDetail() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </FormField>
             )}
-            <div className="space-y-1.5">
-              <Label>编码</Label>
+            <FormField label="编码">
               <Input
                 className="font-mono"
                 disabled={!!editingScript}
                 value={scriptForm.code}
                 onChange={(e) => setScriptForm((f) => ({ ...f, code: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>名称</Label>
+            </FormField>
+            <FormField label="名称">
               <Input
                 value={scriptForm.name}
                 onChange={(e) => setScriptForm((f) => ({ ...f, name: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>作用域</Label>
+            </FormField>
+            <FormField label="作用域">
               <Input
                 className="font-mono"
                 value={scriptForm.path_prefix}
                 onChange={(e) => setScriptForm((f) => ({ ...f, path_prefix: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>优先级</Label>
+            </FormField>
+            <FormField label="优先级">
               <Input
                 type="number"
                 value={scriptForm.priority}
@@ -1088,16 +1048,14 @@ export function SiteDetail() {
                   setScriptForm((f) => ({ ...f, priority: Number(e.target.value) }))
                 }
               />
-            </div>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
-              <Label>启用</Label>
-              <Switch
-                checked={scriptForm.enabled}
-                onCheckedChange={(v) => setScriptForm((f) => ({ ...f, enabled: v }))}
-              />
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Script JSON</Label>
+            </FormField>
+            <SwitchRow
+              label="启用"
+              className="sm:col-span-2"
+              checked={scriptForm.enabled}
+              onCheckedChange={(v) => setScriptForm((f) => ({ ...f, enabled: v }))}
+            />
+            <FormField label="Script JSON" className="sm:col-span-2">
               <Textarea
                 rows={12}
                 className="font-mono text-xs"
@@ -1111,8 +1069,8 @@ export function SiteDetail() {
                 }
                 spellCheck={false}
               />
-            </div>
-          </div>
+            </FormField>
+          </FormGrid>
           <DialogFooter>
             <Button variant="outline" onClick={() => setScriptOpen(false)}>
               取消
@@ -1146,57 +1104,33 @@ export function SiteDetail() {
       </Dialog>
 
       {/* Deletes */}
-      <AlertDialog open={!!deletingApp} onOpenChange={(v) => !v && setDeletingApp(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除 APP {deletingApp?.code}？</AlertDialogTitle>
-            <AlertDialogDescription>仅删配置，不删磁盘文件。</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => delAppMut.mutate(deletingApp.id)}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deletingApp}
+        onOpenChange={(v) => !v && setDeletingApp(null)}
+        title={`删除 APP ${deletingApp?.code}？`}
+        description="仅删配置，不删磁盘文件。"
+        confirmText="删除"
+        loading={delAppMut.isPending}
+        onConfirm={() => delAppMut.mutate(deletingApp.id)}
+      />
 
-      <AlertDialog open={!!deletingProxy} onOpenChange={(v) => !v && setDeletingProxy(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除反代 {deletingProxy?.code}？</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => delProxyMut.mutate(deletingProxy.id)}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deletingProxy}
+        onOpenChange={(v) => !v && setDeletingProxy(null)}
+        title={`删除反代 ${deletingProxy?.code}？`}
+        confirmText="删除"
+        loading={delProxyMut.isPending}
+        onConfirm={() => delProxyMut.mutate(deletingProxy.id)}
+      />
 
-      <AlertDialog open={!!deletingScript} onOpenChange={(v) => !v && setDeletingScript(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除脚本 {deletingScript?.code}？</AlertDialogTitle>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => delScriptMut.mutate(deletingScript.id)}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deletingScript}
+        onOpenChange={(v) => !v && setDeletingScript(null)}
+        title={`删除脚本 ${deletingScript?.code}？`}
+        confirmText="删除"
+        loading={delScriptMut.isPending}
+        onConfirm={() => delScriptMut.mutate(deletingScript.id)}
+      />
 
       <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
         <DialogContent>
@@ -1207,8 +1141,7 @@ export function SiteDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>白名单</Label>
+            <FormField label="白名单">
               <Textarea
                 rows={4}
                 className="font-mono text-xs"
@@ -1218,9 +1151,8 @@ export function SiteDetail() {
                   setAccessForm((f) => ({ ...f, ip_whitelist: e.target.value }))
                 }
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>黑名单</Label>
+            </FormField>
+            <FormField label="黑名单">
               <Textarea
                 rows={4}
                 className="font-mono text-xs"
@@ -1230,7 +1162,7 @@ export function SiteDetail() {
                   setAccessForm((f) => ({ ...f, ip_blacklist: e.target.value }))
                 }
               />
-            </div>
+            </FormField>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAccessOpen(false)}>
@@ -1250,6 +1182,6 @@ export function SiteDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageShell>
   );
 }

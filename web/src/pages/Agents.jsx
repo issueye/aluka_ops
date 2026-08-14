@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Network,
-  RefreshCw,
   Play,
   Square,
   RotateCw,
@@ -17,9 +16,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -32,7 +28,15 @@ import {
 import { PaginationBar } from "@/components/ui/pagination";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
-import { PageShell } from "@/components/ued";
+import {
+  EmptyState,
+  IconTooltip,
+  InlineAlert,
+  ListPageHeader,
+  PageShell,
+  RefreshButton,
+  RowActions,
+} from "@/components/ued";
 
 const agentsApi = {
   list: () => api.get("/api/agents"),
@@ -75,41 +79,35 @@ export function Agents() {
   return (
     <PageShell>
       <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <Network className="h-4 w-4" /> 多节点 Agent
-            </CardTitle>
-            <CardDescription>
-              中心模式(ALUKA_MODE=controller)下展示已上报的 Agent。在线 {onlineCount} / 共{" "}
-              {agents.length}。
-            </CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-            <RefreshCw className={isFetching ? "animate-spin" : ""} /> 刷新
-          </Button>
-        </CardHeader>
+        <ListPageHeader
+          icon={Network}
+          title="多节点 Agent"
+          description={`中心模式(ALUKA_MODE=controller)下展示已上报的 Agent。在线 ${onlineCount} / 共 ${agents.length}。`}
+          actions={<RefreshButton onClick={() => refetch()} loading={isFetching} />}
+        />
         <CardContent>
           {isError ? (
-            <div className="rounded-md border border-danger/30 bg-danger-muted p-4 text-sm text-destructive">
+            <InlineAlert variant="error">
               加载失败。请确认以 controller 模式运行,或后端已启动。
-            </div>
+            </InlineAlert>
           ) : isLoading ? (
             <p className="text-sm text-muted-foreground">加载中...</p>
           ) : agents.length === 0 ? (
-            <div className="space-y-2 py-8 text-center text-sm text-muted-foreground">
-              <Server className="mx-auto h-8 w-8 opacity-50" />
-              <p>暂无 Agent 上报。</p>
-              <p className="text-xs">
-                中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
-                <br />
-                Agent:{" "}
-                <code>
-                  ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
-                  ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
-                </code>
-              </p>
-            </div>
+            <EmptyState
+              icon={Server}
+              title="暂无 Agent 上报"
+              description={
+                <>
+                  中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
+                  <br />
+                  Agent:{" "}
+                  <code>
+                    ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
+                    ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
+                  </code>
+                </>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {pg.pageItems.map((a) => (
@@ -190,53 +188,59 @@ export function Agents() {
                                   {s.pid || "—"}
                                 </TableCell>
                                 <TableCell>
-                                  <div className="flex justify-end gap-1">
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      aria-label="启动"
-                                      disabled={!a.online || actionMut.isPending}
-                                      onClick={() =>
-                                        actionMut.mutate({
-                                          agentId: a.agent_id,
-                                          sid: s.id,
-                                          action: "start",
-                                        })
-                                      }
-                                    >
-                                      <Play className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      aria-label="停止"
-                                      disabled={!a.online || actionMut.isPending}
-                                      onClick={() =>
-                                        actionMut.mutate({
-                                          agentId: a.agent_id,
-                                          sid: s.id,
-                                          action: "stop",
-                                        })
-                                      }
-                                    >
-                                      <Square className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      aria-label="重启"
-                                      disabled={!a.online || actionMut.isPending}
-                                      onClick={() =>
-                                        actionMut.mutate({
-                                          agentId: a.agent_id,
-                                          sid: s.id,
-                                          action: "restart",
-                                        })
-                                      }
-                                    >
-                                      <RotateCw className="h-3.5 w-3.5" />
-                                    </Button>
-                                  </div>
+                                  <RowActions>
+                                    <IconTooltip label="启动">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        aria-label="启动"
+                                        disabled={!a.online || actionMut.isPending}
+                                        onClick={() =>
+                                          actionMut.mutate({
+                                            agentId: a.agent_id,
+                                            sid: s.id,
+                                            action: "start",
+                                          })
+                                        }
+                                      >
+                                        <Play className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </IconTooltip>
+                                    <IconTooltip label="停止">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        aria-label="停止"
+                                        disabled={!a.online || actionMut.isPending}
+                                        onClick={() =>
+                                          actionMut.mutate({
+                                            agentId: a.agent_id,
+                                            sid: s.id,
+                                            action: "stop",
+                                          })
+                                        }
+                                      >
+                                        <Square className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </IconTooltip>
+                                    <IconTooltip label="重启">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        aria-label="重启"
+                                        disabled={!a.online || actionMut.isPending}
+                                        onClick={() =>
+                                          actionMut.mutate({
+                                            agentId: a.agent_id,
+                                            sid: s.id,
+                                            action: "restart",
+                                          })
+                                        }
+                                      >
+                                        <RotateCw className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </IconTooltip>
+                                  </RowActions>
                                 </TableCell>
                               </TableRow>
                             ))}

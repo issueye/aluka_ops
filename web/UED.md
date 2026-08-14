@@ -26,6 +26,7 @@ CSS 变量定义于 `src/index.css`，Tailwind 映射于 `tailwind.config.js`。
 | `warning` / `warning-muted` | 警告、停止中、阈值告警 |
 | `danger` / `danger-muted` | 危险、异常、失败（与 destructive 对齐） |
 | `muted` | 次要文字/底 |
+| `log` / `log-foreground` | 终端/日志查看器底色与文字（亮色浅底深绿、暗色深底亮绿，保证两主题对比度）。xterm 终端须经 `lib/terminalTheme.js`（从 token 解析并跟随主题热更新），禁止页面内硬编码 hex |
 | `border` / `input` / `ring` | 边框、表单、焦点环 |
 
 ### 禁止

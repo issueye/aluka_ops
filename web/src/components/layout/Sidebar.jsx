@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Boxes,
@@ -14,6 +15,7 @@ import {
   Cable,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { healthApi } from "@/lib/api";
 
 const navGroups = [
   {
@@ -56,6 +58,14 @@ const navGroups = [
 ];
 
 export function Sidebar() {
+  const { data: health } = useQuery({
+    queryKey: ["health"],
+    queryFn: healthApi.check,
+    staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const version = health?.version || "";
   return (
     <aside className="flex h-full w-[68px] shrink-0 flex-col border-r bg-card/40 lg:w-60">
       {/* Logo */}
@@ -105,8 +115,10 @@ export function Sidebar() {
 
       {/* 版本 */}
       <div className="shrink-0 border-t p-3 text-center text-[10px] text-muted-foreground lg:text-left lg:text-[11px]">
-        <div className="lg:hidden">v0.2</div>
-        <div className="hidden lg:block">v0.2.0 · 服务治理 / 网关</div>
+        <div className="lg:hidden">{version ? `v${version}` : "v-"}</div>
+        <div className="hidden lg:block">
+          {version ? `v${version}` : "v-"} · 服务治理 / 网关
+        </div>
         <div className="mt-0.5 hidden lg:block">© Aluka Ops</div>
       </div>
     </aside>

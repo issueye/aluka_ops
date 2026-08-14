@@ -81,7 +81,7 @@ export function ServiceDetail() {
       {/* 头部 */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <Button variant="ghost" size="icon" asChild className="shrink-0">
+          <Button variant="ghost" size="icon" asChild className="shrink-0" aria-label="返回服务列表">
             <Link to="/services"><ArrowLeft className="h-4 w-4" /></Link>
           </Button>
           <div className="min-w-0">

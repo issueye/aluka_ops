@@ -4,12 +4,9 @@ import { useAgent } from "@/lib/agentContext";
 import { Button } from "@/components/ui/button";
 
 /** 页面根容器：统一纵向间距 */
-export function PageShell({ className, dense = false, children, ...props }) {
+export function PageShell({ className, children, ...props }) {
   return (
-    <div
-      className={cn(dense ? "space-y-4" : "space-y-4", className)}
-      {...props}
-    >
+    <div className={cn("space-y-4", className)} {...props}>
       <AgentScopeBanner />
       {children}
     </div>

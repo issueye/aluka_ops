@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { api, getScopeAgent } from "@/lib/api";
 import { withAuthQuery } from "@/lib/auth";
+import { attachTerminalTheme, getTerminalTheme } from "@/lib/terminalTheme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -106,12 +107,7 @@ export function TerminalPage() {
       fontSize: 13,
       fontFamily:
         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace',
-      theme: {
-        background: "#0b0f17",
-        foreground: "#d1d5db",
-        cursor: "#38bdf8",
-        selectionBackground: "#1e3a5f",
-      },
+      theme: getTerminalTheme(),
       convertEol: false, // PTY 自己处理换行
       scrollback: 10000,
       allowProposedApi: true,
@@ -151,6 +147,9 @@ export function TerminalPage() {
     termRef.current = term;
     fitRef.current = fit;
 
+    // 主题切换时热更新终端配色
+    const unsubscribeTheme = attachTerminalTheme(term);
+
     const onResize = () => {
       try {
         fit.fit();
@@ -161,6 +160,7 @@ export function TerminalPage() {
     };
     window.addEventListener("resize", onResize);
     return () => {
+      unsubscribeTheme();
       window.removeEventListener("resize", onResize);
       disconnect();
       term.dispose();
@@ -345,7 +345,7 @@ export function TerminalPage() {
         <CardContent>
           <div
             ref={hostRef}
-            className="h-[min(70vh,640px)] w-full overflow-hidden rounded-md border border-border/60 bg-[#0b0f17] p-2"
+            className="h-[min(70vh,640px)] w-full overflow-hidden rounded-md border border-border/60 bg-log p-2"
           />
           <p className="mt-2 text-[11px] text-muted-foreground">
             后端：{backend || info?.backend || "…"}。权限与 aluka_ops

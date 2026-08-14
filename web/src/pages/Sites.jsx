@@ -6,7 +6,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  RefreshCw,
   Power,
   PowerOff,
   Globe,
@@ -22,16 +21,8 @@ import { usePagination } from "@/hooks/usePagination";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -40,7 +31,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -50,16 +40,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { PageShell } from "@/components/ued";
+  ConfirmDialog,
+  DataTableCard,
+  FormField,
+  IconTooltip,
+  PageShell,
+  RefreshButton,
+  RowActions,
+  TableStateRow,
+} from "@/components/ued";
 
 const EMPTY = {
   port: 18090,
@@ -138,227 +127,223 @@ export function Sites() {
     setOpen(true);
   };
 
+  const toggleEnabled = (s) => {
+    gatewayApi
+      .updatePort(s.id, { enabled: !s.enabled })
+      .then(() => {
+        toast.success(s.enabled ? "已停用" : "已启用");
+        invalidate();
+      })
+      .catch((err) => toast.error(err.message));
+  };
+
   return (
     <PageShell>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Globe className="h-4 w-4" /> 站点管理
-              </CardTitle>
-              <CardDescription>
-                每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
-                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-                刷新
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  gatewayApi
-                    .reload()
-                    .then(() => {
-                      toast.success("已重载监听");
-                      invalidate();
-                    })
-                    .catch((e) => toast.error(e.message))
-                }
-              >
-                重载监听
-              </Button>
-              <Button size="sm" onClick={openCreate}>
-                <Plus className="mr-1.5 h-3.5 w-3.5" />
-                新建站点
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-2">
-            {runtime.length === 0 ? (
-              <span className="text-xs text-muted-foreground">
-                当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
-              </span>
-            ) : (
-              runtime.map((r) => (
-                <Badge key={r.port} variant="secondary" className="font-mono">
-                  :{r.port} · {r.rule_count || 0} 规则
-                  {r.script_count ? ` · ${r.script_count} 脚本` : ""}
-                </Badge>
-              ))
-            )}
-          </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>站点</TableHead>
-                  <TableHead>端口</TableHead>
-                  <TableHead>APP</TableHead>
-                  <TableHead>反代</TableHead>
-                  <TableHead>脚本</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-muted-foreground">
-                      加载中…
-                    </TableCell>
-                  </TableRow>
-                ) : sites.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-muted-foreground">
-                      暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pg.pageItems.map((s) => {
-                    const appN = (s.apps || []).length;
-                    const pxN = (s.proxies || []).length;
-                    const scN = (s.scripts || []).length;
-                    return (
-                      <TableRow key={s.id}>
-                        <TableCell>
-                          <Link
-                            to={`/sites/${s.id}`}
-                            className="font-medium hover:text-primary hover:underline"
-                          >
-                            {s.name}
-                          </Link>
-                          {s.description && (
-                            <div className="text-[11px] text-muted-foreground line-clamp-1">
-                              {s.description}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          :{s.port}
-                          {s.enabled && listening.has(s.port) && (
-                            <span className="ml-1 text-[10px] text-success">LISTEN</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <FolderTree className="h-3 w-3" /> {appN}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <ArrowRightLeft className="h-3 w-3" /> {pxN}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center gap-1 text-xs">
-                            <ScrollText className="h-3 w-3" /> {scN}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            <Badge variant={s.enabled ? "success" : "secondary"}>
-                              {s.enabled ? "启用" : "停用"}
-                            </Badge>
-                            {s.ip_whitelist?.trim() && (
-                              <Badge variant="outline" className="text-[10px]">
-                                白名单
-                              </Badge>
-                            )}
-                            {s.ip_blacklist?.trim() && (
-                              <Badge variant="outline" className="text-[10px] text-destructive">
-                                黑名单
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild aria-label="进入站点">
-                              <Link to={`/sites/${s.id}`}>
-                                <ChevronRight className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              aria-label="打开"
-                              asChild
-                            >
-                              <a
-                                href={siteURL(s.port)}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              title={s.enabled ? "停用" : "启用"}
-                              onClick={() => {
-                                gatewayApi
-                                  .updatePort(s.id, { enabled: !s.enabled })
-                                  .then(() => {
-                                    toast.success(s.enabled ? "已停用" : "已启用");
-                                    invalidate();
-                                  })
-                                  .catch((err) => toast.error(err.message));
-                              }}
-                            >
-                              {s.enabled ? (
-                                <PowerOff className="h-3.5 w-3.5" />
-                              ) : (
-                                <Power className="h-3.5 w-3.5 text-success" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => openEdit(s)}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive"
-                              onClick={() => setDeleting(s)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
+      <DataTableCard
+        icon={Globe}
+        title="站点管理"
+        description="每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。"
+        actions={
+          <>
+            <RefreshButton onClick={() => refetch()} loading={isFetching} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                gatewayApi
+                  .reload()
+                  .then(() => {
+                    toast.success("已重载监听");
+                    invalidate();
                   })
-                )}
-              </TableBody>
-            </Table>
-              {!isLoading && sites.length > 0 && (
-                <PaginationBar
-                  page={pg.page}
-                  totalPages={pg.totalPages}
-                  total={pg.total}
-                  from={pg.from}
-                  to={pg.to}
-                  pageSize={pg.pageSize}
-                  onPageChange={pg.setPage}
-                />
-              )}
+                  .catch((e) => toast.error(e.message))
+              }
+            >
+              重载监听
+            </Button>
+            <Button size="sm" onClick={openCreate}>
+              <Plus /> 新建站点
+            </Button>
+          </>
+        }
+        pagination={
+          !isLoading && sites.length > 0
+            ? {
+                page: pg.page,
+                totalPages: pg.totalPages,
+                total: pg.total,
+                from: pg.from,
+                to: pg.to,
+                pageSize: pg.pageSize,
+                setPage: pg.setPage,
+              }
+            : null
+        }
+      >
+        {runtime.length === 0 ? (
+          <div className="border-b px-6 py-3 text-xs text-muted-foreground">
+            当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
           </div>
-        </CardContent>
-      </Card>
+        ) : (
+          <div className="flex flex-wrap gap-2 border-b px-6 py-3">
+            {runtime.map((r) => (
+              <Badge key={r.port} variant="secondary" className="font-mono">
+                :{r.port} · {r.rule_count || 0} 规则
+                {r.script_count ? ` · ${r.script_count} 脚本` : ""}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>站点</TableHead>
+              <TableHead>端口</TableHead>
+              <TableHead>APP</TableHead>
+              <TableHead>反代</TableHead>
+              <TableHead>脚本</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead className="text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableStateRow colSpan={7}>加载中…</TableStateRow>
+            ) : sites.length === 0 ? (
+              <TableStateRow colSpan={7}>
+                暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。
+              </TableStateRow>
+            ) : (
+              pg.pageItems.map((s) => {
+                const appN = (s.apps || []).length;
+                const pxN = (s.proxies || []).length;
+                const scN = (s.scripts || []).length;
+                return (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <Link
+                        to={`/sites/${s.id}`}
+                        className="font-medium hover:text-primary hover:underline"
+                      >
+                        {s.name}
+                      </Link>
+                      {s.description && (
+                        <div className="text-[11px] text-muted-foreground line-clamp-1">
+                          {s.description}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono">
+                      :{s.port}
+                      {s.enabled && listening.has(s.port) && (
+                        <span className="ml-1 text-[10px] text-success">LISTEN</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <FolderTree className="h-3 w-3" /> {appN}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <ArrowRightLeft className="h-3 w-3" /> {pxN}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <ScrollText className="h-3 w-3" /> {scN}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        <Badge variant={s.enabled ? "success" : "secondary"}>
+                          {s.enabled ? "启用" : "停用"}
+                        </Badge>
+                        {s.ip_whitelist?.trim() && (
+                          <Badge variant="outline" className="text-[10px]">
+                            白名单
+                          </Badge>
+                        )}
+                        {s.ip_blacklist?.trim() && (
+                          <Badge variant="outline" className="text-[10px] text-destructive">
+                            黑名单
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <RowActions>
+                        <IconTooltip label="进入站点">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" asChild aria-label="进入站点">
+                            <Link to={`/sites/${s.id}`}>
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </Link>
+                          </Button>
+                        </IconTooltip>
+                        <IconTooltip label="打开站点">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="打开站点"
+                            asChild
+                          >
+                            <a
+                              href={siteURL(s.port)}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        </IconTooltip>
+                        <IconTooltip label={s.enabled ? "停用" : "启用"}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label={s.enabled ? "停用站点" : "启用站点"}
+                            onClick={() => toggleEnabled(s)}
+                          >
+                            {s.enabled ? (
+                              <PowerOff className="h-3.5 w-3.5" />
+                            ) : (
+                              <Power className="h-3.5 w-3.5 text-success" />
+                            )}
+                          </Button>
+                        </IconTooltip>
+                        <IconTooltip label="编辑">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="编辑站点"
+                            onClick={() => openEdit(s)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </IconTooltip>
+                        <IconTooltip label="删除">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive"
+                            aria-label="删除站点"
+                            onClick={() => setDeleting(s)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </IconTooltip>
+                      </RowActions>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </DataTableCard>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -369,8 +354,7 @@ export function Sites() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>监听端口</Label>
+            <FormField label="监听端口">
               <Input
                 type="number"
                 className="font-mono"
@@ -378,24 +362,26 @@ export function Sites() {
                 value={form.port}
                 onChange={(e) => setForm((f) => ({ ...f, port: Number(e.target.value) }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>站点名称</Label>
+            </FormField>
+            <FormField label="站点名称">
               <Input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="例如 官网 / 管理后台"
               />
-            </div>
+            </FormField>
             <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <Label>启用</Label>
+              <span className="text-sm font-medium">启用</span>
               <Switch
                 checked={form.enabled}
                 onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
+                aria-label="启用站点"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label>IP 白名单</Label>
+            <FormField
+              label="IP 白名单"
+              hint="非空时仅允许列表内访问；黑名单优先于白名单。"
+            >
               <Textarea
                 rows={3}
                 className="font-mono text-xs"
@@ -403,12 +389,8 @@ export function Sites() {
                 value={form.ip_whitelist}
                 onChange={(e) => setForm((f) => ({ ...f, ip_whitelist: e.target.value }))}
               />
-              <p className="text-[11px] text-muted-foreground">
-                非空时仅允许列表内访问；黑名单优先于白名单。
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              <Label>IP 黑名单</Label>
+            </FormField>
+            <FormField label="IP 黑名单">
               <Textarea
                 rows={3}
                 className="font-mono text-xs"
@@ -416,15 +398,14 @@ export function Sites() {
                 value={form.ip_blacklist}
                 onChange={(e) => setForm((f) => ({ ...f, ip_blacklist: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>备注</Label>
+            </FormField>
+            <FormField label="备注">
               <Textarea
                 rows={2}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
-            </div>
+            </FormField>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>
@@ -459,25 +440,15 @@ export function Sites() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleting} onOpenChange={(v) => !v && setDeleting(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>删除站点 :{deleting?.port}？</AlertDialogTitle>
-            <AlertDialogDescription>
-              将级联删除该站点下的 APP、反代与路由脚本（静态文件不会自动删除）。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => delMut.mutate({ id: deleting.id, force: true })}
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(v) => !v && setDeleting(null)}
+        title={`删除站点 :${deleting?.port}？`}
+        description="将级联删除该站点下的 APP、反代与路由脚本（静态文件不会自动删除）。"
+        confirmText="删除"
+        loading={delMut.isPending}
+        onConfirm={() => delMut.mutate({ id: deleting.id, force: true })}
+      />
     </PageShell>
   );
 }

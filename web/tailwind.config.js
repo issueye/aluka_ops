@@ -59,6 +59,10 @@ export default {
           foreground: "hsl(var(--danger-foreground))",
           muted: "hsl(var(--danger-muted))",
         },
+        log: {
+          DEFAULT: "hsl(var(--log-bg))",
+          foreground: "hsl(var(--log-text))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

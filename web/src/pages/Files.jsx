@@ -24,14 +24,6 @@ import { withAuthQuery } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -40,7 +32,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { PaginationBar } from "@/components/ui/pagination";
 import {
   Dialog,
   DialogContent,
@@ -49,16 +40,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   ContextMenu,
   ContextMenuItem,
   ContextMenuLabel,
@@ -66,7 +47,17 @@ import {
 } from "@/components/ui/context-menu";
 import { formatTime, formatBytes } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
-import { PageShell } from "@/components/ued";
+import {
+  ConfirmDialog,
+  DataTableCard,
+  FormField,
+  IconTooltip,
+  InlineAlert,
+  PageShell,
+  RefreshButton,
+  RowActions,
+  TableStateRow,
+} from "@/components/ued";
 
 
 function joinPath(parent, name) {
@@ -292,114 +283,94 @@ export function Files() {
 
   return (
     <PageShell>
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <CardTitle className="text-base">文件管理</CardTitle>
-              <CardDescription>
-                仅可管理数据目录内文件
-                {data?.root ? (
-                  <span className="ml-1 font-mono text-[11px] text-muted-foreground">
-                    ({data.root})
-                  </span>
-                ) : null}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
-              >
-                <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
-                刷新
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setMkdirName("");
-                  setMkdirOpen(true);
-                }}
-              >
-                <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-                新建目录
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setNewFileName("");
-                  setNewFileOpen(true);
-                }}
-              >
-                <FilePlus className="mr-1.5 h-3.5 w-3.5" />
-                新建文件
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <Upload className="mr-1.5 h-3.5 w-3.5" />
-                上传文件
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => folderInputRef.current?.click()}
-                disabled={uploading}
-              >
-                <FolderPlus className="mr-1.5 h-3.5 w-3.5" />
-                上传文件夹
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                multiple
-                onChange={onPickUpload}
-              />
-              <input
-                ref={folderInputRef}
-                type="file"
-                className="hidden"
-                // 浏览器文件夹选择(Chrome/Edge/Safari)
-                webkitdirectory=""
-                directory=""
-                multiple
-                onChange={onPickUpload}
-              />
-            </div>
-          </div>
-
-          {uploadProgress && (
-            <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
-              上传中 {uploadProgress.done}/{uploadProgress.total}
-              {uploadProgress.current ? (
-                <span className="ml-2 font-mono text-muted-foreground">
-                  {uploadProgress.current}
-                </span>
-              ) : null}
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{
-                    width: `${
-                      uploadProgress.total
-                        ? Math.round((uploadProgress.done / uploadProgress.total) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* 面包屑 */}
-          <div className="mt-3 flex flex-wrap items-center gap-1 text-sm">
+      <DataTableCard
+        icon={Folder}
+        title="文件管理"
+        description={
+          <>
+            仅可管理数据目录内文件
+            {data?.root ? (
+              <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+                ({data.root})
+              </span>
+            ) : null}
+          </>
+        }
+        actions={
+          <>
+            <RefreshButton onClick={() => refetch()} loading={isFetching} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setMkdirName("");
+                setMkdirOpen(true);
+              }}
+            >
+              <FolderPlus /> 新建目录
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setNewFileName("");
+                setNewFileOpen(true);
+              }}
+            >
+              <FilePlus /> 新建文件
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+            >
+              <Upload /> 上传文件
+            </Button>
+            <Button size="sm" onClick={() => folderInputRef.current?.click()} disabled={uploading}>
+              <FolderPlus /> 上传文件夹
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              multiple
+              onChange={onPickUpload}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              className="hidden"
+              // 浏览器文件夹选择(Chrome/Edge/Safari)
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={onPickUpload}
+            />
+          </>
+        }
+        footer={
+          <p className="border-t px-6 py-3 text-[11px] text-muted-foreground">
+            双击目录进入；双击文件打开文本编辑。右键打开菜单。删除非空目录会递归删除。
+          </p>
+        }
+        pagination={
+          !isLoading && entries.length > 0
+            ? {
+                page: pg.page,
+                totalPages: pg.totalPages,
+                total: pg.total,
+                from: pg.from,
+                to: pg.to,
+                pageSize: pg.pageSize,
+                setPage: pg.setPage,
+              }
+            : null
+        }
+      >
+        {/* 工具条：面包屑 + 上级目录 + 上传进度 */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-6 py-3">
+          <div className="flex flex-wrap items-center gap-1 text-sm">
             <button
               type="button"
               className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -421,26 +392,43 @@ export function Files() {
               </span>
             ))}
           </div>
-        </CardHeader>
-
-        <CardContent>
           {path !== "" && (
-            <div className="mb-2">
-              <Button variant="ghost" size="sm" onClick={() => go(data?.parent ?? "")}>
-                <ArrowUp className="mr-1.5 h-3.5 w-3.5" />
-                上级目录
-              </Button>
+            <Button variant="ghost" size="sm" onClick={() => go(data?.parent ?? "")}>
+              <ArrowUp /> 上级目录
+            </Button>
+          )}
+          {uploadProgress && (
+            <div className="ml-auto min-w-[200px] max-w-xs flex-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs">
+              上传中 {uploadProgress.done}/{uploadProgress.total}
+              {uploadProgress.current ? (
+                <span className="ml-2 truncate font-mono text-muted-foreground">
+                  {uploadProgress.current}
+                </span>
+              ) : null}
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all"
+                  style={{
+                    width: `${
+                      uploadProgress.total
+                        ? Math.round((uploadProgress.done / uploadProgress.total) * 100)
+                        : 0
+                    }%`,
+                  }}
+                />
+              </div>
             </div>
           )}
+        </div>
 
-          {isError && (
-            <div className="mb-3 rounded-md border border-danger/30 bg-danger-muted p-3 text-sm text-destructive">
-              {error?.message || "加载失败"}
-            </div>
-          )}
+        {isError && (
+          <div className="m-6">
+            <InlineAlert variant="error">{error?.message || "加载失败"}</InlineAlert>
+          </div>
+        )}
 
+        {!isError && (
           <div
-            className="rounded-md border"
             onContextMenu={(e) => {
               // 空白区域右键：新建/上传/刷新
               if (e.target.closest("tr[data-file-row]")) return;
@@ -458,17 +446,9 @@ export function Files() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground">
-                      加载中…
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={4}>加载中…</TableStateRow>
                 ) : entries.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-muted-foreground">
-                      空目录 · 右键可新建或上传
-                    </TableCell>
-                  </TableRow>
+                  <TableStateRow colSpan={4}>空目录 · 右键可新建或上传</TableStateRow>
                 ) : (
                   pg.pageItems.map((ent) => (
                     <TableRow
@@ -507,86 +487,77 @@ export function Files() {
                         {formatTime(ent.mod_time)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+                        <RowActions>
                           {!ent.is_dir && (
                             <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                aria-label="编辑"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditor(ent.path);
-                                }}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                aria-label="下载"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDownload(ent);
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                              </Button>
+                              <IconTooltip label="编辑">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="编辑"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openEditor(ent.path);
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </IconTooltip>
+                              <IconTooltip label="下载">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label="下载"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownload(ent);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </IconTooltip>
                             </>
                           )}
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="重命名"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelected(ent);
-                              setRenameName(ent.name);
-                              setRenameOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5 opacity-50" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            aria-label="删除"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelected(ent);
-                              setDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
+                          <IconTooltip label="重命名">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              aria-label="重命名"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openRename(ent);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 opacity-50" />
+                            </Button>
+                          </IconTooltip>
+                          <IconTooltip label="删除">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              aria-label="删除"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDelete(ent);
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                        </RowActions>
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-              {!isLoading && entries.length > 0 && (
-                <PaginationBar
-                  page={pg.page}
-                  totalPages={pg.totalPages}
-                  total={pg.total}
-                  from={pg.from}
-                  to={pg.to}
-                  pageSize={pg.pageSize}
-                  onPageChange={pg.setPage}
-                />
-              )}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
-            双击目录进入；双击文件打开文本编辑。右键打开菜单。删除非空目录会递归删除。
-          </p>
-        </CardContent>
-      </Card>
+        )}
+      </DataTableCard>
 
       {/* 右键菜单 */}
       <ContextMenu
@@ -753,8 +724,7 @@ export function Files() {
           <DialogHeader>
             <DialogTitle>新建目录</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>目录名</Label>
+          <FormField label="目录名">
             <Input
               value={mkdirName}
               onChange={(e) => setMkdirName(e.target.value)}
@@ -766,7 +736,7 @@ export function Files() {
                 }
               }}
             />
-          </div>
+          </FormField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setMkdirOpen(false)}>
               取消
@@ -787,8 +757,7 @@ export function Files() {
           <DialogHeader>
             <DialogTitle>新建文件</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>文件名</Label>
+          <FormField label="文件名">
             <Input
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
@@ -800,7 +769,7 @@ export function Files() {
                 }
               }}
             />
-          </div>
+          </FormField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewFileOpen(false)}>
               取消
@@ -821,14 +790,13 @@ export function Files() {
           <DialogHeader>
             <DialogTitle>重命名</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label>新名称</Label>
+          <FormField label="新名称">
             <Input
               value={renameName}
               onChange={(e) => setRenameName(e.target.value)}
               className="font-mono"
             />
-          </div>
+          </FormField>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRenameOpen(false)}>
               取消
@@ -846,32 +814,25 @@ export function Files() {
       </Dialog>
 
       {/* 删除确认 */}
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除？</AlertDialogTitle>
-            <AlertDialogDescription>
-              将删除{" "}
-              <span className="font-mono text-foreground">{selected?.path}</span>
-              {selected?.is_dir ? "（目录将递归删除）" : ""}。此操作不可恢复。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() =>
-                deleteMut.mutate({
-                  p: selected.path,
-                  recursive: !!selected?.is_dir,
-                })
-              }
-            >
-              删除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="确认删除？"
+        description={
+          <>
+            将删除 <span className="font-mono text-foreground">{selected?.path}</span>
+            {selected?.is_dir ? "（目录将递归删除）" : ""}。此操作不可恢复。
+          </>
+        }
+        confirmText="删除"
+        loading={deleteMut.isPending}
+        onConfirm={() =>
+          deleteMut.mutate({
+            p: selected.path,
+            recursive: !!selected?.is_dir,
+          })
+        }
+      />
 
       {/* 文本编辑器 */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
@@ -893,8 +854,7 @@ export function Files() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditorOpen(false)}>
-              <X className="mr-1.5 h-3.5 w-3.5" />
-              关闭
+              <X /> 关闭
             </Button>
             <Button
               disabled={editorLoading || writeMut.isPending}
@@ -902,8 +862,7 @@ export function Files() {
                 writeMut.mutate({ p: editorPath, content: editorContent })
               }
             >
-              <Save className="mr-1.5 h-3.5 w-3.5" />
-              保存
+              <Save /> 保存
             </Button>
           </DialogFooter>
         </DialogContent>

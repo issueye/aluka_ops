@@ -3,6 +3,15 @@
 
 const STORAGE_KEY = "aluka_ops_theme";
 
+// 主题变更订阅(供 Toaster 等非 hook 场景同步 resolved 主题)
+const listeners = new Set();
+
+/** 订阅 resolved 主题变更,返回取消订阅函数 */
+export function subscribeTheme(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 export function getStoredTheme() {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
@@ -42,5 +51,6 @@ export function applyTheme(theme) {
   body.classList.add(resolved);
   // 同步 color-scheme,改善原生控件/滚动条
   root.style.colorScheme = resolved;
+  listeners.forEach((fn) => fn(resolved));
   return resolved;
 }

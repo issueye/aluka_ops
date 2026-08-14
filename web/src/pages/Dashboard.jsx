@@ -42,6 +42,26 @@ const OP_TYPE_LABEL = {
   uninstall: "卸载",
 };
 
+/** 概览统计卡(可被外层 Link 包裹为可点击卡片) */
+function DashboardStatCard({ stat: s, isLoading }) {
+  return (
+    <Card className="h-full">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {s.label}
+        </CardTitle>
+        <s.icon className={`h-4 w-4 ${s.accent || "text-muted-foreground"}`} />
+      </CardHeader>
+      <CardContent>
+        <div className={`text-2xl font-bold ${s.accent || ""}`}>
+          {isLoading ? "…" : s.value}
+        </div>
+        <p className="text-xs text-muted-foreground">{s.sub}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 
 export function Dashboard() {
   const { data, isLoading, isError } = useQuery({
@@ -223,31 +243,19 @@ export function Dashboard() {
 
       {/* 统计卡片 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((s) => {
-          const Wrapper = s.enabled ? Link : "div";
-          return (
-            <Wrapper
+        {stats.map((s) =>
+          s.enabled ? (
+            <Link
               key={s.label}
-              to={s.enabled ? s.to : undefined}
-              className={s.enabled ? "block transition-transform hover:scale-[1.02]" : undefined}
+              to={s.to}
+              className="block transition-transform hover:scale-[1.02]"
             >
-              <Card className="h-full">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {s.label}
-                  </CardTitle>
-                  <s.icon className={`h-4 w-4 ${s.accent || "text-muted-foreground"}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className={`text-2xl font-bold ${s.accent || ""}`}>
-                    {isLoading ? "…" : s.value}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{s.sub}</p>
-                </CardContent>
-              </Card>
-            </Wrapper>
-          );
-        })}
+              <StatCard stat={s} isLoading={isLoading} />
+            </Link>
+          ) : (
+            <StatCard key={s.label} stat={s} isLoading={isLoading} />
+          )
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -158,7 +158,7 @@ export function LogViewer({ serviceId, active }) {
   const StatusIcon = statusMeta.icon;
 
   return (
-    <div className="flex h-[520px] flex-col rounded-lg border border-border bg-[#0b0f17]">
+    <div className="flex h-[520px] flex-col rounded-lg border border-border bg-log">
       {/* 工具栏 */}
       <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
         <div className="flex items-center gap-2">
@@ -215,7 +215,7 @@ export function LogViewer({ serviceId, active }) {
           </div>
         ) : (
           lines.map((line, i) => (
-            <div key={i} className="whitespace-pre-wrap break-all text-emerald-300/90">
+            <div key={i} className="whitespace-pre-wrap break-all text-log-foreground">
               {line === "" ? "\u00A0" : line}
             </div>
           ))

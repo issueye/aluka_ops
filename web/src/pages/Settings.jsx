@@ -6,7 +6,6 @@ import {
   Link2,
   Link2Off,
   Save,
-  RefreshCw,
   Server,
   Network,
   Shield,
@@ -16,7 +15,6 @@ import { authHeaders } from "@/lib/auth";
 import { cn, formatBytes } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -32,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageShell } from "@/components/ued";
+import { FormField, InlineAlert, PageShell, RefreshButton } from "@/components/ued";
 
 const MODE_LABEL = {
   standalone: "独立节点",
@@ -317,15 +315,7 @@ export function Settings() {
               在此切换 standalone / agent / controller，配置中心地址后可主动连接。配置写入数据库，重启后仍生效（优先于环境变量）。
             </CardDescription>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchCluster()}
-            disabled={clusterFetching}
-          >
-            <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${clusterFetching ? "animate-spin" : ""}`} />
-            刷新
-          </Button>
+          <RefreshButton onClick={() => refetchCluster()} loading={clusterFetching} />
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -353,8 +343,7 @@ export function Settings() {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>运行模式</Label>
+            <FormField label="运行模式" className="sm:col-span-2">
               <Select
                 value={form.mode}
                 onValueChange={(v) => setForm((f) => ({ ...f, mode: v }))}
@@ -370,40 +359,43 @@ export function Settings() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Agent ID</Label>
+            <FormField label="Agent ID" className="sm:col-span-2">
               <Input
                 className="font-mono"
                 value={form.agent_id}
                 onChange={(e) => setForm((f) => ({ ...f, agent_id: e.target.value }))}
                 placeholder="默认主机名"
               />
-            </div>
+            </FormField>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>中心 Controller URL</Label>
+            <FormField
+              label="中心 Controller URL"
+              className="sm:col-span-2"
+              hint="Agent 模式下填写中心地址；Controller 模式可留空。"
+            >
               <Input
                 className="font-mono"
                 value={form.controller_url}
                 onChange={(e) => setForm((f) => ({ ...f, controller_url: e.target.value }))}
                 placeholder="http://192.168.1.10:19090"
               />
-              <p className="text-[11px] text-muted-foreground">
-                Agent 模式下填写中心地址；Controller 模式可留空。
-              </p>
-            </div>
+            </FormField>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>
-                Agent Token
-                {cluster?.agent_token_set && !tokenDirty ? (
-                  <span className="ml-2 text-xs font-normal text-muted-foreground">
-                    （已设置，留空保存则不修改）
-                  </span>
-                ) : null}
-              </Label>
+            <FormField
+              label={
+                <>
+                  Agent Token
+                  {cluster?.agent_token_set && !tokenDirty ? (
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">
+                      （已设置，留空保存则不修改）
+                    </span>
+                  ) : null}
+                </>
+              }
+              className="sm:col-span-2"
+            >
               <Input
                 type="password"
                 className="font-mono"
@@ -415,23 +407,22 @@ export function Settings() {
                 placeholder={cluster?.agent_token_set ? "••••••••" : "共享密钥"}
                 autoComplete="new-password"
               />
-            </div>
+            </FormField>
 
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>本机 Advertise URL（可选）</Label>
+            <FormField
+              label="本机 Advertise URL（可选）"
+              className="sm:col-span-2"
+              hint="供中心在无隧道时回连本机 API；有隧道时可不填。"
+            >
               <Input
                 className="font-mono"
                 value={form.advertise_url}
                 onChange={(e) => setForm((f) => ({ ...f, advertise_url: e.target.value }))}
                 placeholder="http://本机可达IP:端口"
               />
-              <p className="text-[11px] text-muted-foreground">
-                供中心在无隧道时回连本机 API；有隧道时可不填。
-              </p>
-            </div>
+            </FormField>
 
-            <div className="space-y-1.5">
-              <Label>心跳间隔（秒）</Label>
+            <FormField label="心跳间隔（秒）">
               <Input
                 type="number"
                 min={5}
@@ -440,7 +431,7 @@ export function Settings() {
                   setForm((f) => ({ ...f, heartbeat_sec: Number(e.target.value) }))
                 }
               />
-            </div>
+            </FormField>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -496,7 +487,7 @@ export function Settings() {
               <Info label="Controller" value={cluster?.controller_url || "—"} />
             </div>
             {hbFailed && hbMsg && (
-              <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-[11px] leading-relaxed text-destructive">
+              <InlineAlert variant="error" className="mt-2 text-[11px]">
                 <div className="font-medium">连接失败原因</div>
                 <div className="mt-1 break-all whitespace-pre-wrap">{hbMsg}</div>
                 {/refused|无进程监听|19090/i.test(hbMsg) && (
@@ -506,7 +497,7 @@ export function Settings() {
                     <code>http://中心IP:实际端口</code>；4) 防火墙是否放行该端口。
                   </div>
                 )}
-              </div>
+              </InlineAlert>
             )}
             {sessions.length > 0 && (
               <div className="mt-2">
