@@ -1,11 +1,11 @@
 import { cn } from "@/lib/utils";
 
-/** 只读键值字段 */
+/** 只读键值字段（源力设计） */
 export function MetaField({ label, value, mono = false, className }) {
   return (
     <div className={cn("space-y-1", className)}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={cn("break-all text-sm", mono && "font-mono text-xs")}>
+      <div className="text-xs text-text3">{label}</div>
+      <div className={cn("break-all text-sm text-text1", mono && "font-mono text-xs")}>
         {value ?? "—"}
       </div>
     </div>

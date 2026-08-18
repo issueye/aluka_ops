@@ -1,20 +1,20 @@
 import { cn } from "@/lib/utils";
 
 const PRESET = {
-  muted: "bg-muted text-foreground",
-  jdk: "bg-orange-500/15 text-orange-600 dark:text-orange-400",
-  node: "bg-green-500/15 text-green-600 dark:text-green-400",
-  python: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  go: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
-  primary: "bg-primary/15 text-primary",
+  muted: "bg-bg4 text-text2",
+  jdk: "bg-warning-2 text-warning-7",
+  node: "bg-success-2 text-success-7",
+  python: "bg-primary-2 text-primary-7",
+  go: "bg-teal-2 text-teal-7",
+  primary: "bg-primary-2 text-primary",
 };
 
-/** 类型小标签（集中管理色板） */
+/** 类型小标签（源力设计：集中管理色板） */
 export function TypeChip({ tone = "muted", className, children }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium",
         PRESET[tone] || PRESET.muted,
         className
       )}

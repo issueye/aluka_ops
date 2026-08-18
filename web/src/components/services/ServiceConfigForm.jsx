@@ -18,10 +18,10 @@ import {
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { InfoHint } from "@/components/ued";
 
 // ServiceConfigForm 服务运行配置编辑。
 // 运行中仅允许改 auto_restart / max_restarts / shutdown_timeout;
@@ -156,7 +156,7 @@ export function ServiceConfigForm({ service, config }) {
   if (!config) {
     return (
       <Card>
-        <CardContent className="p-6 text-sm text-muted-foreground">
+        <CardContent className="p-6 text-sm text-text3">
           暂无配置记录。
         </CardContent>
       </Card>
@@ -166,12 +166,16 @@ export function ServiceConfigForm({ service, config }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">启动配置</CardTitle>
-        <CardDescription>
-          {running
-            ? "服务运行中:仅可修改自动重启、停止超时与健康检查;启动命令等需停服后编辑。"
-            : "修改后保存即可;下次启动生效。"}
-        </CardDescription>
+        <CardTitle className="flex items-center gap-1.5 text-sm">
+          启动配置
+          <InfoHint
+            label={
+              running
+                ? "服务运行中:仅可修改自动重启、停止超时与健康检查;启动命令等需停服后编辑。"
+                : "修改后保存即可;下次启动生效。"
+            }
+          />
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -196,7 +200,7 @@ export function ServiceConfigForm({ service, config }) {
                 className="font-mono text-sm"
                 placeholder="如 D:\services\outside-prescription（瘦 jar 必填应用根目录）"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-text3">
                 进程 cwd。含 lib/resources 的 Spring Boot 瘦 jar / 启动脚本必须指向应用根目录。
               </p>
             </div>
@@ -239,7 +243,7 @@ export function ServiceConfigForm({ service, config }) {
                   className="font-mono text-sm"
                   placeholder="-Dfile.encoding=UTF-8 -Dloader.path=resources,lib -Xms1024m -Xmx1024m"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-text3">
                   瘦 jar 务必带 -Dloader.path=resources,lib，否则会出现 ClassNotFoundException。
                 </p>
               </div>
@@ -284,7 +288,7 @@ export function ServiceConfigForm({ service, config }) {
               <Label htmlFor="cfg-auto" className="cursor-pointer">
                 崩溃自动拉起
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text3">
                 进程意外退出后,按退避策略自动重启(最多 max_restarts 次)。
               </p>
             </div>
@@ -314,7 +318,7 @@ export function ServiceConfigForm({ service, config }) {
           <div className="space-y-3 rounded-md border p-3">
             <div>
               <Label>健康检查探针</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text3">
                 进程存活之外,定期探测 HTTP/TCP 判断服务是否真正可用。target 可留空,将用端口推导。
               </p>
             </div>

@@ -127,7 +127,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                 onChange={(e) => set("code", e.target.value)}
                 placeholder="如:my-app(用于目录与日志命名)"
               />
-              {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
+              {errors.code && <p className="text-xs text-danger">{errors.code}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="s-name">名称 *</Label>
@@ -137,7 +137,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="如:我的应用"
               />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+              {errors.name && <p className="text-xs text-danger">{errors.name}</p>}
             </div>
           </div>
 
@@ -156,7 +156,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                   <SelectItem value="ps1">ps1 · PowerShell</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">{TYPE_HINT[form.type]}</p>
+              <p className="text-xs text-text3">{TYPE_HINT[form.type]}</p>
             </div>
             <div className="space-y-1.5">
               <Label>运行环境 {form.type === "jar" ? "*" : "(可选)"}</Label>
@@ -176,7 +176,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                   ))}
                 </SelectContent>
               </Select>
-              {errors.runtime_id && <p className="text-xs text-destructive">{errors.runtime_id}</p>}
+              {errors.runtime_id && <p className="text-xs text-danger">{errors.runtime_id}</p>}
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
                 "脚本路径或命令"
               }
             />
-            {errors.command && <p className="text-xs text-destructive">{errors.command}</p>}
+            {errors.command && <p className="text-xs text-danger">{errors.command}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

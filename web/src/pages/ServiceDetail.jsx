@@ -1,9 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Activity, FileText, Terminal, ScrollText, Package, TerminalSquare } from "lucide-react";
+import { useParams } from "react-router-dom";
+import {
+  Activity,
+  FileText,
+  Terminal,
+  ScrollText,
+  Package,
+  TerminalSquare,
+} from "lucide-react";
 import { serviceApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,7 +33,8 @@ import { LogViewer } from "@/components/services/LogViewer";
 import { ServiceConsole } from "@/components/services/ServiceConsole";
 import { ArtifactList } from "@/components/services/ArtifactList";
 import { formatTime } from "@/lib/utils";
-import { PageTemplate, MetaField } from "@/components/ued";
+import { PageShell, DetailHeader, MetaField, InlineAlert } from "@/components/ued";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const OP_STATUS_VARIANT = {
   success: "success",
@@ -36,27 +43,61 @@ const OP_STATUS_VARIANT = {
   pending: "secondary",
 };
 
+const DETAIL_TABS = [
+  { value: "overview", label: "概览", icon: Activity },
+  { value: "config", label: "配置", icon: FileText },
+  { value: "version", label: "版本", icon: Package },
+  { value: "logs", label: "日志", icon: ScrollText },
+  { value: "console", label: "控制台", icon: TerminalSquare },
+  { value: "operations", label: "操作记录", icon: Terminal },
+];
+
 export function ServiceDetail() {
   const { id } = useParams();
   const numId = Number(id);
   const [activeTab, setActiveTab] = useState("overview");
 
-  // 详情(含 service / config / runtime / alive)
-  const { data: detail, isLoading } = useQuery({
+  const { data: detail, isLoading, isError } = useQuery({
     queryKey: ["service", numId],
     queryFn: () => serviceApi.get(numId),
     refetchInterval: 3000,
   });
 
-  // 该服务的操作历史
   const { data: operations = [] } = useQuery({
     queryKey: ["service-operations", numId],
     queryFn: () => serviceApi.operations(numId, 30),
     refetchInterval: 5000,
+    enabled: !!detail?.service,
   });
 
   if (isLoading) {
-    return <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">加载服务详情中...</div>;
+    return (
+      <PageShell>
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-9 w-full max-w-xl" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </PageShell>
+    );
+  }
+
+  if (isError) {
+    return (
+      <PageShell>
+        <DetailHeader
+          breadcrumb={[
+            { label: "服务管理", to: "/services" },
+            { label: "详情" },
+          ]}
+          title="加载失败"
+        />
+        <InlineAlert variant="error" title="无法加载服务详情">
+          请确认后端服务已启动，或返回服务列表重试。
+        </InlineAlert>
+      </PageShell>
+    );
   }
 
   const svc = detail?.service;
@@ -67,52 +108,66 @@ export function ServiceDetail() {
 
   if (!svc) {
     return (
-      <PageTemplate backTo="/services" backLabel="返回服务列表">
-        <Card><CardContent className="p-6 text-muted-foreground">服务不存在或已删除。</CardContent></Card>
-      </PageTemplate>
+      <PageShell>
+        <DetailHeader
+          breadcrumb={[
+            { label: "服务管理", to: "/services" },
+            { label: "未知服务" },
+          ]}
+          title="服务不存在"
+        />
+        <Card>
+          <CardContent className="p-6 text-sm text-text3">
+            服务不存在或已删除。
+          </CardContent>
+        </Card>
+      </PageShell>
     );
   }
 
   return (
-    <PageTemplate
-      maxWidth="max-w-6xl mx-auto"
-      backTo="/services"
-      backLabel="返回服务列表"
-      title={svc.name}
-      description={svc.code}
-      badge={<ServiceStatusBadge status={svc.status} />}
-      actions={<ServiceActions service={svc} />}
-    >
+    <PageShell>
+      <DetailHeader
+        breadcrumb={[
+          { label: "服务管理", to: "/services" },
+          { label: svc.name },
+        ]}
+        title={svc.name}
+        subtitle={svc.code}
+        badges={<ServiceStatusBadge status={svc.status} />}
+        actions={<ServiceActions service={svc} />}
+      />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1 sm:w-auto">
-          <TabsTrigger value="overview"><Activity className="mr-1.5 h-3.5 w-3.5" />概览</TabsTrigger>
-          <TabsTrigger value="config"><FileText className="mr-1.5 h-3.5 w-3.5" />配置</TabsTrigger>
-          <TabsTrigger value="version"><Package className="mr-1.5 h-3.5 w-3.5" />版本</TabsTrigger>
-          <TabsTrigger value="logs"><ScrollText className="mr-1.5 h-3.5 w-3.5" />日志</TabsTrigger>
-          <TabsTrigger value="console"><TerminalSquare className="mr-1.5 h-3.5 w-3.5" />控制台</TabsTrigger>
-          <TabsTrigger value="operations"><Terminal className="mr-1.5 h-3.5 w-3.5" />操作记录</TabsTrigger>
+        <TabsList className="w-full overflow-x-auto">
+          {DETAIL_TABS.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="shrink-0">
+              <tab.icon className="mr-1.5 h-3.5 w-3.5" />
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        {/* 概览 */}
-        <TabsContent value="overview">
+        <TabsContent value="overview" className="mt-4">
           <Card>
-            <CardHeader><CardTitle className="text-sm">运行信息</CardTitle></CardHeader>
-            <CardContent>
+            <CardHeader className="border-b border-border1 px-5 py-3.5">
+              <CardTitle className="text-sm font-medium text-text1">运行信息</CardTitle>
+            </CardHeader>
+            <CardContent className="p-5">
               <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
                 <Field label="进程状态" value={alive ? "存活" : "未运行"} />
                 <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">健康检查</div>
+                  <div className="text-xs text-text3">健康检查</div>
                   <div className="flex items-center gap-2 text-sm">
                     {!health?.enabled ? (
-                      <span className="text-muted-foreground">未配置</span>
+                      <span className="text-text3">未配置</span>
                     ) : health.healthy ? (
                       <Badge variant="success">健康</Badge>
                     ) : (
                       <Badge variant="danger">异常</Badge>
                     )}
                     {health?.enabled && (
-                      <span className="truncate text-xs text-muted-foreground" title={health.message}>
+                      <span className="truncate text-xs text-text3" title={health.message}>
                         {health.type?.toUpperCase()}
                         {health.latency_ms != null ? ` · ${health.latency_ms}ms` : ""}
                         {health.message && health.message !== "ok" ? ` · ${health.message}` : ""}
@@ -138,23 +193,19 @@ export function ServiceDetail() {
           </Card>
         </TabsContent>
 
-        {/* 配置(可编辑) */}
-        <TabsContent value="config">
+        <TabsContent value="config" className="mt-4">
           <ServiceConfigForm service={svc} config={cfg} />
         </TabsContent>
 
-        {/* 版本(制品) */}
-        <TabsContent value="version">
+        <TabsContent value="version" className="mt-4">
           <ArtifactList service={svc} />
         </TabsContent>
 
-        {/* 日志 */}
-        <TabsContent value="logs">
+        <TabsContent value="logs" className="mt-4">
           <LogViewer serviceId={svc.id} active={activeTab === "logs"} />
         </TabsContent>
 
-        {/* 控制台(xterm.js:日志 SSE + stdin 写入) */}
-        <TabsContent value="console">
+        <TabsContent value="console" className="mt-4">
           <ServiceConsole
             serviceId={svc.id}
             active={activeTab === "console"}
@@ -162,8 +213,7 @@ export function ServiceDetail() {
           />
         </TabsContent>
 
-        {/* 操作记录 */}
-        <TabsContent value="operations">
+        <TabsContent value="operations" className="mt-4">
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -179,14 +229,14 @@ export function ServiceDetail() {
                 <TableBody>
                   {operations.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="h-20 text-center text-muted-foreground">
+                      <TableCell colSpan={5} className="h-20 text-center text-text3">
                         暂无操作记录
                       </TableCell>
                     </TableRow>
                   ) : (
                     operations.map((op) => (
                       <TableRow key={op.id}>
-                        <TableCell className="text-muted-foreground">{op.id}</TableCell>
+                        <TableCell className="text-text3">{op.id}</TableCell>
                         <TableCell className="font-medium uppercase">{op.type}</TableCell>
                         <TableCell>
                           <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
@@ -194,11 +244,11 @@ export function ServiceDetail() {
                           </Badge>
                         </TableCell>
                         <TableCell className="max-w-[420px]">
-                          <div className="truncate text-xs text-muted-foreground" title={op.output_log}>
+                          <div className="truncate text-xs text-text3" title={op.output_log}>
                             {op.output_log || op.error_msg || "—"}
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
+                        <TableCell className="text-xs text-text3">
                           {formatTime(op.started_at)}
                         </TableCell>
                       </TableRow>
@@ -210,11 +260,10 @@ export function ServiceDetail() {
           </Card>
         </TabsContent>
       </Tabs>
-    </PageTemplate>
+    </PageShell>
   );
 }
 
-// Field 键值展示。
 function Field({ label, value, mono }) {
   return <MetaField label={label} value={value} mono={mono} />;
 }

@@ -3,7 +3,7 @@ import { Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * 自定义文件投放区（隐藏原生 file input，外层 UED 样式与拖拽反馈动效）
+ * 自定义文件投放区（源力设计：隐藏原生 file input，外层 UED 样式与拖拽反馈动效）
  */
 export function FileDropzone({
   accept,
@@ -27,8 +27,8 @@ export function FileDropzone({
       role="button"
       tabIndex={0}
       className={cn(
-        "group flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/20 px-4 py-8 text-center transition-all duration-200 hover:border-primary/50 hover:bg-primary/5",
-        isDragOver && "border-primary bg-primary/10 scale-[1.01] shadow-sm",
+        "group flex cursor-pointer flex-col items-center justify-center rounded-sm border-2 border-dashed border-border2 bg-bg2 px-4 py-8 text-center transition-all duration-200 hover:border-primary-4 hover:bg-primary-1",
+        isDragOver && "border-primary bg-primary-2 scale-[1.01] shadow-sm",
         disabled && "pointer-events-none opacity-50",
         className
       )}
@@ -74,14 +74,14 @@ export function FileDropzone({
         <>
           <div
             className={cn(
-              "mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/60 text-muted-foreground transition-transform duration-200 group-hover:scale-110",
-              isDragOver && "bg-primary/20 text-primary scale-110"
+              "mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-bg4 text-text3 transition-transform duration-200 group-hover:scale-110",
+              isDragOver && "bg-primary-2 text-primary scale-110"
             )}
           >
             <Upload className="h-6 w-6 stroke-[1.75]" />
           </div>
-          <p className="text-sm font-medium text-foreground">{hint}</p>
-          <p className="mt-1 text-xs text-muted-foreground">支持点击选择或直接拖拽投放</p>
+          <p className="text-sm font-medium text-text1">{hint}</p>
+          <p className="mt-1 text-xs text-text3">支持点击选择或直接拖拽投放</p>
         </>
       )}
     </div>

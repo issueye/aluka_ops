@@ -1,11 +1,18 @@
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * 表格底部分页栏。
+ * 表格底部分页栏（源力设计：页码按钮 28x28，激活蓝底白字）。
  * @param {{ page:number, totalPages:number, total:number, from:number, to:number, onPageChange:(p:number)=>void, className?:string, pageSize?:number }} props
  */
+function pageWindow(page, totalPages) {
+  const pages = [];
+  const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+  const end = Math.min(totalPages, start + 4);
+  for (let i = start; i <= end; i++) pages.push(i);
+  return pages;
+}
+
 export function PaginationBar({
   page,
   totalPages,
@@ -20,11 +27,11 @@ export function PaginationBar({
     return (
       <div
         className={cn(
-          "flex items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground",
+          "flex items-center justify-between gap-2 border-t border-border1 px-4 py-3 text-sm text-text3",
           className
         )}
       >
-        <span>共 0 条</span>
+        <span>共 0 项</span>
       </div>
     );
   }
@@ -34,65 +41,65 @@ export function PaginationBar({
     if (next !== page) onPageChange?.(next);
   };
 
+  const pages = pageWindow(page, totalPages);
+
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-2 border-t px-3 py-2 text-xs text-muted-foreground",
+        "flex flex-wrap items-center justify-between gap-2 border-t border-border1 px-4 py-3 text-sm text-text3",
         className
       )}
     >
       <span>
-        第 {from}–{to} 条，共 {total} 条
+        共 {total} 项，当前显示第 {from}–{to} 项
         {pageSize ? ` · 每页 ${pageSize}` : ""}
       </span>
       <div className="flex items-center gap-1">
-        <Button
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          disabled={page <= 1}
-          onClick={() => go(1)}
-          aria-label="首页"
-        >
-          <ChevronsLeft className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-sm border border-border2 bg-bg1 text-text2 transition-colors",
+            page <= 1
+              ? "cursor-not-allowed text-text4"
+              : "hover:border-primary-4 hover:text-primary"
+          )}
           disabled={page <= 1}
           onClick={() => go(page - 1)}
           aria-label="上一页"
         >
           <ChevronLeft className="h-3.5 w-3.5" />
-        </Button>
-        <span className="min-w-[4.5rem] text-center tabular-nums">
-          {page} / {totalPages}
-        </span>
-        <Button
+        </button>
+        {pages.map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-sm border text-sm transition-colors",
+              p === page
+                ? "border-primary bg-primary font-medium text-primary-foreground"
+                : "border-border2 bg-bg1 text-text1 hover:border-primary-4 hover:text-primary"
+            )}
+            onClick={() => go(p)}
+            aria-label={`第 ${p} 页`}
+            aria-current={p === page ? "page" : undefined}
+          >
+            {p}
+          </button>
+        ))}
+        <button
           type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
+          className={cn(
+            "flex h-7 w-7 items-center justify-center rounded-sm border border-border2 bg-bg1 text-text2 transition-colors",
+            page >= totalPages
+              ? "cursor-not-allowed text-text4"
+              : "hover:border-primary-4 hover:text-primary"
+          )}
           disabled={page >= totalPages}
           onClick={() => go(page + 1)}
           aria-label="下一页"
         >
           <ChevronRight className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          disabled={page >= totalPages}
-          onClick={() => go(totalPages)}
-          aria-label="末页"
-        >
-          <ChevronsRight className="h-3.5 w-3.5" />
-        </Button>
+        </button>
       </div>
     </div>
   );

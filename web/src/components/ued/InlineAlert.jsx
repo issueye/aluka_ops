@@ -2,16 +2,16 @@ import { cn } from "@/lib/utils";
 
 const VARIANTS = {
   error:
-    "border-danger/30 bg-danger-muted text-danger",
+    "border-danger-2 bg-danger-1 text-danger-7",
   warning:
-    "border-warning/30 bg-warning-muted text-warning",
+    "border-warning-2 bg-warning-1 text-warning-7",
   info:
-    "border-primary/30 bg-primary/5 text-foreground",
+    "border-primary-2 bg-primary-1 text-text2",
   success:
-    "border-success/30 bg-success-muted text-success",
+    "border-success-2 bg-success-1 text-success-7",
 };
 
-/** 行内提示横幅 */
+/** 行内提示横幅（源力设计） */
 export function InlineAlert({
   variant = "error",
   className,
@@ -22,7 +22,7 @@ export function InlineAlert({
     <div
       role="alert"
       className={cn(
-        "rounded-md border p-3 text-sm",
+        "rounded-sm border p-3 text-sm",
         VARIANTS[variant] || VARIANTS.error,
         className
       )}

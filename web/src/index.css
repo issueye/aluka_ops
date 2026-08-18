@@ -4,71 +4,181 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 160 84% 30%;
-    --success-foreground: 0 0% 100%;
-    --success-muted: 152 76% 94%;
-    --warning: 38 92% 40%;
-    --warning-foreground: 0 0% 100%;
-    --warning-muted: 48 96% 93%;
-    --danger: 0 84.2% 60.2%;
-    --danger-foreground: 210 40% 98%;
-    --danger-muted: 0 86% 97%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 199 89% 48%;
+    /* 源力设计库 · 亮色 */
+    --background: #ffffff;
+    --foreground: #0c0d0e;
+    --card: #ffffff;
+    --card-foreground: #0c0d0e;
+    --popover: #ffffff;
+    --popover-foreground: #0c0d0e;
+    --primary: #1664ff;
+    --primary-foreground: #ffffff;
+    --primary-hover: #4585ff;
+    --primary-active: #0055ff;
+    --primary-muted: #f3f7ff;
+    --secondary: #f6f8fa;
+    --secondary-foreground: #42464e;
+    --muted: #f1f3f5;
+    --muted-foreground: #737a87;
+    --accent: #f2f3f5;
+    --accent-foreground: #0c0d0e;
+    --destructive: #d7312a;
+    --destructive-foreground: #ffffff;
+    --success: #2a814b;
+    --success-foreground: #ffffff;
+    --success-muted: #e1f6e6;
+    --warning: #bd7e00;
+    --warning-foreground: #ffffff;
+    --warning-muted: #fff3dc;
+    --danger: #d7312a;
+    --danger-foreground: #ffffff;
+    --danger-muted: #ffecec;
+    --border: #eaedf1;
+    --input: #dde2e9;
+    --ring: #1664ff;
     --radius: 0.5rem;
-    /* 终端/日志查看器:亮色下用浅底深绿,保证对比度 */
-    --log-bg: 210 40% 98%;
-    --log-text: 173 80% 24%;
+
+    /* 源力扩展 token */
+    --text-1: #0c0d0e;
+    --text-2: #42464e;
+    --text-3: #737a87;
+    --text-4: #c7ccd6;
+    --bg-1: #ffffff;
+    --bg-2: #fcfdfe;
+    --bg-3: #fafbfc;
+    --bg-4: #f6f8fa;
+    --bg-5: #f1f3f5;
+    --border-1: #eaedf1;
+    --border-2: #dde2e9;
+    --row-hover: #f2f3f5;
+    --row-stripe: #fafbfc;
+
+    /* 源力色阶 */
+    --primary-1: #f3f7ff;
+    --primary-2: #ebf1ff;
+    --primary-3: #97bcff;
+    --primary-4: #6e9fff;
+    --primary-5: #387bff;
+    --primary-6: #1664ff;
+    --primary-7: #1759dd;
+    --primary-8: #114ab9;
+    --success-1: #eef9f1;
+    --success-2: #e1f6e6;
+    --success-3: #7ccd94;
+    --success-4: #5cae77;
+    --success-5: #309256;
+    --success-6: #2a814b;
+    --success-7: #237040;
+    --success-8: #1c5e35;
+    --warning-1: #fef8eb;
+    --warning-2: #fff3dc;
+    --warning-3: #f9c76d;
+    --warning-4: #f0a50f;
+    --warning-5: #d08d06;
+    --warning-6: #bd7e00;
+    --warning-7: #996600;
+    --warning-8: #7a5200;
+    --danger-1: #fdf5f5;
+    --danger-2: #ffecec;
+    --danger-3: #ffa3a0;
+    --danger-4: #ff706d;
+    --danger-5: #ee3f38;
+    --danger-6: #d7312a;
+    --danger-7: #bd2923;
+    --danger-8: #9f211c;
+    --teal-1: #eef8ff;
+    --teal-2: #e4f3fc;
+    --teal-3: #80c5e0;
+    --teal-4: #58a8c4;
+    --teal-5: #3888a3;
+    --teal-6: #24758e;
+    --teal-7: #076c85;
+    --teal-8: #005a70;
+    --violet-1: #faf4ff;
+    --violet-2: #f2eafb;
+    --violet-3: #c1a3ed;
+    --violet-4: #a285d4;
+    --violet-5: #876eb8;
+    --violet-6: #6e4c9f;
+    --violet-7: #603f8e;
+    --violet-8: #532d86;
+    --link-1: #f3f7ff;
+    --link-2: #ebf1ff;
+    --link-3: #97bcff;
+    --link-4: #6e9fff;
+    --link-5: #387bff;
+    --link-6: #1664ff;
+    --link-7: #1759dd;
+    --link-8: #114ab9;
+    --grey-1: #ffffff;
+    --grey-2: #fcfdfe;
+    --grey-3: #eceded;
+    --grey-4: #dde2e9;
+    --grey-5: #c9cdd4;
+    --grey-6: #86909c;
+    --grey-7: #4e5969;
+    --grey-8: #333333;
+    --color-bg-1: #ffffff;
+    --color-bg-2: #fcfdfe;
+    --color-bg-3: #fafbfc;
+    --color-bg-4: #f6f8fa;
+    --color-bg-5: #f1f3f5;
+
+    /* 日志查看器:亮色下用浅底深绿 */
+    --log-bg: #f6f8fa;
+    --log-text: #2a814b;
   }
 
   .dark {
-    --background: 222.2 47% 7%;
-    --foreground: 210 40% 96%;
-    --card: 222.2 47% 9.5%;
-    --card-foreground: 210 40% 96%;
-    --popover: 222.2 47% 9.5%;
-    --popover-foreground: 210 40% 96%;
-    --primary: 199 89% 48%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 96%;
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 160 70% 40%;
-    --success-foreground: 0 0% 100%;
-    --success-muted: 160 40% 14%;
-    --warning: 38 90% 48%;
-    --warning-foreground: 0 0% 10%;
-    --warning-muted: 38 40% 14%;
-    --danger: 0 62.8% 50%;
-    --danger-foreground: 210 40% 98%;
-    --danger-muted: 0 40% 14%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 22%;
-    --ring: 199 89% 48%;
-    --log-bg: 222 35% 7%;
-    --log-text: 152 70% 66%;
+    /* 源力设计库 · 暗色(适配) */
+    --background: #16181d;
+    --foreground: #eceded;
+    --card: #1c1f26;
+    --card-foreground: #eceded;
+    --popover: #1c1f26;
+    --popover-foreground: #eceded;
+    --primary: #387bff;
+    --primary-foreground: #ffffff;
+    --primary-hover: #4585ff;
+    --primary-active: #1664ff;
+    --primary-muted: #1a2a4d;
+    --secondary: #23262d;
+    --secondary-foreground: #eceded;
+    --muted: #23262d;
+    --muted-foreground: #86909c;
+    --accent: #2a2e36;
+    --accent-foreground: #eceded;
+    --destructive: #f65159;
+    --destructive-foreground: #ffffff;
+    --success: #3da766;
+    --success-foreground: #ffffff;
+    --success-muted: #1c3a28;
+    --warning: #e0a020;
+    --warning-foreground: #0c0d0e;
+    --warning-muted: #3a2e12;
+    --danger: #f65159;
+    --danger-foreground: #ffffff;
+    --danger-muted: #3a1c1e;
+    --border: #2a2e36;
+    --input: #33363d;
+    --ring: #387bff;
+
+    --text-1: #eceded;
+    --text-2: #c9cdd4;
+    --text-3: #86909c;
+    --text-4: #4e5969;
+    --bg-1: #16181d;
+    --bg-2: #1a1d23;
+    --bg-3: #1e2128;
+    --bg-4: #23262d;
+    --bg-5: #2a2e36;
+    --border-1: #2a2e36;
+    --border-2: #33363d;
+    --row-hover: #23262d;
+    --row-stripe: #1a1d23;
+
+    --log-bg: #16181d;
+    --log-text: #7ccd94;
   }
 }
 
@@ -88,6 +198,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    line-height: 22px;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
   #root {
@@ -101,11 +214,30 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.2);
+    background: color-mix(in srgb, var(--muted-foreground) 20%, transparent);
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.4);
+    background: color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+  }
+}
+
+@layer components {
+  /* 侧边栏菜单（源力设计 · 纯文字） */
+  .menu-group-block {
+    @apply flex flex-col gap-[2px] py-1;
+  }
+  .group-title {
+    @apply px-3 py-[3px] text-xs leading-5 text-text3;
+  }
+  .menu-item {
+    @apply flex h-8 items-center rounded px-3 text-[13px] leading-[22px] transition-colors duration-150;
+  }
+  .menu-text {
+    @apply flex-1 truncate;
+  }
+  .menu-item-active {
+    @apply bg-primary-muted font-medium text-primary;
   }
 }
 

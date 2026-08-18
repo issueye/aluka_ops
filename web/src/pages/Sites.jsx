@@ -8,11 +8,8 @@ import {
   Trash2,
   Power,
   PowerOff,
-  Globe,
+  Search,
   ExternalLink,
-  FolderTree,
-  ArrowRightLeft,
-  ScrollText,
   ChevronRight,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
@@ -42,10 +39,12 @@ import {
 import {
   ConfirmDialog,
   FormField,
-  IconTooltip,
   PageTemplate,
   RowActions,
+  SegmentedPicker,
   TableStateRow,
+  TextActionButton,
+  TextActionLink,
 } from "@/components/ued";
 
 const EMPTY = {
@@ -57,26 +56,57 @@ const EMPTY = {
   ip_blacklist: "",
 };
 
+const PAGE_SIZE = 10;
+
 export function Sites() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [deleting, setDeleting] = useState(null);
+  const [enabledFilter, setEnabledFilter] = useState("all");
+  const [keyword, setKeyword] = useState("");
 
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["gateway-ports"],
     queryFn: gatewayApi.listPorts,
     refetchInterval: 10000,
   });
 
   const sites = data?.items || [];
-  const pg = usePagination(sites, 10);
   const runtime = data?.runtime || [];
   const listening = useMemo(
     () => new Set((runtime || []).map((r) => r.port)),
     [runtime]
   );
+
+  const enabledCount = useMemo(() => {
+    const count = { all: sites.length, on: 0, off: 0 };
+    for (const s of sites) {
+      if (s.enabled) count.on++;
+      else count.off++;
+    }
+    return count;
+  }, [sites]);
+
+  const filtered = useMemo(() => {
+    let list = sites;
+    if (enabledFilter !== "all") {
+      list = list.filter((s) => (enabledFilter === "on" ? s.enabled : !s.enabled));
+    }
+    if (keyword.trim()) {
+      const kw = keyword.trim().toLowerCase();
+      list = list.filter(
+        (s) =>
+          s.name?.toLowerCase().includes(kw) ||
+          String(s.port)?.includes(kw) ||
+          s.description?.toLowerCase().includes(kw)
+      );
+    }
+    return list;
+  }, [sites, enabledFilter, keyword]);
+
+  const pg = usePagination(filtered, PAGE_SIZE);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["gateway-ports"] });
@@ -137,13 +167,13 @@ export function Sites() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={Globe}
-      cardTitle="站点管理"
-      cardDescription="每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。"
+      list
+      title="站点管理"
+      description={`每个站点对应一个动态监听端口；进入站点后管理 APP（静态）、反代规则与路由脚本。共 ${sites.length} 个站点。`}
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
-      cardActions={
+      error={isError ? "加载站点列表失败，请确认后端服务已启动。" : null}
+      actions={
         <>
           <Button
             variant="outline"
@@ -161,12 +191,35 @@ export function Sites() {
             重载监听
           </Button>
           <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-1" /> 新建站点
+            <Plus className="h-3.5 w-3.5 mr-1" /> 新建站点
           </Button>
         </>
       }
+      filters={
+        <>
+          <SegmentedPicker
+            options={[
+              { value: "all", label: `全部(${enabledCount.all})` },
+              { value: "on", label: `启用(${enabledCount.on})` },
+              { value: "off", label: `停用(${enabledCount.off})` },
+            ]}
+            value={enabledFilter}
+            onChange={setEnabledFilter}
+            size="sm"
+          />
+          <div className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-bg1 px-3 shadow-[0_0_0_1px_var(--border-2)]">
+            <Search className="h-4 w-4 shrink-0 text-text3" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索站点名称或端口"
+              className="h-8 w-44 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent"
+            />
+          </div>
+        </>
+      }
       pagination={
-        !isLoading && sites.length > 0
+        !isLoading && filtered.length > 0
           ? {
               page: pg.page,
               totalPages: pg.totalPages,
@@ -180,11 +233,11 @@ export function Sites() {
       }
     >
       {runtime.length === 0 ? (
-        <div className="border-b px-6 py-3 text-xs text-muted-foreground">
+        <div className="border-b border-border1 px-4 py-3 text-xs text-text3">
           当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 border-b px-6 py-3">
+        <div className="flex flex-wrap gap-2 border-b border-border1 px-4 py-3">
           {runtime.map((r) => (
             <Badge key={r.port} variant="secondary" className="font-mono">
               :{r.port} · {r.rule_count || 0} 规则
@@ -194,154 +247,108 @@ export function Sites() {
         </div>
       )}
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>站点</TableHead>
-              <TableHead>端口</TableHead>
-              <TableHead>APP</TableHead>
-              <TableHead>反代</TableHead>
-              <TableHead>脚本</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead className="text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableStateRow colSpan={7}>加载中…</TableStateRow>
-            ) : sites.length === 0 ? (
-              <TableStateRow colSpan={7}>
-                暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。
-              </TableStateRow>
-            ) : (
-              pg.pageItems.map((s) => {
-                const appN = (s.apps || []).length;
-                const pxN = (s.proxies || []).length;
-                const scN = (s.scripts || []).length;
-                return (
-                  <TableRow key={s.id}>
-                    <TableCell>
-                      <Link
-                        to={`/sites/${s.id}`}
-                        className="font-medium hover:text-primary hover:underline"
-                      >
-                        {s.name}
-                      </Link>
-                      {s.description && (
-                        <div className="text-[11px] text-muted-foreground line-clamp-1">
-                          {s.description}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      :{s.port}
-                      {s.enabled && listening.has(s.port) && (
-                        <span className="ml-1 text-[10px] text-success">LISTEN</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <FolderTree className="h-3 w-3" /> {appN}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <ArrowRightLeft className="h-3 w-3" /> {pxN}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <ScrollText className="h-3 w-3" /> {scN}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        <Badge variant={s.enabled ? "success" : "secondary"}>
-                          {s.enabled ? "启用" : "停用"}
-                        </Badge>
-                        {s.ip_whitelist?.trim() && (
-                          <Badge variant="outline" className="text-[10px]">
-                            白名单
-                          </Badge>
-                        )}
-                        {s.ip_blacklist?.trim() && (
-                          <Badge variant="outline" className="text-[10px] text-destructive">
-                            黑名单
-                          </Badge>
-                        )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>站点</TableHead>
+            <TableHead className="w-[110px]">端口</TableHead>
+            <TableHead className="w-[60px]">APP</TableHead>
+            <TableHead className="w-[60px]">反代</TableHead>
+            <TableHead className="w-[60px]">脚本</TableHead>
+            <TableHead className="w-[120px]">状态</TableHead>
+            <TableHead className="text-right">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableStateRow colSpan={7}>加载中…</TableStateRow>
+          ) : filtered.length === 0 ? (
+            <TableStateRow colSpan={7}>
+              暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。
+            </TableStateRow>
+          ) : (
+            pg.pageItems.map((s) => {
+              const appN = (s.apps || []).length;
+              const pxN = (s.proxies || []).length;
+              const scN = (s.scripts || []).length;
+              return (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    <Link
+                      to={`/sites/${s.id}`}
+                      className="font-medium hover:text-primary hover:underline"
+                    >
+                      {s.name}
+                    </Link>
+                    {s.description && (
+                      <div className="text-[11px] text-text3 line-clamp-1">
+                        {s.description}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <RowActions>
-                        <IconTooltip label="进入站点">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" asChild aria-label="进入站点">
-                            <Link to={`/sites/${s.id}`}>
-                              <ChevronRight className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="打开站点">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="打开站点"
-                            asChild
-                          >
-                            <a
-                              href={siteURL(s.port)}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label={s.enabled ? "停用" : "启用"}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label={s.enabled ? "停用站点" : "启用站点"}
-                            onClick={() => toggleEnabled(s)}
-                          >
-                            {s.enabled ? (
-                              <PowerOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Power className="h-3.5 w-3.5 text-success" />
-                            )}
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="编辑">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="编辑站点"
-                            onClick={() => openEdit(s)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="删除">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive"
-                            aria-label="删除站点"
-                            onClick={() => setDeleting(s)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </IconTooltip>
-                      </RowActions>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+                    )}
+                  </TableCell>
+                  <TableCell className="font-mono">
+                    :{s.port}
+                    {s.enabled && listening.has(s.port) && (
+                      <span className="ml-1 text-[10px] text-success">LISTEN</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs">{appN}</TableCell>
+                  <TableCell className="text-xs">{pxN}</TableCell>
+                  <TableCell className="text-xs">{scN}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap gap-1">
+                      <Badge variant={s.enabled ? "success" : "secondary"}>
+                        {s.enabled ? "启用" : "停用"}
+                      </Badge>
+                      {s.ip_whitelist?.trim() && (
+                        <Badge variant="outline" className="text-[10px]">
+                          白名单
+                        </Badge>
+                      )}
+                      {s.ip_blacklist?.trim() && (
+                        <Badge variant="outline" className="text-[10px] text-danger">
+                          黑名单
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <RowActions className="justify-end">
+                      <TextActionLink to={`/sites/${s.id}`}>
+                        <ChevronRight className="h-3 w-3" /> 进入
+                      </TextActionLink>
+                      <TextActionLink
+                        href={siteURL(s.port)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <ExternalLink className="h-3 w-3" /> 打开
+                      </TextActionLink>
+                      <TextActionButton onClick={() => toggleEnabled(s)}>
+                        {s.enabled ? (
+                          <>
+                            <PowerOff className="h-3 w-3" /> 停用
+                          </>
+                        ) : (
+                          <>
+                            <Power className="h-3 w-3" /> 启用
+                          </>
+                        )}
+                      </TextActionButton>
+                      <TextActionButton onClick={() => openEdit(s)}>
+                        <Pencil className="h-3 w-3" /> 编辑
+                      </TextActionButton>
+                      <TextActionButton tone="danger" onClick={() => setDeleting(s)}>
+                        <Trash2 className="h-3 w-3" /> 删除
+                      </TextActionButton>
+                    </RowActions>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

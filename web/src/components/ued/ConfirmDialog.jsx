@@ -33,7 +33,7 @@ export function ConfirmDialog({
               <AlertDialogDescription>{description}</AlertDialogDescription>
             ) : (
               <AlertDialogDescription asChild>
-                <div className="text-sm text-muted-foreground">{description}</div>
+                <div className="text-sm text-text3">{description}</div>
               </AlertDialogDescription>
             )
           ) : null}
@@ -43,7 +43,7 @@ export function ConfirmDialog({
           <AlertDialogAction
             className={
               destructive
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                ? "bg-danger text-danger-foreground hover:bg-danger-7"
                 : undefined
             }
             disabled={loading}

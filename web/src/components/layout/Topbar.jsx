@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AgentSwitcher } from "@/components/layout/AgentSwitcher";
 import { IconTooltip, StatusBadge } from "@/components/ued";
+import { Logo } from "./Logo";
 
-export function Topbar({ title, description }) {
+export function Topbar() {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["health"],
@@ -41,19 +42,11 @@ export function Topbar({ title, description }) {
   };
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background/85 px-6 backdrop-blur-md">
-      <div>
-        <h1 className="text-base font-semibold tracking-tight">{title}</h1>
-        {description && (
-          <p className="text-xs text-muted-foreground">{description}</p>
-        )}
+    <header className="relative z-[100] flex h-12 shrink-0 items-center justify-between bg-bg1 px-4 shadow-[0_2px_6px_0_rgba(0,0,0,0.05)] lg:px-6">
+      <div className="flex min-w-0 items-center">
+        <Logo className="text-text1" markClassName="h-6 w-6" />
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
-        {data?.version && (
-          <span className="hidden text-xs font-mono text-muted-foreground sm:inline">
-            后端 v{data.version}
-          </span>
-        )}
         <AgentSwitcher />
         <ThemeToggle />
         <StatusBadge

@@ -19,7 +19,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -45,7 +44,7 @@ import {
 import { ArtifactUpload } from "./ArtifactUpload";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
-import { IconTooltip, RowActions } from "@/components/ued";
+import { IconTooltip, InfoHint, RowActions } from "@/components/ued";
 
 // ArtifactList 服务制品列表 + 安装/卸载/上传/删除/下载。
 export function ArtifactList({ service }) {
@@ -149,21 +148,18 @@ export function ArtifactList({ service }) {
     <div className="space-y-4">
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="space-y-1.5">
-            <CardTitle className="flex items-center gap-2">
-              <PackagePlus className="h-4 w-4" /> 制品与版本
-            </CardTitle>
-            <CardDescription>
-              上传制品并安装到部署目录。当前版本:{service.current_version || "未安装"} ·
-              安装目录:{service.install_dir || "—"}
-            </CardDescription>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <PackagePlus className="h-4 w-4" /> 制品与版本
+            <InfoHint
+              label={`上传制品并安装到部署目录。当前版本:${service.current_version || "未安装"} · 安装目录:${service.install_dir || "—"}`}
+            />
+          </CardTitle>
           <div className="flex gap-2">
             {hasCurrent && (
               <Button
                 variant="outline"
                 size="sm"
-                className="text-destructive hover:text-destructive"
+                className="text-danger hover:text-danger"
                 onClick={() => setUninstallOpen(true)}
               >
                 <PackageX /> 卸载
@@ -192,13 +188,13 @@ export function ArtifactList({ service }) {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-20 text-center text-text3">
                     加载中...
                   </TableCell>
                 </TableRow>
               ) : artifacts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-20 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-20 text-center text-text3">
                     暂无制品,点击右上角"上传制品"。
                   </TableCell>
                 </TableRow>
@@ -209,22 +205,22 @@ export function ArtifactList({ service }) {
                       {a.is_current ? (
                         <Star className="h-4 w-4 fill-amber-400 text-warning" />
                       ) : (
-                        <span className="text-muted-foreground/30">—</span>
+                        <span className="text-text3/30">—</span>
                       )}
                     </TableCell>
                     <TableCell className="font-medium">
                       v{a.version}
                       {a.description && (
-                        <div className="text-xs font-normal text-muted-foreground line-clamp-1">
+                        <div className="text-xs font-normal text-text3 line-clamp-1">
                           {a.description}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-[220px] truncate font-mono text-xs text-muted-foreground" title={a.filename}>
+                    <TableCell className="max-w-[220px] truncate font-mono text-xs text-text3" title={a.filename}>
                       {a.filename}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{fmtSize(a.size)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{formatTime(a.created_at)}</TableCell>
+                    <TableCell className="text-xs text-text3">{fmtSize(a.size)}</TableCell>
+                    <TableCell className="text-xs text-text3">{formatTime(a.created_at)}</TableCell>
                     <TableCell>
                       <div className="flex items-center justify-end gap-1">
                         {a.is_current ? (
@@ -274,7 +270,7 @@ export function ArtifactList({ service }) {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="text-destructive hover:text-destructive"
+                              className="text-danger hover:text-danger"
                               onClick={() => setDeleting(a)}
                               aria-label="删除"
                             >
@@ -312,7 +308,7 @@ export function ArtifactList({ service }) {
           <AlertDialogHeader>
             <AlertDialogTitle>确认安装 v{installing?.version}?</AlertDialogTitle>
             <AlertDialogDescription>
-              将部署「<span className="font-medium text-foreground">{installing?.filename}</span>
+              将部署「<span className="font-medium text-text1">{installing?.filename}</span>
               」到安装目录。{service.status === "running" && " 服务正在运行,安装前会先停止。"}
               {installing && !installing.is_current && hasCurrent && " 这将替换当前已安装的版本。"}
             </AlertDialogDescription>
@@ -340,7 +336,7 @@ export function ArtifactList({ service }) {
               确认{switching?.action === "upgrade" ? "升级" : "回滚"}到 v{switching?.version}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              将部署「<span className="font-medium text-foreground">{switching?.filename}</span>
+              将部署「<span className="font-medium text-text1">{switching?.filename}</span>
               」替换当前版本 v{service.current_version}。
               {service.status === "running" && " 服务正在运行,操作前会先停止。"}
               若部署失败,系统会自动回滚到当前版本(当前版本不受影响)。
@@ -373,7 +369,7 @@ export function ArtifactList({ service }) {
           <AlertDialogFooter>
             <AlertDialogCancel disabled={uninstallMut.isPending}>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-danger text-danger-foreground hover:bg-danger"
               disabled={uninstallMut.isPending}
               onClick={(e) => {
                 e.preventDefault();
@@ -392,14 +388,14 @@ export function ArtifactList({ service }) {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除制品?</AlertDialogTitle>
             <AlertDialogDescription>
-              将删除「<span className="font-medium text-foreground">v{deleting?.version}</span>
+              将删除「<span className="font-medium text-text1">v{deleting?.version}</span>
               」的制品文件与记录。该操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMut.isPending}>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-danger text-danger-foreground hover:bg-danger"
               disabled={deleteMut.isPending}
               onClick={(e) => {
                 e.preventDefault();

@@ -2,12 +2,12 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const TONE_DOT = {
-  success: "bg-success shadow-[0_0_8px_hsl(var(--success)/0.6)]",
-  warning: "bg-warning shadow-[0_0_8px_hsl(var(--warning)/0.6)]",
-  danger: "bg-danger shadow-[0_0_8px_hsl(var(--danger)/0.6)]",
-  default: "bg-primary shadow-[0_0_8px_hsl(var(--primary)/0.6)]",
-  secondary: "bg-muted-foreground",
-  outline: "bg-muted-foreground",
+  success: "bg-success shadow-[0_0_8px_rgba(42,129,75,0.6)]",
+  warning: "bg-warning shadow-[0_0_8px_rgba(189,126,0,0.6)]",
+  danger: "bg-danger shadow-[0_0_8px_rgba(215,49,42,0.6)]",
+  default: "bg-primary shadow-[0_0_8px_rgba(22,100,255,0.6)]",
+  secondary: "bg-text3",
+  outline: "bg-text3",
 };
 
 /** 状态点 */

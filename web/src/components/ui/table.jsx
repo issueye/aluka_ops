@@ -1,7 +1,6 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-// 仅横向溢出时出现滚动条；纵向交给页面主区域滚动，避免表格+页面双滚动条
 const Table = React.forwardRef(({ className, ...props }, ref) => (
   <div className="relative w-full overflow-x-auto overflow-y-visible">
     <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
@@ -10,12 +9,20 @@ const Table = React.forwardRef(({ className, ...props }, ref) => (
 Table.displayName = "Table";
 
 const TableHeader = React.forwardRef(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead
+    ref={ref}
+    className={cn("[&_tr]:border-b border-border1 bg-bg4", className)}
+    {...props}
+  />
 ));
 TableHeader.displayName = "TableHeader";
 
 const TableBody = React.forwardRef(({ className, ...props }, ref) => (
-  <tbody ref={ref} className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+  <tbody
+    ref={ref}
+    className={cn("[&_tr:last-child]:border-0", className)}
+    {...props}
+  />
 ));
 TableBody.displayName = "TableBody";
 
@@ -23,7 +30,7 @@ const TableRow = React.forwardRef(({ className, ...props }, ref) => (
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b border-border1 transition-colors hover:bg-rowhover data-[state=selected]:bg-rowhover",
       className
     )}
     {...props}
@@ -35,7 +42,7 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
   <th
     ref={ref}
     className={cn(
-      "h-10 px-3 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-10 px-4 text-left align-middle text-sm font-medium text-text2 [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}
@@ -44,7 +51,14 @@ const TableHead = React.forwardRef(({ className, ...props }, ref) => (
 TableHead.displayName = "TableHead";
 
 const TableCell = React.forwardRef(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn("p-3 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
+  <td
+    ref={ref}
+    className={cn(
+      "px-4 py-3 align-middle text-text1 [&:has([role=checkbox])]:pr-0",
+      className
+    )}
+    {...props}
+  />
 ));
 TableCell.displayName = "TableCell";
 

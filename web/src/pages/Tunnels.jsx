@@ -7,7 +7,6 @@ import {
   Trash2,
   Power,
   PowerOff,
-  Cable,
   Network,
 } from "lucide-react";
 import { tunnelApi, api } from "@/lib/api";
@@ -217,21 +216,19 @@ export function Tunnels() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={Cable}
-      cardTitle="流量隧道"
-      cardDescription="反向 TCP：中心监听端口 → 经 Agent 隧道转发到内网服务（类似 SSH -R）。Agent 需主动连接中心（mode=agent + controller-url）。"
+      list
+      title="流量隧道"
+      description="反向 TCP：中心监听端口 → 经 Agent 隧道转发到内网服务（类似 SSH -R）。"
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
-      cardActions={
+      actions={
         <Button size="sm" onClick={openCreate}>
           <Plus className="mr-1" /> 新建规则
         </Button>
       }
       footer={
-        <p className="border-t px-6 py-3 text-[11px] text-muted-foreground">
-          示例：中心 -mode controller -port 19090 -agent-token secret；Agent -mode agent
-          -controller-url http://中心:19090 -agent-token secret。规则 listen=18090 →
+        <p className="border-t border-border1 px-5 py-3 text-xs text-text3">
+          示例：中心 -mode controller；Agent -mode agent -controller-url …。规则 listen=18090 →
           agent 上 127.0.0.1:8080 后，访问中心:18090 即打到内网服务。
         </p>
       }
@@ -250,13 +247,13 @@ export function Tunnels() {
       }
     >
         {/* 在线会话 */}
-        <div className="border-b px-6 py-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <div className="border-b border-border1 px-5 py-3">
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-text3">
             <Network className="h-3.5 w-3.5" />
             隧道会话（Agent 已连接）
           </div>
           {sessions.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text3">
               暂无会话。请用 agent 模式启动节点并配置 ALUKA_CONTROLLER_URL / ALUKA_AGENT_TOKEN。
             </p>
           ) : (
@@ -297,7 +294,7 @@ export function Tunnels() {
                   <TableRow key={r.id}>
                     <TableCell>
                       <div className="font-medium">{r.name}</div>
-                      <div className="font-mono text-[11px] text-muted-foreground">
+                      <div className="font-mono text-[11px] text-text3">
                         {r.code}
                       </div>
                     </TableCell>
@@ -315,14 +312,14 @@ export function Tunnels() {
                       </div>
                       {rt.error && (
                         <div
-                          className="mt-0.5 max-w-[180px] truncate text-[10px] text-destructive"
+                          className="mt-0.5 max-w-[180px] truncate text-[10px] text-danger"
                           title={rt.error}
                         >
                           {rt.error}
                         </div>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-xs text-text3">
                       活跃 {rt.active_conns ?? 0}
                       <span className="mx-1">·</span>
                       累计 {rt.total_conns ?? 0}
@@ -362,7 +359,7 @@ export function Tunnels() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-destructive"
+                            className="h-8 w-8 text-danger"
                             aria-label="删除规则"
                             onClick={() => setDeleting(r)}
                           >
@@ -519,7 +516,7 @@ export function Tunnels() {
         title="删除隧道规则？"
         description={
           <>
-            将删除 <span className="font-mono text-foreground">{deleting?.code}</span>
+            将删除 <span className="font-mono text-text1">{deleting?.code}</span>
             ，并停止中心端口 {deleting?.listen_port} 的监听。
           </>
         }

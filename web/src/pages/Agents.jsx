@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Network,
   Play,
   Square,
   RotateCw,
@@ -70,14 +69,12 @@ export function Agents() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={Network}
-      cardTitle="多节点 Agent"
-      cardDescription={`中心模式（ALUKA_MODE=controller）下展示已上报的 Agent。在线 ${onlineCount} / 共 ${agents.length}。`}
+      list
+      title="多节点 Agent"
+      description={`中心模式（ALUKA_MODE=controller）下展示已上报的 Agent。在线 ${onlineCount} / 共 ${agents.length}。`}
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
       error={isError ? "加载失败。请确认以 controller 模式运行，或后端服务已启动。" : null}
-      cardContentClassName="p-6"
       pagination={
         !isLoading && agents.length > 0
           ? {
@@ -93,37 +90,39 @@ export function Agents() {
       }
     >
       {isLoading ? (
-        <p className="py-6 text-center text-sm text-muted-foreground animate-pulse">加载中...</p>
+        <p className="py-8 text-center text-sm text-text3 animate-pulse">加载中...</p>
       ) : agents.length === 0 ? (
-        <EmptyState
-          icon={Server}
-          title="暂无 Agent 上报"
-          description={
-            <>
-              中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
-              <br />
-              Agent:{" "}
-              <code>
-                ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
-                ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
-              </code>
-            </>
-          }
-        />
+        <div className="p-6">
+          <EmptyState
+            icon={Server}
+            title="暂无 Agent 上报"
+            description={
+              <>
+                中心: <code>ALUKA_MODE=controller ALUKA_AGENT_TOKEN=xxx</code>
+                <br />
+                Agent:{" "}
+                <code>
+                  ALUKA_MODE=agent ALUKA_CONTROLLER_URL=http://中心:端口
+                  ALUKA_AGENT_TOKEN=xxx ALUKA_ADVERTISE_URL=http://本机:端口
+                </code>
+              </>
+            }
+          />
+        </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 p-4">
           {pg.pageItems.map((a) => (
-            <div key={a.agent_id} className="rounded-xl border border-border/60 overflow-hidden">
+            <div key={a.agent_id} className="overflow-hidden rounded-sm border border-border1">
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-bg5"
                 onClick={() => toggle(a.agent_id)}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   {expanded[a.agent_id] ? (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <ChevronDown className="h-4 w-4 shrink-0 text-text3" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-text3" />
                   )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -131,25 +130,25 @@ export function Agents() {
                       <Badge variant={a.online ? "success" : "danger"}>
                         {a.online ? "在线" : "离线"}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-text3">
                         {a.host} · {a.os}/{a.arch} · v{a.version || "-"}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
+                    <div className="text-xs text-text3 mt-0.5">
                       服务 {a.services_total ?? 0} (运行 {a.services_running ?? 0} / 异常{" "}
                       {a.services_crashed ?? 0}) · 最近心跳 {formatTime(a.last_seen_at)}
                     </div>
                   </div>
                 </div>
-                <code className="hidden max-w-[240px] truncate font-mono text-xs text-muted-foreground sm:block">
+                <code className="hidden max-w-[240px] truncate font-mono text-xs text-text3 sm:block">
                   {a.api_base || "-"}
                 </code>
               </button>
 
               {expanded[a.agent_id] && (
-                <div className="border-t border-border/60 bg-muted/10 px-4 py-3">
+                <div className="border-t border-border1 bg-bg4 px-4 py-3">
                   {(a.services || []).length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-2">
+                    <p className="text-xs text-text3 py-2">
                       心跳未携带服务明细，可点刷新从 Agent 实时拉取。
                     </p>
                   ) : (
@@ -168,7 +167,7 @@ export function Agents() {
                           <TableRow key={`${a.agent_id}-${s.id}`}>
                             <TableCell>
                               <div className="text-sm font-medium">{s.name}</div>
-                              <div className="font-mono text-xs text-muted-foreground">
+                              <div className="font-mono text-xs text-text3">
                                 {s.code}
                               </div>
                             </TableCell>

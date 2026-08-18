@@ -5,7 +5,6 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 import {
-  TerminalSquare,
   Wifi,
   WifiOff,
   RefreshCw,
@@ -18,20 +17,13 @@ import { attachTerminalTheme, getTerminalTheme } from "@/lib/terminalTheme";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PageTemplate } from "@/components/ued";
+import { PageShell } from "@/components/ued";
 
 /**
  * 服务器级 Web 控制台。
@@ -159,9 +151,16 @@ export function TerminalPage() {
       }
     };
     window.addEventListener("resize", onResize);
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => onResize())
+        : null;
+    if (hostRef.current && ro) ro.observe(hostRef.current);
+
     return () => {
       unsubscribeTheme();
       window.removeEventListener("resize", onResize);
+      ro?.disconnect();
       disconnect();
       term.dispose();
       termRef.current = null;
@@ -286,21 +285,19 @@ export function TerminalPage() {
   };
 
   return (
-    <PageTemplate
-      card
-      cardIcon={TerminalSquare}
-      cardTitle="服务器控制台"
-      cardDescription={
-        <>
-          系统级伪终端：Linux/macOS 使用 PTY，Windows 使用 ConPTY。
-          {sessionId ? (
-            <span className="ml-2 font-mono text-[11px]">
-              session={sessionId}
-            </span>
-          ) : null}
-        </>
-      }
-      cardActions={
+    <PageShell className="flex h-[calc(100dvh-3rem)] min-h-0 flex-col !space-y-3 !py-4">
+      {/* 顶栏：标题 + 连接控制 */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-xl font-semibold leading-7 text-text1">
+            服务器控制台
+          </h1>
+          <p className="mt-1 truncate text-[13px] leading-5 text-text3">
+            {sessionId
+              ? `伪终端 · ${backend || info?.backend || "PTY"} · ${sessionId}`
+              : "系统级伪终端（Linux/macOS: PTY · Windows: ConPTY）"}
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           {connBadge()}
           <Select
@@ -308,7 +305,7 @@ export function TerminalPage() {
             onValueChange={setShellType}
             disabled={conn === "connected" || conn === "connecting"}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="h-8 w-[180px]">
               <SelectValue placeholder="Shell" />
             </SelectTrigger>
             <SelectContent>
@@ -338,34 +335,20 @@ export function TerminalPage() {
             </Button>
           )}
         </div>
-      }
-      cardContentClassName="p-6 space-y-2"
-    >
-          <div className="overflow-hidden rounded-lg border border-border/70 shadow-inner bg-log">
-            {/* 终端仿窗体顶栏 */}
-            <div className="flex h-8 items-center justify-between border-b border-border/40 bg-muted/40 px-3 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-destructive/60" />
-                <span className="h-2.5 w-2.5 rounded-full bg-warning/60" />
-                <span className="h-2.5 w-2.5 rounded-full bg-success/60" />
-                <span className="ml-2 font-mono text-[11px] opacity-75">
-                  aluka-console ~ {shellType || defaultShell || "powershell"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 font-mono text-[10px]">
-                {sessionId ? <span className="opacity-60">session:{sessionId.slice(0, 8)}</span> : null}
-                <span className="opacity-75">{backend || "local"}</span>
-              </div>
-            </div>
-            <div
-              ref={hostRef}
-              className="h-[min(65vh,600px)] w-full p-2"
-            />
-          </div>
-          <p className="text-[11px] text-muted-foreground flex items-center justify-between">
-            <span>后端执行环境：{backend || info?.backend || "本机 PTY"}。支持完整交互按键、快捷键与颜色。</span>
-            <span className="font-mono text-[10px] opacity-60">xterm.js + fit-addon</span>
-          </p>
-    </PageTemplate>
+      </div>
+
+      {/* 终端：占满剩余视口 */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border1 bg-log">
+        <div className="flex h-8 shrink-0 items-center justify-between border-b border-border1/80 bg-black/20 px-3 text-xs text-text3">
+          <span className="truncate font-mono text-[11px] opacity-80">
+            aluka-console ~ {shellType || defaultShell || "powershell"}
+          </span>
+          <span className="shrink-0 font-mono text-[10px] opacity-60">
+            {backend || info?.backend || "local"} · xterm.js
+          </span>
+        </div>
+        <div ref={hostRef} className="min-h-0 w-full flex-1 p-2" />
+      </div>
+    </PageShell>
   );
 }

@@ -3,7 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
   Plus,
   Pencil,
   Trash2,
@@ -53,11 +52,12 @@ import {
   FormField,
   FormGrid,
   IconTooltip,
-  PageTemplate,
+  PageShell,
   RefreshButton,
   RowActions,
   TableStateRow,
 } from "@/components/ued";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const EMPTY_APP = {
   code: "",
@@ -368,74 +368,96 @@ export function SiteDetail() {
   };
 
   if (isLoading) {
-    return <div className="p-6 text-center text-sm text-muted-foreground animate-pulse">加载站点详情中…</div>;
+    return (
+      <PageShell>
+        <div className="space-y-5">
+          <Skeleton className="h-4 w-48" />
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-9 w-full max-w-xl" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      </PageShell>
+    );
   }
   if (isError || !site) {
     return (
-      <PageTemplate backTo="/sites" backLabel="返回站点列表">
+      <PageShell>
+        <DetailHeader
+          breadcrumb={[
+            { label: "站点管理", to: "/sites" },
+            { label: "未知站点" },
+          ]}
+          title="站点不存在"
+        />
         <Card>
-          <CardContent className="p-6 text-muted-foreground">站点不存在或已删除。</CardContent>
+          <CardContent className="p-6 text-sm text-text3">站点不存在或已删除。</CardContent>
         </Card>
-      </PageTemplate>
+      </PageShell>
     );
   }
 
   return (
-    <PageTemplate
-      backTo="/sites"
-      backLabel="返回站点列表"
-      title={site.name}
-      badge={
-        <>
-          <Badge variant={site.enabled ? "success" : "secondary"}>
-            {site.enabled ? "启用" : "停用"}
-          </Badge>
-          {site.enabled && listening.has(site.port) && (
-            <Badge variant="outline" className="font-mono text-[10px] text-success">
-              :{site.port} LISTEN
+    <PageShell>
+      <DetailHeader
+        breadcrumb={[
+          { label: "站点管理", to: "/sites" },
+          { label: site.name },
+        ]}
+        title={site.name}
+        subtitle={`端口 :${site.port}`}
+        badges={
+          <>
+            <Badge variant={site.enabled ? "success" : "secondary"}>
+              {site.enabled ? "启用" : "停用"}
             </Badge>
-          )}
-        </>
-      }
-      description={`端口 :${site.port}${site.description ? ` · ${site.description}` : ""}`}
-      onRefresh={() => refetch()}
-      isRefreshing={isFetching}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setAccessForm({
-                ip_whitelist: site.ip_whitelist || "",
-                ip_blacklist: site.ip_blacklist || "",
-              });
-              setAccessOpen(true);
-            }}
-          >
-            <Shield className="h-3.5 w-3.5 mr-1" /> IP 访问控制
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-3.5 w-3.5 mr-1" /> 打开站点
-            </a>
-          </Button>
-        </div>
-      }
-    >
+            {site.enabled && listening.has(site.port) && (
+              <Badge variant="outline" className="font-mono text-xs text-success">
+                LISTEN
+              </Badge>
+            )}
+          </>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <RefreshButton onClick={() => refetch()} loading={isFetching} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setAccessForm({
+                  ip_whitelist: site.ip_whitelist || "",
+                  ip_blacklist: site.ip_blacklist || "",
+                });
+                setAccessOpen(true);
+              }}
+            >
+              <Shield className="mr-1 h-3.5 w-3.5" /> IP 访问控制
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={siteURL(site.port)} target="_blank" rel="noreferrer">
+                <ExternalLink className="mr-1 h-3.5 w-3.5" /> 打开站点
+              </a>
+            </Button>
+          </div>
+        }
+      />
+
+      {site.description ? (
+        <p className="text-[13px] leading-5 text-text3">{site.description}</p>
+      ) : null}
 
       {(site.ip_whitelist?.trim() || site.ip_blacklist?.trim()) && (
         <Card>
           <CardContent className="grid gap-3 p-4 text-xs sm:grid-cols-2">
             <div>
-              <div className="mb-1 font-medium text-muted-foreground">白名单</div>
-              <pre className="max-h-24 overflow-auto rounded bg-muted/40 p-2 font-mono whitespace-pre-wrap">
+              <div className="mb-1 font-medium text-text3">白名单</div>
+              <pre className="max-h-24 overflow-auto rounded bg-bg5 p-2 font-mono whitespace-pre-wrap">
                 {site.ip_whitelist?.trim() || "（空=不限制）"}
               </pre>
             </div>
             <div>
-              <div className="mb-1 font-medium text-muted-foreground">黑名单</div>
-              <pre className="max-h-24 overflow-auto rounded bg-muted/40 p-2 font-mono whitespace-pre-wrap">
+              <div className="mb-1 font-medium text-text3">黑名单</div>
+              <pre className="max-h-24 overflow-auto rounded bg-bg5 p-2 font-mono whitespace-pre-wrap">
                 {site.ip_blacklist?.trim() || "（空）"}
               </pre>
             </div>
@@ -443,21 +465,21 @@ export function SiteDetail() {
         </Card>
       )}
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
-          <TabsTrigger value="apps">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList className="w-full overflow-x-auto">
+          <TabsTrigger value="apps" className="shrink-0">
             <FolderTree className="mr-1.5 h-3.5 w-3.5" /> APP ({apps.length})
           </TabsTrigger>
-          <TabsTrigger value="proxies">
+          <TabsTrigger value="proxies" className="shrink-0">
             <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" /> 反代 ({proxies.length})
           </TabsTrigger>
-          <TabsTrigger value="scripts">
+          <TabsTrigger value="scripts" className="shrink-0">
             <ScrollText className="mr-1.5 h-3.5 w-3.5" /> 路由脚本 ({scripts.length})
           </TabsTrigger>
         </TabsList>
 
         {/* ===== APP Tab ===== */}
-        <TabsContent value="apps" className="space-y-3">
+        <TabsContent value="apps" className="mt-4 space-y-5">
           <DataTableCard
             title="静态 APP"
             description="绑定本站点端口的前端静态资源（路径 + 目录 + SPA）"
@@ -500,7 +522,7 @@ export function SiteDetail() {
                     <TableRow key={app.id}>
                       <TableCell>
                         <div className="font-medium">{app.name}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
+                        <div className="font-mono text-[11px] text-text3">
                           {app.code}
                         </div>
                       </TableCell>
@@ -553,7 +575,7 @@ export function SiteDetail() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-danger"
                               aria-label="删除 APP"
                               onClick={() => setDeletingApp(app)}
                             >
@@ -571,7 +593,7 @@ export function SiteDetail() {
         </TabsContent>
 
         {/* ===== Proxy Tab ===== */}
-        <TabsContent value="proxies" className="space-y-3">
+        <TabsContent value="proxies" className="mt-4 space-y-5">
           <DataTableCard
             title="反代规则"
             description="路径前缀 → 上游；同站点内最长前缀优先。上传建议 body/IO 超时设为 0。"
@@ -615,7 +637,7 @@ export function SiteDetail() {
                     <TableRow key={px.id}>
                       <TableCell>
                         <div className="font-medium">{px.name}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
+                        <div className="font-mono text-[11px] text-text3">
                           {px.code}
                         </div>
                       </TableCell>
@@ -626,7 +648,7 @@ export function SiteDetail() {
                       >
                         {px.upstream}
                       </TableCell>
-                      <TableCell className="text-[11px] text-muted-foreground">
+                      <TableCell className="text-[11px] text-text3">
                         body {px.max_body_bytes ? px.max_body_bytes : "不限"}
                         <br />
                         io {px.io_timeout_sec ? `${px.io_timeout_sec}s` : "不限"}
@@ -653,7 +675,7 @@ export function SiteDetail() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-danger"
                               aria-label="删除反代"
                               onClick={() => setDeletingProxy(px)}
                             >
@@ -671,7 +693,7 @@ export function SiteDetail() {
         </TabsContent>
 
         {/* ===== Scripts Tab ===== */}
-        <TabsContent value="scripts" className="space-y-3">
+        <TabsContent value="scripts" className="mt-4 space-y-5">
           {templates.length > 0 && (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {templates.map((tpl) => (
@@ -679,7 +701,7 @@ export function SiteDetail() {
                   key={tpl.id}
                   type="button"
                   onClick={() => openCreateScript(tpl.id)}
-                  className="rounded-md border border-border/60 bg-card/40 p-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                  className="rounded-md border border-border1 bg-bg2 p-3 text-left transition hover:border-primary-3 hover:bg-primary-1"
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium">{tpl.name}</span>
@@ -687,7 +709,7 @@ export function SiteDetail() {
                       {CATEGORY_LABEL[tpl.category] || tpl.category}
                     </Badge>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+                  <p className="mt-1 line-clamp-2 text-[11px] text-text3">
                     {tpl.description}
                   </p>
                 </button>
@@ -734,7 +756,7 @@ export function SiteDetail() {
                     <TableRow key={sc.id}>
                       <TableCell>
                         <div className="font-medium">{sc.name}</div>
-                        <div className="font-mono text-[11px] text-muted-foreground">
+                        <div className="font-mono text-[11px] text-text3">
                           {sc.code}
                         </div>
                       </TableCell>
@@ -766,7 +788,7 @@ export function SiteDetail() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-danger"
                               aria-label="删除脚本"
                               onClick={() => setDeletingScript(sc)}
                             >
@@ -1177,6 +1199,6 @@ export function SiteDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </PageTemplate>
+    </PageShell>
   );
 }

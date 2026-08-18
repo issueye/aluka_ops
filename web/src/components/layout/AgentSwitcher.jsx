@@ -48,7 +48,7 @@ export function AgentSwitcher() {
               <span className="flex items-center gap-2">
                 <Server className="h-3.5 w-3.5" />
                 {a.agent_id}
-                <span className="text-muted-foreground">{a.host}</span>
+                <span className="text-text3">{a.host}</span>
               </span>
             </SelectItem>
           ))}

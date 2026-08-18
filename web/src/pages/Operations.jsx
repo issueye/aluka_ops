@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { History } from "lucide-react";
 import { operationApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -72,14 +71,13 @@ export function Operations() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={History}
-      cardTitle="操作记录"
-      cardDescription={`全部服务的 install / start / stop / restart / upgrade / uninstall 历史。共 ${operations.length} 条（最多 100 条）。`}
+      list
+      title="操作记录"
+      description={`全部服务的 install / start / stop / restart / upgrade / uninstall 历史。共 ${operations.length} 条（最多 100 条）。`}
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
       error={isError ? "加载操作记录失败，请确认后端服务已启动。" : null}
-      cardFilters={
+      filters={
         <>
           <Select value={type} onValueChange={setType}>
             <SelectTrigger className="w-[130px]">
@@ -140,7 +138,7 @@ export function Operations() {
           ) : (
             pg.pageItems.map((op) => (
               <TableRow key={op.id}>
-                <TableCell className="text-muted-foreground font-mono">{op.id}</TableCell>
+                <TableCell className="text-text3 font-mono">{op.id}</TableCell>
                 <TableCell className="font-medium uppercase">{op.type}</TableCell>
                 <TableCell>
                   <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
@@ -159,15 +157,15 @@ export function Operations() {
                       {op.service_code && <CodeText>{op.service_code}</CodeText>}
                     </Link>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <span className="text-text3">—</span>
                   )}
                 </TableCell>
                 <TableCell className="max-w-[360px]">
-                  <div className="truncate text-xs text-muted-foreground">
+                  <div className="truncate text-xs text-text3">
                     {op.error_msg || op.output_log || op.detail || "—"}
                   </div>
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-xs text-text3">
                   {formatTime(op.started_at || op.created_at)}
                 </TableCell>
               </TableRow>

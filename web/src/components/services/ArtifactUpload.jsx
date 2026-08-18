@@ -89,15 +89,15 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
                 <>
                   <FileArchive className="mb-2 h-7 w-7 text-primary" />
                   <span className="text-sm font-medium">{file.name}</span>
-                  <span className="mt-1 text-xs text-muted-foreground">
+                  <span className="mt-1 text-xs text-text3">
                     {formatBytes(file.size)}
                   </span>
                 </>
               ) : (
                 <>
-                  <UploadCloud className="mb-2 h-7 w-7 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">点击或拖拽选择文件</p>
-                  <p className="mt-1 text-xs text-muted-foreground/70">jar / exe / zip</p>
+                  <UploadCloud className="mb-2 h-7 w-7 text-text3" />
+                  <p className="text-sm text-text3">点击或拖拽选择文件</p>
+                  <p className="mt-1 text-xs text-text3/70">jar / exe / zip</p>
                 </>
               )}
             </FileDropzone>

@@ -4,7 +4,7 @@ import { ListPageHeader } from "./ListPageHeader";
 import { cn } from "@/lib/utils";
 
 /**
- * 列表页标准壳：Header + flush 内容 + 可选分页
+ * 列表页标准壳（源力设计）：Header + flush 内容 + 可选分页
  */
 export function DataTableCard({
   icon,
@@ -19,7 +19,7 @@ export function DataTableCard({
   children,
 }) {
   return (
-    <Card className={className}>
+    <Card className={cn("overflow-hidden", className)}>
       {(title || actions || filters) && (
         <ListPageHeader
           icon={icon}

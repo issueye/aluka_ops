@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ShieldCheck } from "lucide-react";
 import { auditApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -66,14 +65,13 @@ export function AuditLog() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={ShieldCheck}
-      cardTitle="审计日志"
-      cardDescription={`记录系统写操作（创建/修改/删除/启停/安装升级等）。共 ${logs.length} 条记录（最多 100 条）。`}
+      list
+      title="审计日志"
+      description={`记录系统写操作（创建/修改/删除/启停/安装升级等）。共 ${logs.length} 条记录（最多 100 条）。`}
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
       error={isError ? "加载审计日志失败，请确认后端服务已启动。" : null}
-      cardFilters={
+      filters={
         <>
           <Select value={action} onValueChange={setAction}>
             <SelectTrigger className="w-[150px]">
@@ -137,23 +135,23 @@ export function AuditLog() {
           ) : (
             pg.pageItems.map((log) => (
               <TableRow key={log.id}>
-                <TableCell className="text-muted-foreground font-mono">{log.id}</TableCell>
+                <TableCell className="text-text3 font-mono">{log.id}</TableCell>
                 <TableCell>
                   <Badge variant="secondary" className="font-mono text-xs">
                     {log.action}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-sm">{log.target_type || "—"}</TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
+                <TableCell className="font-mono text-xs text-text3">
                   {log.target_id || "—"}
                 </TableCell>
                 <TableCell className="text-sm">{log.operator || "system"}</TableCell>
                 <TableCell className="max-w-[360px]">
-                  <div className="truncate font-mono text-xs text-muted-foreground">
+                  <div className="truncate font-mono text-xs text-text3">
                     {log.detail || "—"}
                   </div>
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-xs text-text3">
                   {formatTime(log.created_at)}
                 </TableCell>
               </TableRow>

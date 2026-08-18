@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Star, Cpu, Search, CheckCircle2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, CheckCircle2 } from "lucide-react";
 import { runtimeApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -29,12 +30,14 @@ import {
   ConfirmDialog,
   TypeChip,
   RowActions,
-  IconTooltip,
+  SegmentedPicker,
+  TextActionButton,
   PathText,
 } from "@/components/ued";
 
-const TYPE_TONE = { jdk: "jdk", node: "node", python: "python", go: "go" };
+const TYPES = ["jdk", "node", "python", "go"];
 const TYPE_LABEL = { jdk: "JDK", node: "Node", python: "Python", go: "Go" };
+const PAGE_SIZE = 10;
 
 export function Runtimes() {
   const queryClient = useQueryClient();
@@ -43,13 +46,40 @@ export function Runtimes() {
   const [deleting, setDeleting] = useState(null);
   const [detectOpen, setDetectOpen] = useState(false);
   const [detected, setDetected] = useState([]);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [keyword, setKeyword] = useState("");
 
   const { data: runtimes = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ["runtimes"],
     queryFn: runtimeApi.list,
   });
 
-  const pg = usePagination(runtimes, 10);
+  const typeCount = useMemo(() => {
+    const count = { all: runtimes.length };
+    for (const rt of runtimes) {
+      if (count[rt.type] === undefined) count[rt.type] = 0;
+      count[rt.type]++;
+    }
+    return count;
+  }, [runtimes]);
+
+  const filtered = useMemo(() => {
+    let list = runtimes;
+    if (typeFilter !== "all") {
+      list = list.filter((rt) => rt.type === typeFilter);
+    }
+    if (keyword.trim()) {
+      const kw = keyword.trim().toLowerCase();
+      list = list.filter(
+        (rt) =>
+          rt.name?.toLowerCase().includes(kw) ||
+          rt.description?.toLowerCase().includes(kw)
+      );
+    }
+    return list;
+  }, [runtimes, typeFilter, keyword]);
+
+  const pg = usePagination(filtered, PAGE_SIZE);
 
   const deleteMutation = useMutation({
     mutationFn: (id) => runtimeApi.remove(id),
@@ -104,14 +134,13 @@ export function Runtimes() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={Cpu}
-      cardTitle="运行环境列表"
-      cardDescription="管理服务可绑定的运行环境（如 JDK）。每个类型仅可设置一个默认环境。"
+      list
+      title="环境管理"
+      description={`管理服务可绑定的运行环境（如 JDK），每个类型仅可设置一个默认环境。共 ${runtimes.length} 个环境。`}
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
       error={isError ? "加载运行环境失败，请确认后端服务已启动。" : null}
-      cardActions={
+      actions={
         <>
           <Button
             variant="outline"
@@ -119,15 +148,40 @@ export function Runtimes() {
             onClick={() => detectMutation.mutate()}
             disabled={detectMutation.isPending}
           >
-            <Search className={detectMutation.isPending ? "animate-pulse mr-1" : "mr-1"} /> 探测本机 JDK
+            <Search className="h-3.5 w-3.5 mr-1" /> 探测本机 JDK
           </Button>
           <Button size="sm" onClick={openCreate}>
-            <Plus className="mr-1" /> 新增环境
+            <Plus className="h-3.5 w-3.5 mr-1" /> 新建环境
           </Button>
         </>
       }
+      filters={
+        <>
+          <SegmentedPicker
+            options={[
+              { value: "all", label: `全部(${typeCount.all})` },
+              ...TYPES.filter((t) => (typeCount[t] ?? 0) > 0).map((t) => ({
+                value: t,
+                label: `${TYPE_LABEL[t]}(${typeCount[t]})`,
+              })),
+            ]}
+            value={typeFilter}
+            onChange={setTypeFilter}
+            size="sm"
+          />
+          <div className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-bg1 px-3 shadow-[0_0_0_1px_var(--border-2)]">
+            <Search className="h-4 w-4 shrink-0 text-text3" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索环境名称"
+              className="h-8 w-44 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent"
+            />
+          </div>
+        </>
+      }
       pagination={
-        !isLoading && runtimes.length > 0
+        !isLoading && filtered.length > 0
           ? {
               page: pg.page,
               totalPages: pg.totalPages,
@@ -147,7 +201,7 @@ export function Runtimes() {
             <TableHead className="w-[80px]">类型</TableHead>
             <TableHead className="w-[100px]">版本</TableHead>
             <TableHead>安装路径</TableHead>
-            <TableHead className="w-[80px] text-center">默认</TableHead>
+            <TableHead className="w-[70px] text-center">默认</TableHead>
             <TableHead className="w-[150px]">更新时间</TableHead>
             <TableHead className="text-right">操作</TableHead>
           </TableRow>
@@ -155,9 +209,9 @@ export function Runtimes() {
         <TableBody>
           {isLoading ? (
             <TableStateRow colSpan={7}>加载中...</TableStateRow>
-          ) : runtimes.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <TableStateRow colSpan={7}>
-              暂无运行环境，点击右上角「新增环境」或「探测本机 JDK」快速登记。
+              暂无运行环境，点击右上角「新建环境」或「探测本机 JDK」快速登记。
             </TableStateRow>
           ) : (
             pg.pageItems.map((rt) => (
@@ -165,11 +219,11 @@ export function Runtimes() {
                 <TableCell className="font-medium">
                   <div>{rt.name}</div>
                   {rt.description && (
-                    <div className="text-xs text-muted-foreground">{rt.description}</div>
+                    <div className="text-xs text-text3">{rt.description}</div>
                   )}
                 </TableCell>
                 <TableCell>
-                  <TypeChip tone={TYPE_TONE[rt.type]}>{TYPE_LABEL[rt.type] || rt.type}</TypeChip>
+                  <TypeChip tone={rt.type}>{TYPE_LABEL[rt.type] || rt.type}</TypeChip>
                 </TableCell>
                 <TableCell className="text-xs">{rt.version || "—"}</TableCell>
                 <TableCell>
@@ -177,39 +231,22 @@ export function Runtimes() {
                 </TableCell>
                 <TableCell className="text-center">
                   {rt.is_default ? (
-                    <IconTooltip label="默认环境">
-                      <Star className="inline-block h-4 w-4 fill-amber-400 text-amber-400" />
-                    </IconTooltip>
+                    <TypeChip tone="primary">默认</TypeChip>
                   ) : (
-                    <span className="text-muted-foreground/30">—</span>
+                    <span className="text-text4">—</span>
                   )}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
+                <TableCell className="text-xs text-text3">
                   {formatTime(rt.updated_at || rt.created_at)}
                 </TableCell>
                 <TableCell>
-                  <RowActions>
-                    <IconTooltip label="编辑">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(rt)}
-                        aria-label="编辑"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </IconTooltip>
-                    <IconTooltip label="删除">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={() => setDeleting(rt)}
-                        aria-label="删除"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </IconTooltip>
+                  <RowActions className="justify-end">
+                    <TextActionButton onClick={() => openEdit(rt)}>
+                      <Pencil className="h-3 w-3" /> 编辑
+                    </TextActionButton>
+                    <TextActionButton tone="danger" onClick={() => setDeleting(rt)}>
+                      <Trash2 className="h-3 w-3" /> 删除
+                    </TextActionButton>
                   </RowActions>
                 </TableCell>
               </TableRow>
@@ -228,15 +265,13 @@ export function Runtimes() {
         open={!!deleting}
         onOpenChange={(o) => !o && setDeleting(null)}
         title="确认删除运行环境?"
-        description={
-          deleting ? (
+        description={deleting ? (
             <>
               将删除「
-              <span className="font-medium text-foreground">{deleting.name}</span>
+              <span className="font-medium text-text1">{deleting.name}</span>
               」(版本 {deleting.version || "—"})。若该环境正被服务引用，可能影响启动，请谨慎操作。
             </>
-          ) : null
-        }
+          ) : null}
         confirmText="删除"
         loading={deleteMutation.isPending}
         onConfirm={() => deleteMutation.mutate(deleting.id)}
@@ -252,13 +287,13 @@ export function Runtimes() {
             </DialogDescription>
           </DialogHeader>
           {detected.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">未发现可用 JDK</p>
+            <p className="py-6 text-center text-sm text-text3">未发现可用 JDK</p>
           ) : (
             <div className="max-h-[400px] space-y-2 overflow-y-auto">
               {detected.map((item, idx) => (
                 <div
                   key={`${item.install_path}-${idx}`}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border/60 p-3"
+                  className="flex items-center justify-between gap-3 rounded-sm border border-border1 p-3"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">

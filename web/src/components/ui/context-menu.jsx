@@ -126,10 +126,10 @@ export function ContextMenuItem({
       disabled={disabled}
       className={cn(
         "flex w-full select-none items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors",
-        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+        "hover:bg-bg5 hover:text-text1 focus:bg-bg5 focus:text-text1",
         "disabled:pointer-events-none disabled:opacity-50",
         destructive &&
-          "text-destructive hover:text-destructive focus:text-destructive",
+          "text-danger hover:text-danger focus:text-danger",
         className
       )}
       onClick={run}
@@ -145,7 +145,7 @@ export function ContextMenuItem({
 
 export function ContextMenuSeparator({ className }) {
   return (
-    <div role="separator" className={cn("-mx-1 my-1 h-px bg-muted", className)} />
+    <div role="separator" className={cn("-mx-1 my-1 h-px bg-bg5", className)} />
   );
 }
 
@@ -153,7 +153,7 @@ export function ContextMenuLabel({ children, className }) {
   return (
     <div
       className={cn(
-        "px-2 py-1.5 text-[11px] font-medium text-muted-foreground",
+        "px-2 py-1.5 text-[11px] font-medium text-text3",
         className
       )}
     >

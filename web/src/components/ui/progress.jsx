@@ -12,7 +12,7 @@ function Progress({ value = 0, className, indicatorClassName, ...props }) {
       aria-valuenow={pct}
       aria-valuemin={0}
       aria-valuemax={100}
-      className={cn("relative h-1.5 w-full overflow-hidden rounded-full bg-muted", className)}
+      className={cn("relative h-1.5 w-full overflow-hidden rounded-full bg-bg5", className)}
       {...props}
     >
       <div

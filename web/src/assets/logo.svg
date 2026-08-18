@@ -1,12 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <!-- Aluka Ops mark · 源力蓝 + 状态青 -->
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="32" viewBox="0 0 140 32" fill="none">
+  <!-- Mark -->
   <rect width="32" height="32" rx="8" fill="#1664FF"/>
-  <!-- A：左斜 -->
   <path d="M8.5 23.5 L15.2 8.2" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
-  <!-- A：右斜 -->
   <path d="M23.5 23.5 L16.8 8.2" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"/>
-  <!-- A：横杠 -->
   <path d="M11.2 17.2 H20.8" stroke="#37E2E2" stroke-width="2.2" stroke-linecap="round"/>
-  <!-- 顶点状态节点 -->
   <circle cx="16" cy="7.2" r="2.35" fill="#37E2E2"/>
+  <!-- Wordmark -->
+  <text x="42" y="21.5" fill="currentColor" font-family="PingFang SC, Microsoft YaHei, Helvetica Neue, Arial, sans-serif" font-size="15" font-weight="600" letter-spacing="0.02em">Aluka Ops</text>
 </svg>

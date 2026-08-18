@@ -253,9 +253,9 @@ export function ServiceConsole({ serviceId, active, running }) {
   const StatusIcon = statusMeta.icon;
 
   return (
-    <div className="flex h-[min(70vh,640px)] flex-col overflow-hidden rounded-lg border border-border bg-log">
+    <div className="flex h-[min(70vh,640px)] flex-col overflow-hidden rounded-lg border border-border1 bg-log">
       {/* 工具栏 */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-border1 px-3 py-2">
         <div className="flex items-center gap-2">
           <TerminalSquare className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium">控制台</span>

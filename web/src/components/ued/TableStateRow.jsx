@@ -6,7 +6,7 @@ export function TableStateRow({ colSpan = 6, children }) {
     <TableRow>
       <TableCell
         colSpan={colSpan}
-        className="h-24 text-center text-muted-foreground"
+        className="h-24 text-center text-text3"
       >
         {children}
       </TableCell>

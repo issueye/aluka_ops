@@ -51,7 +51,6 @@ import {
   ConfirmDialog,
   FormField,
   IconTooltip,
-  InlineAlert,
   PageTemplate,
   RowActions,
   TableStateRow,
@@ -281,98 +280,92 @@ export function Files() {
 
   return (
     <PageTemplate
-      card
-      cardIcon={Folder}
-      cardTitle="文件管理"
-      cardDescription={
-        <>
-          仅可管理数据目录内文件
-          {data?.root ? (
-            <span className="ml-1 font-mono text-[11px] text-muted-foreground">
-              ({data.root})
-            </span>
-          ) : null}
-        </>
+      list
+      title="文件管理"
+      description={
+        data?.root
+          ? `仅可管理数据目录内文件（${data.root}）`
+          : "仅可管理数据目录内文件"
       }
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
-      cardActions={
+      error={isError ? error?.message || "加载文件列表失败" : null}
+      actions={
         <>
           <Button
             variant="outline"
             size="sm"
             onClick={() => {
-                setMkdirName("");
-                setMkdirOpen(true);
-              }}
-            >
-              <FolderPlus /> 新建目录
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setNewFileName("");
-                setNewFileOpen(true);
-              }}
-            >
-              <FilePlus /> 新建文件
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-            >
-              <Upload /> 上传文件
-            </Button>
-            <Button size="sm" onClick={() => folderInputRef.current?.click()} disabled={uploading}>
-              <FolderPlus /> 上传文件夹
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="hidden"
-              multiple
-              onChange={onPickUpload}
-            />
-            <input
-              ref={folderInputRef}
-              type="file"
-              className="hidden"
-              // 浏览器文件夹选择(Chrome/Edge/Safari)
-              webkitdirectory=""
-              directory=""
-              multiple
-              onChange={onPickUpload}
-            />
-          </>
-        }
-        footer={
-          <p className="border-t px-6 py-3 text-[11px] text-muted-foreground">
-            双击目录进入；双击文件打开文本编辑。右键打开菜单。删除非空目录会递归删除。
-          </p>
-        }
-        pagination={
-          !isLoading && entries.length > 0
-            ? {
-                page: pg.page,
-                totalPages: pg.totalPages,
-                total: pg.total,
-                from: pg.from,
-                to: pg.to,
-                pageSize: pg.pageSize,
-                setPage: pg.setPage,
-              }
-            : null
-        }
-      >
+              setMkdirName("");
+              setMkdirOpen(true);
+            }}
+          >
+            <FolderPlus /> 新建目录
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setNewFileName("");
+              setNewFileOpen(true);
+            }}
+          >
+            <FilePlus /> 新建文件
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            <Upload /> 上传文件
+          </Button>
+          <Button size="sm" onClick={() => folderInputRef.current?.click()} disabled={uploading}>
+            <FolderPlus /> 上传文件夹
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            multiple
+            onChange={onPickUpload}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            className="hidden"
+            webkitdirectory=""
+            directory=""
+            multiple
+            onChange={onPickUpload}
+          />
+        </>
+      }
+      footer={
+        <p className="border-t border-border1 px-5 py-3 text-xs text-text3">
+          双击目录进入；双击文件打开文本编辑。右键打开菜单。删除非空目录会递归删除。
+        </p>
+      }
+      pagination={
+        !isLoading && entries.length > 0
+          ? {
+              page: pg.page,
+              totalPages: pg.totalPages,
+              total: pg.total,
+              from: pg.from,
+              to: pg.to,
+              pageSize: pg.pageSize,
+              setPage: pg.setPage,
+            }
+          : null
+      }
+    >
         {/* 工具条：面包屑 + 上级目录 + 上传进度 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-6 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border1 px-5 py-3">
           <div className="flex flex-wrap items-center gap-1 text-sm">
             <button
               type="button"
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-text3 hover:bg-bg5 hover:text-text1"
               onClick={() => go("")}
             >
               <Home className="h-3.5 w-3.5" />
@@ -380,10 +373,10 @@ export function Files() {
             </button>
             {crumbs.map((c) => (
               <span key={c.path} className="inline-flex items-center gap-1">
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronRight className="h-3.5 w-3.5 text-text3" />
                 <button
                   type="button"
-                  className="rounded px-1.5 py-0.5 font-mono text-xs hover:bg-accent"
+                  className="rounded px-1.5 py-0.5 font-mono text-xs hover:bg-bg5"
                   onClick={() => go(c.path)}
                 >
                   {c.name}
@@ -397,14 +390,14 @@ export function Files() {
             </Button>
           )}
           {uploadProgress && (
-            <div className="ml-auto min-w-[200px] max-w-xs flex-1 rounded-md border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs">
+            <div className="ml-auto min-w-[200px] max-w-xs flex-1 rounded-md border border-primary/30 bg-primary-1 px-3 py-1.5 text-xs">
               上传中 {uploadProgress.done}/{uploadProgress.total}
               {uploadProgress.current ? (
-                <span className="ml-2 truncate font-mono text-muted-foreground">
+                <span className="ml-2 truncate font-mono text-text3">
                   {uploadProgress.current}
                 </span>
               ) : null}
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg4">
                 <div
                   className="h-full rounded-full bg-primary transition-all"
                   style={{
@@ -420,14 +413,7 @@ export function Files() {
           )}
         </div>
 
-        {isError && (
-          <div className="m-6">
-            <InlineAlert variant="error">{error?.message || "加载失败"}</InlineAlert>
-          </div>
-        )}
-
-        {!isError && (
-          <div
+        <div
             onContextMenu={(e) => {
               // 空白区域右键：新建/上传/刷新
               if (e.target.closest("tr[data-file-row]")) return;
@@ -455,7 +441,7 @@ export function Files() {
                       data-file-row
                       className={
                         selected?.path === ent.path || ctxMenu?.entry?.path === ent.path
-                          ? "cursor-pointer select-none bg-primary/5"
+                          ? "cursor-pointer select-none bg-primary-1"
                           : "cursor-pointer select-none"
                       }
                       onClick={() => setSelected(ent)}
@@ -474,15 +460,15 @@ export function Files() {
                           {ent.is_dir ? (
                             <Folder className="h-4 w-4 shrink-0 text-warning" />
                           ) : (
-                            <File className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <File className="h-4 w-4 shrink-0 text-text3" />
                           )}
                           <span className="select-none font-mono text-sm">{ent.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
+                      <TableCell className="font-mono text-xs text-text3">
                         {ent.is_dir ? "—" : formatBytes(ent.size)}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="text-xs text-text3">
                         {formatTime(ent.mod_time)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -537,7 +523,7 @@ export function Files() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              className="h-8 w-8 text-danger hover:text-danger"
                               aria-label="删除"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -555,7 +541,6 @@ export function Files() {
               </TableBody>
             </Table>
           </div>
-        )}
 
       {/* 右键菜单 */}
       <ContextMenu
@@ -818,7 +803,7 @@ export function Files() {
         title="确认删除？"
         description={
           <>
-            将删除 <span className="font-mono text-foreground">{selected?.path}</span>
+            将删除 <span className="font-mono text-text1">{selected?.path}</span>
             {selected?.is_dir ? "（目录将递归删除）" : ""}。此操作不可恢复。
           </>
         }
@@ -841,7 +826,7 @@ export function Files() {
             </DialogTitle>
           </DialogHeader>
           {editorLoading ? (
-            <p className="text-sm text-muted-foreground">加载中…</p>
+            <p className="text-sm text-text3">加载中…</p>
           ) : (
             <Textarea
               value={editorContent}

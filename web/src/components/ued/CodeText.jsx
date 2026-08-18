@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
-/** 等宽内联文本 */
+/** 等宽内联文本（源力设计） */
 export function CodeText({ className, children, ...props }) {
   return (
     <span
-      className={cn("font-mono text-xs text-muted-foreground", className)}
+      className={cn("font-mono text-xs text-text3", className)}
       {...props}
     >
       {children}
@@ -12,12 +12,12 @@ export function CodeText({ className, children, ...props }) {
   );
 }
 
-/** 路径文本 */
+/** 路径文本（源力设计） */
 export function PathText({ className, children, ...props }) {
   return (
     <span
       className={cn(
-        "break-all font-mono text-xs text-muted-foreground",
+        "break-all font-mono text-xs text-text3",
         className
       )}
       {...props}

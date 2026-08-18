@@ -117,7 +117,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="如:JDK 17"
               />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
+              {errors.name && <p className="text-xs text-danger">{errors.name}</p>}
             </div>
 
             <div className="space-y-1.5">
@@ -155,7 +155,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
                 placeholder="如:C:/Program Files/Java/jdk-17"
               />
               {errors.install_path && (
-                <p className="text-xs text-destructive">{errors.install_path}</p>
+                <p className="text-xs text-danger">{errors.install_path}</p>
               )}
             </div>
           </div>
@@ -169,7 +169,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
               onChange={(e) => set("env_template", e.target.value)}
               placeholder='{"JAVA_HOME":"{{install_path}}", ...}'
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-text3">
               支持 <code>{"{{install_path}}"}</code>、<code>{"{{PATH}}"}</code> 占位符。
             </p>
           </div>
@@ -187,7 +187,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
               <Label htmlFor="rt-default" className="cursor-pointer">设为默认环境</Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-text3">
                 同类型仅一个默认;未显式绑定环境的服务将使用默认值。
               </p>
             </div>

@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-/** 表单字段：Label + 控件 + hint/error */
+/** 表单字段（源力设计）：Label + 控件 + hint/error */
 export function FormField({
   label,
   htmlFor,
@@ -16,14 +16,14 @@ export function FormField({
       {label ? (
         <Label htmlFor={htmlFor}>
           {label}
-          {required ? <span className="ml-0.5 text-destructive">*</span> : null}
+          {required ? <span className="ml-0.5 text-danger">*</span> : null}
         </Label>
       ) : null}
       {children}
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p className="text-xs text-danger">{error}</p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="text-xs text-text3">{hint}</p>
       ) : null}
     </div>
   );

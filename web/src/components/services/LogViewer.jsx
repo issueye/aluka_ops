@@ -158,17 +158,17 @@ export function LogViewer({ serviceId, active }) {
   const StatusIcon = statusMeta.icon;
 
   return (
-    <div className="flex h-[520px] flex-col rounded-lg border border-border bg-log">
+    <div className="flex h-[520px] flex-col rounded-lg border border-border1 bg-log">
       {/* 工具栏 */}
-      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-border1 px-3 py-2">
         <div className="flex items-center gap-2">
           <Badge variant={statusMeta.variant} className="gap-1.5">
             <StatusIcon className="h-3 w-3" />
             {statusMeta.text}
           </Badge>
-          <span className="text-xs text-muted-foreground">{lines.length} 行</span>
+          <span className="text-xs text-text3">{lines.length} 行</span>
           {meta?.file && (
-            <span className="max-w-[300px] truncate font-mono text-xs text-muted-foreground" >
+            <span className="max-w-[300px] truncate font-mono text-xs text-text3" >
               {meta.file}
             </span>
           )}
@@ -204,7 +204,7 @@ export function LogViewer({ serviceId, active }) {
         className="flex-1 overflow-auto p-3 font-mono text-[12.5px] leading-relaxed"
       >
         {lines.length === 0 ? (
-          <div className="flex h-full items-center justify-center text-muted-foreground/60">
+          <div className="flex h-full items-center justify-center text-text3/60">
             {status === "closed"
               ? "日志流已结束"
               : meta?.note
@@ -224,7 +224,7 @@ export function LogViewer({ serviceId, active }) {
 
       {/* 自动滚动指示 */}
       {!autoScrollRef.current && (
-        <div className="shrink-0 border-t border-border/60 px-3 py-1 text-center text-xs text-muted-foreground">
+        <div className="shrink-0 border-t border-border1 px-3 py-1 text-center text-xs text-text3">
           自动滚动已暂停(滚动到底部恢复)
         </div>
       )}
