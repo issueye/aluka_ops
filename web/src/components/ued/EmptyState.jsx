@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
+import { Icon } from "./Icon";
 
 /**
  * 空状态（源力设计）：图标 + 标题 + 描述 + 可选操作
  */
 export function EmptyState({
-  icon: Icon,
+  icon,
   title,
   description,
   action,
@@ -19,9 +20,9 @@ export function EmptyState({
         className
       )}
     >
-      {Icon ? (
+      {icon ? (
         <div className="mb-3.5 flex h-12 w-12 items-center justify-center rounded-full bg-bg4 text-text3">
-          <Icon className="h-6 w-6 stroke-[1.5]" />
+          <Icon icon={icon} size="xl" strokeWidth={1.5} />
         </div>
       ) : null}
       {title ? (

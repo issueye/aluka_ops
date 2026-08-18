@@ -10,23 +10,16 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   PageTemplate,
   EmptyState,
-  IconTooltip,
   RowActions,
+  DataTable,
+  IconButton,
+  Icon,
 } from "@/components/ued";
 
 const agentsApi = {
@@ -119,11 +112,11 @@ export function Agents() {
                 onClick={() => toggle(a.agent_id)}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  {expanded[a.agent_id] ? (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-text3" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 shrink-0 text-text3" />
-                  )}
+                  <Icon
+                    icon={expanded[a.agent_id] ? ChevronDown : ChevronRight}
+                    size="md"
+                    className="text-text3"
+                  />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-sm">{a.agent_id}</span>
@@ -152,101 +145,99 @@ export function Agents() {
                       心跳未携带服务明细，可点刷新从 Agent 实时拉取。
                     </p>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>服务</TableHead>
-                          <TableHead className="w-[80px]">类型</TableHead>
-                          <TableHead className="w-[100px]">状态</TableHead>
-                          <TableHead className="w-[80px]">PID</TableHead>
-                          <TableHead className="w-[140px] text-right">远程操作</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {a.services.map((s) => (
-                          <TableRow key={`${a.agent_id}-${s.id}`}>
-                            <TableCell>
+                    <DataTable
+                      data={a.services}
+                      rowKey={(s) => `${a.agent_id}-${s.id}`}
+                      columns={[
+                        {
+                          key: "name",
+                          title: "服务",
+                          render: (s) => (
+                            <>
                               <div className="text-sm font-medium">{s.name}</div>
-                              <div className="font-mono text-xs text-text3">
-                                {s.code}
-                              </div>
-                            </TableCell>
-                            <TableCell className="uppercase text-xs">{s.type}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  s.status === "running"
-                                    ? "success"
-                                    : s.status === "crashed"
-                                    ? "danger"
-                                    : "secondary"
+                              <div className="font-mono text-xs text-text3">{s.code}</div>
+                            </>
+                          ),
+                        },
+                        {
+                          key: "type",
+                          title: "类型",
+                          width: "w-[80px]",
+                          className: "uppercase text-xs",
+                        },
+                        {
+                          key: "status",
+                          title: "状态",
+                          width: "w-[100px]",
+                          render: (s) => (
+                            <Badge
+                              variant={
+                                s.status === "running"
+                                  ? "success"
+                                  : s.status === "crashed"
+                                  ? "danger"
+                                  : "secondary"
+                              }
+                            >
+                              {s.status}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          key: "pid",
+                          title: "PID",
+                          width: "w-[80px]",
+                          className: "font-mono text-xs",
+                          render: (s) => s.pid || "—",
+                        },
+                        {
+                          key: "actions",
+                          title: "远程操作",
+                          width: "w-[140px]",
+                          align: "right",
+                          render: (s) => (
+                            <RowActions>
+                              <IconButton
+                                icon={Play}
+                                label="启动"
+                                disabled={!a.online || actionMut.isPending}
+                                onClick={() =>
+                                  actionMut.mutate({
+                                    agentId: a.agent_id,
+                                    sid: s.id,
+                                    action: "start",
+                                  })
                                 }
-                              >
-                                {s.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">
-                              {s.pid || "—"}
-                            </TableCell>
-                            <TableCell>
-                              <RowActions>
-                                <IconTooltip label="启动">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label="启动"
-                                    disabled={!a.online || actionMut.isPending}
-                                    onClick={() =>
-                                      actionMut.mutate({
-                                        agentId: a.agent_id,
-                                        sid: s.id,
-                                        action: "start",
-                                      })
-                                    }
-                                  >
-                                    <Play className="h-3.5 w-3.5" />
-                                  </Button>
-                                </IconTooltip>
-                                <IconTooltip label="停止">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label="停止"
-                                    disabled={!a.online || actionMut.isPending}
-                                    onClick={() =>
-                                      actionMut.mutate({
-                                        agentId: a.agent_id,
-                                        sid: s.id,
-                                        action: "stop",
-                                      })
-                                    }
-                                  >
-                                    <Square className="h-3.5 w-3.5" />
-                                  </Button>
-                                </IconTooltip>
-                                <IconTooltip label="重启">
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label="重启"
-                                    disabled={!a.online || actionMut.isPending}
-                                    onClick={() =>
-                                      actionMut.mutate({
-                                        agentId: a.agent_id,
-                                        sid: s.id,
-                                        action: "restart",
-                                      })
-                                    }
-                                  >
-                                    <RotateCw className="h-3.5 w-3.5" />
-                                  </Button>
-                                </IconTooltip>
-                              </RowActions>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                              />
+                              <IconButton
+                                icon={Square}
+                                label="停止"
+                                disabled={!a.online || actionMut.isPending}
+                                onClick={() =>
+                                  actionMut.mutate({
+                                    agentId: a.agent_id,
+                                    sid: s.id,
+                                    action: "stop",
+                                  })
+                                }
+                              />
+                              <IconButton
+                                icon={RotateCw}
+                                label="重启"
+                                disabled={!a.online || actionMut.isPending}
+                                onClick={() =>
+                                  actionMut.mutate({
+                                    agentId: a.agent_id,
+                                    sid: s.id,
+                                    action: "restart",
+                                  })
+                                }
+                              />
+                            </RowActions>
+                          ),
+                        },
+                      ]}
+                    />
                   )}
                 </div>
               )}

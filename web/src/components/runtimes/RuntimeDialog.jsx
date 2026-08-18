@@ -6,14 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SelectField, LabeledSwitch } from "@/components/ued";
 
 const DEFAULT_ENV_TEMPLATE =
   '{"JAVA_HOME":"{{install_path}}","PATH":"{{install_path}}\\\\bin;{{PATH}}"}';
@@ -122,17 +115,16 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
 
             <div className="space-y-1.5">
               <Label>类型</Label>
-              <Select value={form.type} onValueChange={(v) => set("type", v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="jdk">JDK</SelectItem>
-                  <SelectItem value="node">Node.js</SelectItem>
-                  <SelectItem value="python">Python</SelectItem>
-                  <SelectItem value="go">Go</SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectField
+                value={form.type}
+                onChange={(v) => set("type", v)}
+                options={[
+                  { value: "jdk", label: "JDK" },
+                  { value: "node", label: "Node.js" },
+                  { value: "python", label: "Python" },
+                  { value: "go", label: "Go" },
+                ]}
+              />
             </div>
           </div>
 
@@ -184,19 +176,15 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-md border p-3">
-            <div>
-              <Label htmlFor="rt-default" className="cursor-pointer">设为默认环境</Label>
-              <p className="text-xs text-text3">
-                同类型仅一个默认;未显式绑定环境的服务将使用默认值。
-              </p>
-            </div>
-            <Switch
-              id="rt-default"
-              checked={form.is_default}
-              onCheckedChange={(v) => set("is_default", v)}
-            />
-          </div>
+          <LabeledSwitch
+            boxed
+            className="p-3"
+            id="rt-default"
+            label="设为默认环境"
+            description="同类型仅一个默认;未显式绑定环境的服务将使用默认值。"
+            checked={form.is_default}
+            onCheckedChange={(v) => set("is_default", v)}
+          />
 
           <DialogFooter>
             <Button

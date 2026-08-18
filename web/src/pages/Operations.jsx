@@ -3,27 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { operationApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   PageTemplate,
-  TableStateRow,
   CodeText,
+  SelectField,
+  DataTable,
 } from "@/components/ued";
 
 const OP_STATUS_VARIANT = {
@@ -79,30 +65,20 @@ export function Operations() {
       error={isError ? "加载操作记录失败，请确认后端服务已启动。" : null}
       filters={
         <>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="类型" />
-            </SelectTrigger>
-            <SelectContent>
-              {OP_TYPES.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="状态" />
-            </SelectTrigger>
-            <SelectContent>
-              {OP_STATUSES.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SelectField
+            className="w-[130px]"
+            value={type}
+            onChange={setType}
+            options={OP_TYPES}
+            placeholder="类型"
+          />
+          <SelectField
+            className="w-[130px]"
+            value={status}
+            onChange={setStatus}
+            options={OP_STATUSES}
+            placeholder="状态"
+          />
         </>
       }
       pagination={
@@ -119,60 +95,70 @@ export function Operations() {
           : null
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60px]">#</TableHead>
-            <TableHead className="w-[100px]">类型</TableHead>
-            <TableHead className="w-[90px]">状态</TableHead>
-            <TableHead>服务</TableHead>
-            <TableHead>详情</TableHead>
-            <TableHead className="w-[160px]">时间</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableStateRow colSpan={6}>加载中...</TableStateRow>
-          ) : operations.length === 0 ? (
-            <TableStateRow colSpan={6}>暂无操作记录。</TableStateRow>
-          ) : (
-            pg.pageItems.map((op) => (
-              <TableRow key={op.id}>
-                <TableCell className="text-text3 font-mono">{op.id}</TableCell>
-                <TableCell className="font-medium uppercase">{op.type}</TableCell>
-                <TableCell>
-                  <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
-                    {op.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {op.service_id ? (
-                    <Link
-                      to={`/services/${op.service_id}`}
-                      className="hover:text-primary hover:underline"
-                    >
-                      <div className="text-sm font-medium">
-                        {op.service_name || `服务 #${op.service_id}`}
-                      </div>
-                      {op.service_code && <CodeText>{op.service_code}</CodeText>}
-                    </Link>
-                  ) : (
-                    <span className="text-text3">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="max-w-[360px]">
-                  <div className="truncate text-xs text-text3">
-                    {op.error_msg || op.output_log || op.detail || "—"}
+      <DataTable
+        loading={isLoading}
+        data={pg.pageItems}
+        empty="暂无操作记录。"
+        columns={[
+          {
+            key: "id",
+            title: "#",
+            width: "w-[60px]",
+            className: "text-text3 font-mono",
+          },
+          {
+            key: "type",
+            title: "类型",
+            width: "w-[100px]",
+            className: "font-medium uppercase",
+          },
+          {
+            key: "status",
+            title: "状态",
+            width: "w-[90px]",
+            render: (op) => (
+              <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
+                {op.status}
+              </Badge>
+            ),
+          },
+          {
+            key: "service",
+            title: "服务",
+            render: (op) =>
+              op.service_id ? (
+                <Link
+                  to={`/services/${op.service_id}`}
+                  className="hover:text-primary hover:underline"
+                >
+                  <div className="text-sm font-medium">
+                    {op.service_name || `服务 #${op.service_id}`}
                   </div>
-                </TableCell>
-                <TableCell className="text-xs text-text3">
-                  {formatTime(op.started_at || op.created_at)}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+                  {op.service_code && <CodeText>{op.service_code}</CodeText>}
+                </Link>
+              ) : (
+                <span className="text-text3">—</span>
+              ),
+          },
+          {
+            key: "detail",
+            title: "详情",
+            className: "max-w-[360px]",
+            render: (op) => (
+              <div className="truncate text-xs text-text3">
+                {op.error_msg || op.output_log || op.detail || "—"}
+              </div>
+            ),
+          },
+          {
+            key: "time",
+            title: "时间",
+            width: "w-[160px]",
+            className: "text-xs text-text3",
+            render: (op) => formatTime(op.started_at || op.created_at),
+          },
+        ]}
+      />
     </PageTemplate>
   );
 }

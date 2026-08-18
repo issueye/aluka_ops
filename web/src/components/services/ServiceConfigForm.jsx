@@ -7,21 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { InfoHint } from "@/components/ued";
+import { InfoHint, SelectField, LabeledSwitch } from "@/components/ued";
 
 // ServiceConfigForm 服务运行配置编辑。
 // 运行中仅允许改 auto_restart / max_restarts / shutdown_timeout;
@@ -283,22 +275,16 @@ export function ServiceConfigForm({ service, config }) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-md border p-3">
-            <div className="space-y-1">
-              <Label htmlFor="cfg-auto" className="cursor-pointer">
-                崩溃自动拉起
-              </Label>
-              <p className="text-xs text-text3">
-                进程意外退出后,按退避策略自动重启(最多 max_restarts 次)。
-              </p>
-            </div>
-            <Switch
-              id="cfg-auto"
-              checked={form.auto_restart}
-              onCheckedChange={(v) => set("auto_restart", v)}
-              disabled={mut.isPending}
-            />
-          </div>
+          <LabeledSwitch
+            boxed
+            className="p-3"
+            id="cfg-auto"
+            label="崩溃自动拉起"
+            description="进程意外退出后,按退避策略自动重启(最多 max_restarts 次)。"
+            checked={form.auto_restart}
+            onCheckedChange={(v) => set("auto_restart", v)}
+            disabled={mut.isPending}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -325,20 +311,16 @@ export function ServiceConfigForm({ service, config }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>探针类型</Label>
-                <Select
+                <SelectField
                   value={form.hc_type}
-                  onValueChange={(v) => set("hc_type", v)}
+                  onChange={(v) => set("hc_type", v)}
                   disabled={mut.isPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">关闭</SelectItem>
-                    <SelectItem value="http">HTTP</SelectItem>
-                    <SelectItem value="tcp">TCP</SelectItem>
-                  </SelectContent>
-                </Select>
+                  options={[
+                    { value: "none", label: "关闭" },
+                    { value: "http", label: "HTTP" },
+                    { value: "tcp", label: "TCP" },
+                  ]}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cfg-hc-target">目标</Label>

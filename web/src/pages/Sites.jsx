@@ -8,26 +8,15 @@ import {
   Trash2,
   Power,
   PowerOff,
-  Search,
   ExternalLink,
   ChevronRight,
 } from "lucide-react";
 import { gatewayApi } from "@/lib/api";
 import { siteURL } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -42,9 +31,12 @@ import {
   PageTemplate,
   RowActions,
   SegmentedPicker,
-  TableStateRow,
   TextActionButton,
   TextActionLink,
+  ActionButton,
+  SearchInput,
+  DataTable,
+  LabeledSwitch,
 } from "@/components/ued";
 
 const EMPTY = {
@@ -175,9 +167,8 @@ export function Sites() {
       error={isError ? "加载站点列表失败，请确认后端服务已启动。" : null}
       actions={
         <>
-          <Button
+          <ActionButton
             variant="outline"
-            size="sm"
             onClick={() =>
               gatewayApi
                 .reload()
@@ -189,10 +180,10 @@ export function Sites() {
             }
           >
             重载监听
-          </Button>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> 新建站点
-          </Button>
+          </ActionButton>
+          <ActionButton icon={Plus} onClick={openCreate}>
+            新建站点
+          </ActionButton>
         </>
       }
       filters={
@@ -207,15 +198,12 @@ export function Sites() {
             onChange={setEnabledFilter}
             size="sm"
           />
-          <div className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-bg1 px-3 shadow-[0_0_0_1px_var(--border-2)]">
-            <Search className="h-4 w-4 shrink-0 text-text3" />
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索站点名称或端口"
-              className="h-8 w-44 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent"
-            />
-          </div>
+          <SearchInput
+            className="ml-auto"
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索站点名称或端口"
+          />
         </>
       }
       pagination={
@@ -247,108 +235,125 @@ export function Sites() {
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>站点</TableHead>
-            <TableHead className="w-[110px]">端口</TableHead>
-            <TableHead className="w-[60px]">APP</TableHead>
-            <TableHead className="w-[60px]">反代</TableHead>
-            <TableHead className="w-[60px]">脚本</TableHead>
-            <TableHead className="w-[120px]">状态</TableHead>
-            <TableHead className="text-right">操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableStateRow colSpan={7}>加载中…</TableStateRow>
-          ) : filtered.length === 0 ? (
-            <TableStateRow colSpan={7}>
-              暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。
-            </TableStateRow>
-          ) : (
-            pg.pageItems.map((s) => {
-              const appN = (s.apps || []).length;
-              const pxN = (s.proxies || []).length;
-              const scN = (s.scripts || []).length;
-              return (
-                <TableRow key={s.id}>
-                  <TableCell>
-                    <Link
-                      to={`/sites/${s.id}`}
-                      className="font-medium hover:text-primary hover:underline"
-                    >
-                      {s.name}
-                    </Link>
-                    {s.description && (
-                      <div className="text-[11px] text-text3 line-clamp-1">
-                        {s.description}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="font-mono">
-                    :{s.port}
-                    {s.enabled && listening.has(s.port) && (
-                      <span className="ml-1 text-[10px] text-success">LISTEN</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-xs">{appN}</TableCell>
-                  <TableCell className="text-xs">{pxN}</TableCell>
-                  <TableCell className="text-xs">{scN}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Badge variant={s.enabled ? "success" : "secondary"}>
-                        {s.enabled ? "启用" : "停用"}
-                      </Badge>
-                      {s.ip_whitelist?.trim() && (
-                        <Badge variant="outline" className="text-[10px]">
-                          白名单
-                        </Badge>
-                      )}
-                      {s.ip_blacklist?.trim() && (
-                        <Badge variant="outline" className="text-[10px] text-danger">
-                          黑名单
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <RowActions className="justify-end">
-                      <TextActionLink to={`/sites/${s.id}`}>
-                        <ChevronRight className="h-3 w-3" /> 进入
-                      </TextActionLink>
-                      <TextActionLink
-                        href={siteURL(s.port)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <ExternalLink className="h-3 w-3" /> 打开
-                      </TextActionLink>
-                      <TextActionButton onClick={() => toggleEnabled(s)}>
-                        {s.enabled ? (
-                          <>
-                            <PowerOff className="h-3 w-3" /> 停用
-                          </>
-                        ) : (
-                          <>
-                            <Power className="h-3 w-3" /> 启用
-                          </>
-                        )}
-                      </TextActionButton>
-                      <TextActionButton onClick={() => openEdit(s)}>
-                        <Pencil className="h-3 w-3" /> 编辑
-                      </TextActionButton>
-                      <TextActionButton tone="danger" onClick={() => setDeleting(s)}>
-                        <Trash2 className="h-3 w-3" /> 删除
-                      </TextActionButton>
-                    </RowActions>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        loading={isLoading}
+        data={pg.pageItems}
+        empty="暂无站点。先新建站点（监听端口），再进入站点配置 APP 与反代。"
+        columns={[
+          {
+            key: "name",
+            title: "站点",
+            render: (s) => (
+              <>
+                <Link
+                  to={`/sites/${s.id}`}
+                  className="font-medium hover:text-primary hover:underline"
+                >
+                  {s.name}
+                </Link>
+                {s.description && (
+                  <div className="text-[11px] text-text3 line-clamp-1">
+                    {s.description}
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "port",
+            title: "端口",
+            width: "w-[110px]",
+            className: "font-mono",
+            render: (s) => (
+              <>
+                :{s.port}
+                {s.enabled && listening.has(s.port) && (
+                  <span className="ml-1 text-[10px] text-success">LISTEN</span>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "apps",
+            title: "APP",
+            width: "w-[60px]",
+            className: "text-xs",
+            render: (s) => (s.apps || []).length,
+          },
+          {
+            key: "proxies",
+            title: "反代",
+            width: "w-[60px]",
+            className: "text-xs",
+            render: (s) => (s.proxies || []).length,
+          },
+          {
+            key: "scripts",
+            title: "脚本",
+            width: "w-[60px]",
+            className: "text-xs",
+            render: (s) => (s.scripts || []).length,
+          },
+          {
+            key: "status",
+            title: "状态",
+            width: "w-[120px]",
+            render: (s) => (
+              <div className="flex flex-wrap gap-1">
+                <Badge variant={s.enabled ? "success" : "secondary"}>
+                  {s.enabled ? "启用" : "停用"}
+                </Badge>
+                {s.ip_whitelist?.trim() && (
+                  <Badge variant="outline" className="text-[10px]">
+                    白名单
+                  </Badge>
+                )}
+                {s.ip_blacklist?.trim() && (
+                  <Badge variant="outline" className="text-[10px] text-danger">
+                    黑名单
+                  </Badge>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "actions",
+            title: "操作",
+            align: "right",
+            render: (s) => (
+              <RowActions className="justify-end">
+                <TextActionLink to={`/sites/${s.id}`}>
+                  <ChevronRight className="h-3 w-3" /> 进入
+                </TextActionLink>
+                <TextActionLink
+                  href={siteURL(s.port)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <ExternalLink className="h-3 w-3" /> 打开
+                </TextActionLink>
+                <TextActionButton onClick={() => toggleEnabled(s)}>
+                  {s.enabled ? (
+                    <>
+                      <PowerOff className="h-3 w-3" /> 停用
+                    </>
+                  ) : (
+                    <>
+                      <Power className="h-3 w-3" /> 启用
+                    </>
+                  )}
+                </TextActionButton>
+                <TextActionButton onClick={() => openEdit(s)}>
+                  <Pencil className="h-3 w-3" /> 编辑
+                </TextActionButton>
+                <TextActionButton tone="danger" onClick={() => setDeleting(s)}>
+                  <Trash2 className="h-3 w-3" /> 删除
+                </TextActionButton>
+              </RowActions>
+            ),
+          },
+        ]}
+      />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -375,14 +380,12 @@ export function Sites() {
                 placeholder="例如 官网 / 管理后台"
               />
             </FormField>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2">
-              <span className="text-sm font-medium">启用</span>
-              <Switch
-                checked={form.enabled}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
-                aria-label="启用站点"
-              />
-            </div>
+            <LabeledSwitch
+              boxed
+              label="启用"
+              checked={form.enabled}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
+            />
             <FormField
               label="IP 白名单"
               hint="非空时仅允许列表内访问；黑名单优先于白名单。"
@@ -413,10 +416,11 @@ export function Sites() {
             </FormField>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <ActionButton variant="outline" size="default" onClick={() => setOpen(false)}>
               取消
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
+              size="default"
               disabled={saveMut.isPending}
               onClick={() => {
                 if (editing) {
@@ -440,7 +444,7 @@ export function Sites() {
               }}
             >
               保存
-            </Button>
+            </ActionButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

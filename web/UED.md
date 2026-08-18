@@ -75,8 +75,19 @@ Button、Badge、Card、Input、Label、Textarea、Select、Switch、Table、Tab
 | 组件 | 职责 |
 |------|------|
 | `PageShell` | 页面根间距 |
+| `PageTemplate` | 列表/详情页骨架 |
+| `Title` / `SectionTitle` | 页面标题、区块标题 |
+| `Icon` | Lucide 图标尺寸（xs/sm/md/lg/xl） |
+| `ActionButton` / `IconButton` | 带图标/加载的按钮、图标按钮 |
+| `SearchInput` | 筛选栏搜索框 |
+| `SelectField` | 下拉选择（options API） |
+| `InputField` | Label + 输入框 |
+| `DataTable` | 声明式表格（columns + data） |
+| `TabBar` | Tab（items API） |
+| `LabeledSwitch` | 带文案的 Switch |
+| `MoreMenu` | 「···」下拉菜单 |
 | `ListPageHeader` | 列表 Card 头：图标+标题+描述+操作 |
-| `DetailHeader` | 详情顶栏：返回+标题+徽章+操作 |
+| `DetailHeader` | 详情顶栏：面包屑+标题+徽章+操作 |
 | `DataTableCard` | Card + 表体 + 分页壳 |
 | `TableStateRow` | 加载/空行 |
 | `EmptyState` | 空状态 |
@@ -109,8 +120,9 @@ Button、Badge、Card、Input、Label、Textarea、Select、Switch、Table、Tab
 | 空状态 | `EmptyState` 或表格 empty 文案 |
 | 错误 | `InlineAlert variant="error"` |
 | 图标按钮提示 | `Tooltip` / `IconTooltip`，禁止仅靠原生 `title` 作为唯一提示 |
-| 下拉选择 | 仅用 `@/components/ui/select`，禁止可见原生 `<select>` |
-| 行操作过多 | `DropdownMenu` 收纳为「···」 |
+| 下拉选择 | 仅用 `SelectField`（或 `@/components/ui/select` 的复杂组合），禁止可见原生 `<select>` |
+| 行操作过多 | `MoreMenu` 收纳为「···」 |
+| 列表表格 | 优先 `DataTable`（columns + data），加载/空态内置 |
 
 ---
 
@@ -120,21 +132,29 @@ Button、Badge、Card、Input、Label、Textarea、Select、Switch、Table、Tab
 - [ ] `window.confirm` / `window.alert` / `window.prompt`
 - [ ] 删除按钮 `bg-red-600` 等硬编码危险色
 - [ ] 新代码仅用 `title=` 而无 `aria-label` / Tooltip
-- [ ] 在 page 内复制一套 FormField / ErrorBanner 样式而不用 ued
+- [ ] 在 page 内复制一套 FormField / ErrorBanner / 搜索框 / 表格空态样式而不用 ued
 
 ---
 
 ## 8. 导入约定
 
 ```js
-// 原子
+// 原子（仅 ued 未覆盖的特例）
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, ... } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
-// 复合
-import { PageShell, ListPageHeader, ConfirmDialog, FormField, StatusBadge } from "@/components/ued";
+// 复合：页面优先从这里取标题/按钮/下拉/表格/Tab/输入/Switch/图标/空状态
+import {
+  Title,
+  ActionButton,
+  SearchInput,
+  SelectField,
+  DataTable,
+  TabBar,
+  LabeledSwitch,
+  Icon,
+  EmptyState,
+  PageTemplate,
+} from "@/components/ued";
 ```
 
 根布局须包裹 `TooltipProvider`（见 `AppLayout`）。

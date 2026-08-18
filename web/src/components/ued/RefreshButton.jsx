@@ -1,6 +1,7 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Icon } from "./Icon";
 
 export function RefreshButton({
   onClick,
@@ -19,9 +20,11 @@ export function RefreshButton({
       className={cn("group transition-all duration-150 active:scale-95", className)}
       {...props}
     >
-      <RefreshCw
+      <Icon
+        icon={RefreshCw}
+        size="sm"
         className={cn(
-          "h-3.5 w-3.5 transition-transform duration-300 group-hover:rotate-180",
+          "transition-transform duration-300 group-hover:rotate-180",
           loading && "animate-spin"
         )}
       />

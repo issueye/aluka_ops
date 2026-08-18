@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { InfoHint } from "./InfoHint";
+import { Icon } from "./Icon";
 
 /**
  * 列表页 Card 头部（源力设计）：图标 + 标题 + 描述 | 右侧操作
  */
 export function ListPageHeader({
-  icon: Icon,
+  icon,
   title,
   description,
   actions,
@@ -22,7 +23,7 @@ export function ListPageHeader({
     >
       <div className="flex min-w-0 items-center gap-2">
         <CardTitle className="flex min-w-0 items-center gap-2 text-sm font-medium text-text1">
-          {Icon ? <Icon className="h-4 w-4 shrink-0 text-text3" /> : null}
+          {icon ? <Icon icon={icon} size="md" className="text-text3" /> : null}
           <span className="truncate">{title}</span>
         </CardTitle>
         {description ? <InfoHint label={description} /> : null}

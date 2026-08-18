@@ -2,18 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { serviceApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ServiceStatusBadge } from "@/components/services/ServiceStatusBadge";
 import { ServiceActions } from "@/components/services/ServiceActions";
 import { ServiceDialog } from "@/components/services/ServiceDialog";
@@ -25,10 +15,12 @@ import {
   ConfirmDialog,
   RowActions,
   SegmentedPicker,
-  TableStateRow,
   TextActionButton,
   TextActionLink,
   TypeChip,
+  ActionButton,
+  SearchInput,
+  DataTable,
 } from "@/components/ued";
 
 const TYPE_LABEL = { jar: "JAR", exe: "EXE", bat: "BAT", sh: "SH", ps1: "PS1" };
@@ -100,9 +92,9 @@ export function Services() {
       isRefreshing={isFetching}
       error={isError ? "加载服务列表失败，请确认后端服务已启动。" : null}
       actions={
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="h-3.5 w-3.5 mr-1" /> 新建服务
-        </Button>
+        <ActionButton icon={Plus} onClick={() => setDialogOpen(true)}>
+          新建服务
+        </ActionButton>
       }
       filters={
         <>
@@ -115,15 +107,12 @@ export function Services() {
             onChange={setStatusFilter}
             size="sm"
           />
-          <div className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-bg1 px-3 shadow-[0_0_0_1px_var(--border-2)]">
-            <Search className="h-4 w-4 shrink-0 text-text3" />
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索服务名称或代码"
-              className="h-8 w-44 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent"
-            />
-          </div>
+          <SearchInput
+            className="ml-auto"
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索服务名称或代码"
+          />
         </>
       }
       pagination={
@@ -140,67 +129,74 @@ export function Services() {
           : null
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[110px]">状态</TableHead>
-            <TableHead>名称 / 编码</TableHead>
-            <TableHead className="w-[70px]">类型</TableHead>
-            <TableHead className="w-[90px]">PID</TableHead>
-            <TableHead className="w-[150px]">启动时间</TableHead>
-            <TableHead className="text-right">操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableStateRow colSpan={6}>加载中...</TableStateRow>
-          ) : filtered.length === 0 ? (
-            <TableStateRow colSpan={6}>暂无服务，点击右上角「新建服务」创建。</TableStateRow>
-          ) : (
-            pg.pageItems.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <ServiceStatusBadge status={s.status} />
-                </TableCell>
-                <TableCell>
-                  <Link
-                    to={`/services/${s.id}`}
-                    className="font-medium hover:text-primary hover:underline"
-                  >
-                    {s.name}
-                  </Link>
-                  <div>
-                    <CodeText>{s.code}</CodeText>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <TypeChip>{TYPE_LABEL[s.type] || s.type}</TypeChip>
-                </TableCell>
-                <TableCell>
-                  <CodeText>{s.pid ? s.pid : "—"}</CodeText>
-                </TableCell>
-                <TableCell className="text-xs text-text3">
-                  {formatTime(s.started_at)}
-                </TableCell>
-                <TableCell>
-                  <RowActions className="justify-end">
-                    <ServiceActions service={s} />
-                    <TextActionLink to={`/services/${s.id}`}>详情</TextActionLink>
-                    <TextActionButton
-                      tone="danger"
-                      disabled={s.status === "running"}
-                      title={s.status === "running" ? "运行中不可删除" : "删除"}
-                      onClick={() => setDeleting(s)}
-                    >
-                      <Trash2 className="h-3 w-3" /> 删除
-                    </TextActionButton>
-                  </RowActions>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        loading={isLoading}
+        data={pg.pageItems}
+        empty="暂无服务，点击右上角「新建服务」创建。"
+        columns={[
+          {
+            key: "status",
+            title: "状态",
+            width: "w-[110px]",
+            render: (s) => <ServiceStatusBadge status={s.status} />,
+          },
+          {
+            key: "name",
+            title: "名称 / 编码",
+            render: (s) => (
+              <>
+                <Link
+                  to={`/services/${s.id}`}
+                  className="font-medium hover:text-primary hover:underline"
+                >
+                  {s.name}
+                </Link>
+                <div>
+                  <CodeText>{s.code}</CodeText>
+                </div>
+              </>
+            ),
+          },
+          {
+            key: "type",
+            title: "类型",
+            width: "w-[70px]",
+            render: (s) => <TypeChip>{TYPE_LABEL[s.type] || s.type}</TypeChip>,
+          },
+          {
+            key: "pid",
+            title: "PID",
+            width: "w-[90px]",
+            render: (s) => <CodeText>{s.pid ? s.pid : "—"}</CodeText>,
+          },
+          {
+            key: "started_at",
+            title: "启动时间",
+            width: "w-[150px]",
+            className: "text-xs text-text3",
+            render: (s) => formatTime(s.started_at),
+          },
+          {
+            key: "actions",
+            title: "操作",
+            align: "right",
+            render: (s) => (
+              <RowActions className="justify-end">
+                <ServiceActions service={s} />
+                <TextActionLink to={`/services/${s.id}`}>详情</TextActionLink>
+                <TextActionButton
+                  tone="danger"
+                  disabled={s.status === "running"}
+                  title={s.status === "running" ? "运行中不可删除" : "删除"}
+                  onClick={() => setDeleting(s)}
+                >
+                  <Trash2 className="h-3 w-3" /> 删除
+                </TextActionButton>
+              </RowActions>
+            ),
+          },
+        ]}
+      />
 
       <ServiceDialog open={dialogOpen} onOpenChange={setDialogOpen} />
 

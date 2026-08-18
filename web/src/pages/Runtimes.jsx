@@ -3,17 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Search, CheckCircle2 } from "lucide-react";
 import { runtimeApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -26,13 +16,16 @@ import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   PageTemplate,
-  TableStateRow,
   ConfirmDialog,
   TypeChip,
   RowActions,
   SegmentedPicker,
   TextActionButton,
   PathText,
+  ActionButton,
+  SearchInput,
+  DataTable,
+  Icon,
 } from "@/components/ued";
 
 const TYPES = ["jdk", "node", "python", "go"];
@@ -142,17 +135,17 @@ export function Runtimes() {
       error={isError ? "加载运行环境失败，请确认后端服务已启动。" : null}
       actions={
         <>
-          <Button
+          <ActionButton
             variant="outline"
-            size="sm"
+            icon={Search}
             onClick={() => detectMutation.mutate()}
-            disabled={detectMutation.isPending}
+            loading={detectMutation.isPending}
           >
-            <Search className="h-3.5 w-3.5 mr-1" /> 探测本机 JDK
-          </Button>
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> 新建环境
-          </Button>
+            探测本机 JDK
+          </ActionButton>
+          <ActionButton icon={Plus} onClick={openCreate}>
+            新建环境
+          </ActionButton>
         </>
       }
       filters={
@@ -169,15 +162,12 @@ export function Runtimes() {
             onChange={setTypeFilter}
             size="sm"
           />
-          <div className="ml-auto flex h-8 items-center gap-1.5 rounded-sm bg-bg1 px-3 shadow-[0_0_0_1px_var(--border-2)]">
-            <Search className="h-4 w-4 shrink-0 text-text3" />
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索环境名称"
-              className="h-8 w-44 border-none bg-transparent px-0 shadow-none focus-visible:ring-0 focus-visible:border-transparent"
-            />
-          </div>
+          <SearchInput
+            className="ml-auto"
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="搜索环境名称"
+          />
         </>
       }
       pagination={
@@ -194,71 +184,82 @@ export function Runtimes() {
           : null
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>名称</TableHead>
-            <TableHead className="w-[80px]">类型</TableHead>
-            <TableHead className="w-[100px]">版本</TableHead>
-            <TableHead>安装路径</TableHead>
-            <TableHead className="w-[70px] text-center">默认</TableHead>
-            <TableHead className="w-[150px]">更新时间</TableHead>
-            <TableHead className="text-right">操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableStateRow colSpan={7}>加载中...</TableStateRow>
-          ) : filtered.length === 0 ? (
-            <TableStateRow colSpan={7}>
-              暂无运行环境，点击右上角「新建环境」或「探测本机 JDK」快速登记。
-            </TableStateRow>
-          ) : (
-            pg.pageItems.map((rt) => (
-              <TableRow key={rt.id}>
-                <TableCell className="font-medium">
-                  <div>{rt.name}</div>
-                  {rt.description && (
-                    <div className="text-xs text-text3">{rt.description}</div>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <TypeChip tone={rt.type}>{TYPE_LABEL[rt.type] || rt.type}</TypeChip>
-                </TableCell>
-                <TableCell className="text-xs">{rt.version || "—"}</TableCell>
-                <TableCell>
-                  <PathText>{rt.install_path}</PathText>
-                </TableCell>
-                <TableCell className="text-center">
-                  {rt.is_default ? (
-                    <TypeChip tone="primary">默认</TypeChip>
-                  ) : (
-                    <span className="text-text4">—</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-xs text-text3">
-                  {formatTime(rt.updated_at || rt.created_at)}
-                </TableCell>
-                <TableCell>
-                  <RowActions className="justify-end">
-                    <TextActionButton onClick={() => openEdit(rt)}>
-                      <Pencil className="h-3 w-3" /> 编辑
-                    </TextActionButton>
-                    <TextActionButton tone="danger" onClick={() => setDeleting(rt)}>
-                      <Trash2 className="h-3 w-3" /> 删除
-                    </TextActionButton>
-                  </RowActions>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        loading={isLoading}
+        data={pg.pageItems}
+        empty="暂无运行环境，点击右上角「新建环境」或「探测本机 JDK」快速登记。"
+        columns={[
+          {
+            key: "name",
+            title: "名称",
+            render: (rt) => (
+              <>
+                <div className="font-medium">{rt.name}</div>
+                {rt.description && (
+                  <div className="text-xs text-text3">{rt.description}</div>
+                )}
+              </>
+            ),
+          },
+          {
+            key: "type",
+            title: "类型",
+            width: "w-[80px]",
+            render: (rt) => <TypeChip tone={rt.type}>{TYPE_LABEL[rt.type] || rt.type}</TypeChip>,
+          },
+          {
+            key: "version",
+            title: "版本",
+            width: "w-[100px]",
+            className: "text-xs",
+            render: (rt) => rt.version || "—",
+          },
+          {
+            key: "install_path",
+            title: "安装路径",
+            render: (rt) => <PathText>{rt.install_path}</PathText>,
+          },
+          {
+            key: "is_default",
+            title: "默认",
+            width: "w-[70px]",
+            align: "center",
+            render: (rt) =>
+              rt.is_default ? (
+                <TypeChip tone="primary">默认</TypeChip>
+              ) : (
+                <span className="text-text4">—</span>
+              ),
+          },
+          {
+            key: "updated_at",
+            title: "更新时间",
+            width: "w-[150px]",
+            className: "text-xs text-text3",
+            render: (rt) => formatTime(rt.updated_at || rt.created_at),
+          },
+          {
+            key: "actions",
+            title: "操作",
+            align: "right",
+            render: (rt) => (
+              <RowActions className="justify-end">
+                <TextActionButton onClick={() => openEdit(rt)}>
+                  <Pencil className="h-3 w-3" /> 编辑
+                </TextActionButton>
+                <TextActionButton tone="danger" onClick={() => setDeleting(rt)}>
+                  <Trash2 className="h-3 w-3" /> 删除
+                </TextActionButton>
+              </RowActions>
+            ),
+          },
+        ]}
+      />
 
       <RuntimeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        runtime={editing}
+        editing={editing}
       />
 
       <ConfirmDialog
@@ -303,7 +304,7 @@ export function Runtimes() {
                       </Badge>
                       {item.registered && (
                         <Badge variant="success" className="gap-1 text-xs">
-                          <CheckCircle2 className="h-3 w-3" /> 已登记
+                          <Icon icon={CheckCircle2} size="xs" /> 已登记
                         </Badge>
                       )}
                     </div>
@@ -315,14 +316,13 @@ export function Runtimes() {
                     </div>
                   </div>
                   {!item.registered && (
-                    <Button
-                      size="sm"
+                    <ActionButton
                       variant="outline"
                       disabled={registerMutation.isPending}
                       onClick={() => registerMutation.mutate(item)}
                     >
                       登记
-                    </Button>
+                    </ActionButton>
                   )}
                 </div>
               ))}

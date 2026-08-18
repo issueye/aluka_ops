@@ -16,16 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServiceStatusBadge } from "@/components/services/ServiceStatusBadge";
 import { ServiceActions } from "@/components/services/ServiceActions";
 import { ServiceConfigForm } from "@/components/services/ServiceConfigForm";
@@ -33,7 +24,7 @@ import { LogViewer } from "@/components/services/LogViewer";
 import { ServiceConsole } from "@/components/services/ServiceConsole";
 import { ArtifactList } from "@/components/services/ArtifactList";
 import { formatTime } from "@/lib/utils";
-import { PageShell, DetailHeader, MetaField, InlineAlert } from "@/components/ued";
+import { PageShell, DetailHeader, MetaField, InlineAlert, TabBar, TabsContent, DataTable } from "@/components/ued";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const OP_STATUS_VARIANT = {
@@ -138,16 +129,7 @@ export function ServiceDetail() {
         actions={<ServiceActions service={svc} />}
       />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full overflow-x-auto">
-          {DETAIL_TABS.map((tab) => (
-            <TabsTrigger key={tab.value} value={tab.value} className="shrink-0">
-              <tab.icon className="mr-1.5 h-3.5 w-3.5" />
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
+      <TabBar value={activeTab} onValueChange={setActiveTab} items={DETAIL_TABS}>
         <TabsContent value="overview" className="mt-4">
           <Card>
             <CardHeader className="border-b border-border1 px-5 py-3.5">
@@ -216,50 +198,45 @@ export function ServiceDetail() {
         <TabsContent value="operations" className="mt-4">
           <Card>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[60px]">#</TableHead>
-                    <TableHead className="w-[90px]">类型</TableHead>
-                    <TableHead className="w-[90px]">状态</TableHead>
-                    <TableHead>详情</TableHead>
-                    <TableHead className="w-[160px]">时间</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {operations.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-20 text-center text-text3">
-                        暂无操作记录
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    operations.map((op) => (
-                      <TableRow key={op.id}>
-                        <TableCell className="text-text3">{op.id}</TableCell>
-                        <TableCell className="font-medium uppercase">{op.type}</TableCell>
-                        <TableCell>
-                          <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
-                            {op.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-[420px]">
-                          <div className="truncate text-xs text-text3" title={op.output_log}>
-                            {op.output_log || op.error_msg || "—"}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-text3">
-                          {formatTime(op.started_at)}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+              <DataTable
+                data={operations}
+                empty="暂无操作记录"
+                columns={[
+                  { key: "id", title: "#", width: "w-[60px]", className: "text-text3" },
+                  { key: "type", title: "类型", width: "w-[90px]", className: "font-medium uppercase" },
+                  {
+                    key: "status",
+                    title: "状态",
+                    width: "w-[90px]",
+                    render: (op) => (
+                      <Badge variant={OP_STATUS_VARIANT[op.status] || "secondary"}>
+                        {op.status}
+                      </Badge>
+                    ),
+                  },
+                  {
+                    key: "detail",
+                    title: "详情",
+                    className: "max-w-[420px]",
+                    render: (op) => (
+                      <div className="truncate text-xs text-text3" title={op.output_log}>
+                        {op.output_log || op.error_msg || "—"}
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "time",
+                    title: "时间",
+                    width: "w-[160px]",
+                    className: "text-xs text-text3",
+                    render: (op) => formatTime(op.started_at),
+                  },
+                ]}
+              />
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+      </TabBar>
     </PageShell>
   );
 }

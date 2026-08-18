@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -38,14 +37,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
   ConfirmDialog,
   DataTableCard,
   DetailHeader,
@@ -56,6 +47,11 @@ import {
   RefreshButton,
   RowActions,
   TableStateRow,
+  TabBar,
+  TabsContent,
+  ActionButton,
+  LabeledSwitch,
+  SelectField,
 } from "@/components/ued";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -110,18 +106,6 @@ const CATEGORY_LABEL = {
   static: "静态",
   combo: "组合",
 };
-
-/** Switch 行:Label 文案 + 开关,用于表单内的布尔字段 */
-function SwitchRow({ label, checked, onCheckedChange, className }) {
-  return (
-    <div
-      className={`flex items-center justify-between rounded-md border px-3 py-2 ${className || ""}`}
-    >
-      <span className="text-sm font-medium">{label}</span>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} aria-label={label} />
-    </div>
-  );
-}
 
 export function SiteDetail() {
   const { id } = useParams();
@@ -465,18 +449,15 @@ export function SiteDetail() {
         </Card>
       )}
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="w-full overflow-x-auto">
-          <TabsTrigger value="apps" className="shrink-0">
-            <FolderTree className="mr-1.5 h-3.5 w-3.5" /> APP ({apps.length})
-          </TabsTrigger>
-          <TabsTrigger value="proxies" className="shrink-0">
-            <ArrowRightLeft className="mr-1.5 h-3.5 w-3.5" /> 反代 ({proxies.length})
-          </TabsTrigger>
-          <TabsTrigger value="scripts" className="shrink-0">
-            <ScrollText className="mr-1.5 h-3.5 w-3.5" /> 路由脚本 ({scripts.length})
-          </TabsTrigger>
-        </TabsList>
+      <TabBar
+        value={tab}
+        onValueChange={setTab}
+        items={[
+          { value: "apps", label: `APP (${apps.length})`, icon: FolderTree },
+          { value: "proxies", label: `反代 (${proxies.length})`, icon: ArrowRightLeft },
+          { value: "scripts", label: `路由脚本 (${scripts.length})`, icon: ScrollText },
+        ]}
+      >
 
         {/* ===== APP Tab ===== */}
         <TabsContent value="apps" className="mt-4 space-y-5">
@@ -484,9 +465,9 @@ export function SiteDetail() {
             title="静态 APP"
             description="绑定本站点端口的前端静态资源（路径 + 目录 + SPA）"
             actions={
-              <Button size="sm" onClick={openCreateApp}>
-                <Plus /> 新建 APP
-              </Button>
+              <ActionButton icon={Plus} onClick={openCreateApp}>
+                新建 APP
+              </ActionButton>
             }
             pagination={
               apps.length > 0
@@ -598,9 +579,9 @@ export function SiteDetail() {
             title="反代规则"
             description="路径前缀 → 上游；同站点内最长前缀优先。上传建议 body/IO 超时设为 0。"
             actions={
-              <Button size="sm" onClick={openCreateProxy}>
-                <Plus /> 添加反代
-              </Button>
+              <ActionButton icon={Plus} onClick={openCreateProxy}>
+                添加反代
+              </ActionButton>
             }
             pagination={
               proxies.length > 0
@@ -720,9 +701,9 @@ export function SiteDetail() {
             title="路由脚本"
             description="优先于 APP/反代执行；支持 rewrite / redirect / deny / proxy / static"
             actions={
-              <Button size="sm" onClick={() => openCreateScript()}>
-                <Plus /> 自定义脚本
-              </Button>
+              <ActionButton icon={Plus} onClick={() => openCreateScript()}>
+                自定义脚本
+              </ActionButton>
             }
             pagination={
               scripts.length > 0
@@ -804,7 +785,7 @@ export function SiteDetail() {
             </Table>
           </DataTableCard>
         </TabsContent>
-      </Tabs>
+      </TabBar>
 
       {/* ===== APP Dialog ===== */}
       <Dialog open={appOpen} onOpenChange={setAppOpen}>
@@ -843,17 +824,20 @@ export function SiteDetail() {
                 placeholder="apps/webapp"
               />
             </FormField>
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="去掉路径前缀"
               checked={appForm.strip_prefix}
               onCheckedChange={(v) => setAppForm((f) => ({ ...f, strip_prefix: v }))}
             />
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="SPA fallback"
               checked={appForm.spa_fallback}
               onCheckedChange={(v) => setAppForm((f) => ({ ...f, spa_fallback: v }))}
             />
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="启用"
               className="sm:col-span-2"
               checked={appForm.enabled}
@@ -915,7 +899,8 @@ export function SiteDetail() {
                 onChange={(e) => setProxyForm((f) => ({ ...f, path_prefix: e.target.value }))}
               />
             </FormField>
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="去掉前缀"
               checked={proxyForm.strip_prefix}
               onCheckedChange={(v) => setProxyForm((f) => ({ ...f, strip_prefix: v }))}
@@ -945,12 +930,14 @@ export function SiteDetail() {
                 }
               />
             </FormField>
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="启用"
               checked={proxyForm.enabled}
               onCheckedChange={(v) => setProxyForm((f) => ({ ...f, enabled: v }))}
             />
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="WebSocket"
               checked={proxyForm.enable_websocket}
               onCheckedChange={(v) =>
@@ -1001,9 +988,17 @@ export function SiteDetail() {
           <FormGrid cols={2} className="gap-3">
             {!editingScript && templates.length > 0 && (
               <FormField label="套用模板" className="sm:col-span-2">
-                <Select
+                <SelectField
                   value={scriptForm.template_id || "__none__"}
-                  onValueChange={(tid) => {
+                  placeholder="自定义 / 不套用"
+                  options={[
+                    { value: "__none__", label: "自定义 / 不套用" },
+                    ...templates.map((tpl) => ({
+                      value: String(tpl.id),
+                      label: `[${CATEGORY_LABEL[tpl.category] || tpl.category}] ${tpl.name}`,
+                    })),
+                  ]}
+                  onChange={(tid) => {
                     if (!tid || tid === "__none__") {
                       setScriptForm((f) => ({ ...f, template_id: "" }));
                       return;
@@ -1021,19 +1016,7 @@ export function SiteDetail() {
                       description: tpl.description || "",
                     }));
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="自定义 / 不套用" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">自定义 / 不套用</SelectItem>
-                    {templates.map((tpl) => (
-                      <SelectItem key={tpl.id} value={String(tpl.id)}>
-                        [{CATEGORY_LABEL[tpl.category] || tpl.category}] {tpl.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </FormField>
             )}
             <FormField label="编码">
@@ -1066,7 +1049,8 @@ export function SiteDetail() {
                 }
               />
             </FormField>
-            <SwitchRow
+            <LabeledSwitch
+              boxed
               label="启用"
               className="sm:col-span-2"
               checked={scriptForm.enabled}

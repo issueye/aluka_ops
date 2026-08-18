@@ -132,10 +132,6 @@ export function Login() {
               <Logo className="justify-center text-text1" markClassName="h-7 w-7" />
             </div>
 
-            {/* 标题 */}
-            <h1 className="mb-2 text-center text-xl font-semibold leading-7 text-text1">Aluka Ops</h1>
-            <p className="mb-8 text-center text-[13px] leading-5 text-text3">服务治理面板</p>
-
             {/* 表单 */}
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <FormField

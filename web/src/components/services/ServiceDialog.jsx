@@ -7,13 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -21,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SelectField } from "@/components/ued";
 
 // 服务类型说明
 const TYPE_HINT = {
@@ -144,38 +138,31 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>类型</Label>
-              <Select value={form.type} onValueChange={(v) => set("type", v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="exe">exe · 可执行程序</SelectItem>
-                  <SelectItem value="jar">jar · Java 应用</SelectItem>
-                  <SelectItem value="bat">bat · 批处理</SelectItem>
-                  <SelectItem value="sh">sh · Shell</SelectItem>
-                  <SelectItem value="ps1">ps1 · PowerShell</SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectField
+                value={form.type}
+                onChange={(v) => set("type", v)}
+                options={[
+                  { value: "exe", label: "exe · 可执行程序" },
+                  { value: "jar", label: "jar · Java 应用" },
+                  { value: "bat", label: "bat · 批处理" },
+                  { value: "sh", label: "sh · Shell" },
+                  { value: "ps1", label: "ps1 · PowerShell" },
+                ]}
+              />
               <p className="text-xs text-text3">{TYPE_HINT[form.type]}</p>
             </div>
             <div className="space-y-1.5">
               <Label>运行环境 {form.type === "jar" ? "*" : "(可选)"}</Label>
-              <Select
+              <SelectField
                 value={form.runtime_id}
-                onValueChange={(v) => set("runtime_id", v)}
+                onChange={(v) => set("runtime_id", v)}
                 disabled={runtimes.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={runtimes.length === 0 ? "请先在环境管理添加" : "选择 JDK"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {runtimes.map((rt) => (
-                    <SelectItem key={rt.id} value={String(rt.id)}>
-                      {rt.name} {rt.version ? `(${rt.version})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder={runtimes.length === 0 ? "请先在环境管理添加" : "选择 JDK"}
+                options={runtimes.map((rt) => ({
+                  value: String(rt.id),
+                  label: `${rt.name} ${rt.version ? `(${rt.version})` : ""}`.trim(),
+                }))}
+              />
               {errors.runtime_id && <p className="text-xs text-danger">{errors.runtime_id}</p>}
             </div>
           </div>

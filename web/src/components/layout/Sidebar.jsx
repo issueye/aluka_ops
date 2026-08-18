@@ -56,10 +56,6 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full w-[200px] min-w-[200px] shrink-0 flex-col bg-bg4">
-      <div className="flex shrink-0 items-center px-[22px] py-5">
-        <Logo markOnly markClassName="h-7 w-7" />
-      </div>
-
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3">
         {navGroups.map((group, groupIndex) => (
           <div key={group.label} className="menu-group-block">

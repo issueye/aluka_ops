@@ -2,26 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { auditApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { formatTime } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   PageTemplate,
-  TableStateRow,
+  SelectField,
+  DataTable,
 } from "@/components/ued";
 
 const ACTIONS = [
@@ -73,30 +59,20 @@ export function AuditLog() {
       error={isError ? "加载审计日志失败，请确认后端服务已启动。" : null}
       filters={
         <>
-          <Select value={action} onValueChange={setAction}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="动作" />
-            </SelectTrigger>
-            <SelectContent>
-              {ACTIONS.map((a) => (
-                <SelectItem key={a.value} value={a.value}>
-                  {a.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={targetType} onValueChange={setTargetType}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="对象" />
-            </SelectTrigger>
-            <SelectContent>
-              {TARGETS.map((t) => (
-                <SelectItem key={t.value} value={t.value}>
-                  {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SelectField
+            className="w-[150px]"
+            value={action}
+            onChange={setAction}
+            options={ACTIONS}
+            placeholder="动作"
+          />
+          <SelectField
+            className="w-[130px]"
+            value={targetType}
+            onChange={setTargetType}
+            options={TARGETS}
+            placeholder="对象"
+          />
         </>
       }
       pagination={
@@ -113,52 +89,67 @@ export function AuditLog() {
           : null
       }
     >
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60px]">#</TableHead>
-            <TableHead className="w-[120px]">动作</TableHead>
-            <TableHead className="w-[100px]">对象</TableHead>
-            <TableHead className="w-[80px]">对象ID</TableHead>
-            <TableHead className="w-[100px]">操作人</TableHead>
-            <TableHead>详情</TableHead>
-            <TableHead className="w-[160px]">时间</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableStateRow colSpan={7}>加载中...</TableStateRow>
-          ) : logs.length === 0 ? (
-            <TableStateRow colSpan={7}>
-              暂无审计记录。执行创建/启停/配置修改等写操作后会在此展示。
-            </TableStateRow>
-          ) : (
-            pg.pageItems.map((log) => (
-              <TableRow key={log.id}>
-                <TableCell className="text-text3 font-mono">{log.id}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {log.action}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm">{log.target_type || "—"}</TableCell>
-                <TableCell className="font-mono text-xs text-text3">
-                  {log.target_id || "—"}
-                </TableCell>
-                <TableCell className="text-sm">{log.operator || "system"}</TableCell>
-                <TableCell className="max-w-[360px]">
-                  <div className="truncate font-mono text-xs text-text3">
-                    {log.detail || "—"}
-                  </div>
-                </TableCell>
-                <TableCell className="text-xs text-text3">
-                  {formatTime(log.created_at)}
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <DataTable
+        loading={isLoading}
+        data={pg.pageItems}
+        empty="暂无审计记录。执行创建/启停/配置修改等写操作后会在此展示。"
+        columns={[
+          {
+            key: "id",
+            title: "#",
+            width: "w-[60px]",
+            className: "text-text3 font-mono",
+          },
+          {
+            key: "action",
+            title: "动作",
+            width: "w-[120px]",
+            render: (log) => (
+              <Badge variant="secondary" className="font-mono text-xs">
+                {log.action}
+              </Badge>
+            ),
+          },
+          {
+            key: "target_type",
+            title: "对象",
+            width: "w-[100px]",
+            className: "text-sm",
+            render: (log) => log.target_type || "—",
+          },
+          {
+            key: "target_id",
+            title: "对象ID",
+            width: "w-[80px]",
+            className: "font-mono text-xs text-text3",
+            render: (log) => log.target_id || "—",
+          },
+          {
+            key: "operator",
+            title: "操作人",
+            width: "w-[100px]",
+            className: "text-sm",
+            render: (log) => log.operator || "system",
+          },
+          {
+            key: "detail",
+            title: "详情",
+            className: "max-w-[360px]",
+            render: (log) => (
+              <div className="truncate font-mono text-xs text-text3">
+                {log.detail || "—"}
+              </div>
+            ),
+          },
+          {
+            key: "created_at",
+            title: "时间",
+            width: "w-[160px]",
+            className: "text-xs text-text3",
+            render: (log) => formatTime(log.created_at),
+          },
+        ]}
+      />
     </PageTemplate>
   );
 }

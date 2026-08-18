@@ -15,15 +15,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -33,20 +24,17 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ConfirmDialog,
   FormField,
   FormGrid,
-  IconTooltip,
   PageTemplate,
   RowActions,
-  TableStateRow,
+  ActionButton,
+  DataTable,
+  IconButton,
+  SelectField,
+  LabeledSwitch,
+  Icon,
 } from "@/components/ued";
 
 const EMPTY = {
@@ -222,9 +210,9 @@ export function Tunnels() {
       onRefresh={() => refetch()}
       isRefreshing={isFetching}
       actions={
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="mr-1" /> 新建规则
-        </Button>
+        <ActionButton icon={Plus} onClick={openCreate}>
+          新建规则
+        </ActionButton>
       }
       footer={
         <p className="border-t border-border1 px-5 py-3 text-xs text-text3">
@@ -249,7 +237,7 @@ export function Tunnels() {
         {/* 在线会话 */}
         <div className="border-b border-border1 px-5 py-3">
           <div className="mb-2 flex items-center gap-2 text-xs font-medium text-text3">
-            <Network className="h-3.5 w-3.5" />
+            <Icon icon={Network} size="sm" />
             隧道会话（Agent 已连接）
           </div>
           {sessions.length === 0 ? (
@@ -268,112 +256,100 @@ export function Tunnels() {
           )}
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>名称</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>中心端口</TableHead>
-              <TableHead>远端</TableHead>
-              <TableHead>状态</TableHead>
-              <TableHead>连接</TableHead>
-              <TableHead className="text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableStateRow colSpan={7}>加载中…</TableStateRow>
-            ) : rules.length === 0 ? (
-              <TableStateRow colSpan={7}>
-                暂无隧道规则。创建后中心将在 listen_port 上接受连接并转发到 Agent。
-              </TableStateRow>
-            ) : (
-              pg.pageItems.map((r) => {
+        <DataTable
+          loading={isLoading}
+          data={pg.pageItems}
+          empty="暂无隧道规则。创建后中心将在 listen_port 上接受连接并转发到 Agent。"
+          columns={[
+            {
+              key: "name",
+              title: "名称",
+              render: (r) => (
+                <>
+                  <div className="font-medium">{r.name}</div>
+                  <div className="font-mono text-[11px] text-text3">{r.code}</div>
+                </>
+              ),
+            },
+            {
+              key: "agent_id",
+              title: "Agent",
+              className: "font-mono text-xs",
+            },
+            {
+              key: "listen",
+              title: "中心端口",
+              className: "font-mono text-xs",
+              render: (r) => `${r.listen_host || "0.0.0.0"}:${r.listen_port}`,
+            },
+            {
+              key: "remote",
+              title: "远端",
+              className: "font-mono text-xs",
+              render: (r) => `${r.remote_host}:${r.remote_port}`,
+            },
+            {
+              key: "status",
+              title: "状态",
+              render: (r) => {
                 const rt = r.runtime || {};
                 return (
-                  <TableRow key={r.id}>
-                    <TableCell>
-                      <div className="font-medium">{r.name}</div>
-                      <div className="font-mono text-[11px] text-text3">
-                        {r.code}
+                  <>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {statusBadge(rt)}
+                      {!r.enabled && <Badge variant="secondary">停用</Badge>}
+                    </div>
+                    {rt.error && (
+                      <div
+                        className="mt-0.5 max-w-[180px] truncate text-[10px] text-danger"
+                        title={rt.error}
+                      >
+                        {rt.error}
                       </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{r.agent_id}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {r.listen_host || "0.0.0.0"}:{r.listen_port}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {r.remote_host}:{r.remote_port}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1">
-                        {statusBadge(rt)}
-                        {!r.enabled && <Badge variant="secondary">停用</Badge>}
-                      </div>
-                      {rt.error && (
-                        <div
-                          className="mt-0.5 max-w-[180px] truncate text-[10px] text-danger"
-                          title={rt.error}
-                        >
-                          {rt.error}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-text3">
-                      活跃 {rt.active_conns ?? 0}
-                      <span className="mx-1">·</span>
-                      累计 {rt.total_conns ?? 0}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <RowActions>
-                        <IconTooltip label={r.enabled ? "停用" : "启用"}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label={r.enabled ? "停用规则" : "启用规则"}
-                            disabled={enableMut.isPending}
-                            onClick={() =>
-                              enableMut.mutate({ id: r.id, enabled: !r.enabled })
-                            }
-                          >
-                            {r.enabled ? (
-                              <PowerOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Power className="h-3.5 w-3.5" />
-                            )}
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="编辑">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            aria-label="编辑规则"
-                            onClick={() => openEdit(r)}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </IconTooltip>
-                        <IconTooltip label="删除">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-danger"
-                            aria-label="删除规则"
-                            onClick={() => setDeleting(r)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </IconTooltip>
-                      </RowActions>
-                    </TableCell>
-                  </TableRow>
+                    )}
+                  </>
                 );
-              })
-            )}
-          </TableBody>
-        </Table>
+              },
+            },
+            {
+              key: "conns",
+              title: "连接",
+              className: "text-xs text-text3",
+              render: (r) => {
+                const rt = r.runtime || {};
+                return (
+                  <>
+                    活跃 {rt.active_conns ?? 0}
+                    <span className="mx-1">·</span>
+                    累计 {rt.total_conns ?? 0}
+                  </>
+                );
+              },
+            },
+            {
+              key: "actions",
+              title: "操作",
+              align: "right",
+              render: (r) => (
+                <RowActions>
+                  <IconButton
+                    icon={r.enabled ? PowerOff : Power}
+                    label={r.enabled ? "停用" : "启用"}
+                    disabled={enableMut.isPending}
+                    onClick={() => enableMut.mutate({ id: r.id, enabled: !r.enabled })}
+                  />
+                  <IconButton icon={Pencil} label="编辑" onClick={() => openEdit(r)} />
+                  <IconButton
+                    icon={Trash2}
+                    label="删除"
+                    className="text-danger"
+                    onClick={() => setDeleting(r)}
+                  />
+                </RowActions>
+              ),
+            },
+          ]}
+        />
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -407,21 +383,12 @@ export function Tunnels() {
               hint={agentOptions.length === 0 ? "暂无 Agent 上报，可稍后在 Agents 页确认" : undefined}
             >
               {agentOptions.length > 0 ? (
-                <Select
-                  value={form.agent_id || undefined}
-                  onValueChange={(v) => setForm((f) => ({ ...f, agent_id: v }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="选择 Agent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentOptions.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SelectField
+                  value={form.agent_id}
+                  onChange={(v) => setForm((f) => ({ ...f, agent_id: v }))}
+                  placeholder="选择 Agent"
+                  options={agentOptions.map((a) => ({ value: a.id, label: a.label }))}
+                />
               ) : (
                 <Input
                   className="font-mono"
@@ -483,14 +450,13 @@ export function Tunnels() {
                 }
               />
             </FormField>
-            <div className="flex items-center justify-between rounded-md border px-3 py-2 sm:col-span-2">
-              <span className="text-sm font-medium">启用</span>
-              <Switch
-                checked={form.enabled}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
-                aria-label="启用规则"
-              />
-            </div>
+            <LabeledSwitch
+              boxed
+              className="sm:col-span-2"
+              label="启用"
+              checked={form.enabled}
+              onCheckedChange={(v) => setForm((f) => ({ ...f, enabled: v }))}
+            />
             <FormField label="备注" className="sm:col-span-2">
               <Textarea
                 value={form.description}
