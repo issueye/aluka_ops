@@ -28,13 +28,15 @@ import {
   Radio,
   RadioTower,
   Boxes,
+  ShieldOff,
 } from "lucide-react";
-import { healthApi, authApi, systemApi, clusterApi, api } from "@/lib/api";
+import { healthApi, authApi, systemApi, clusterApi, api, authGuardApi, panelSettingsApi } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { useTheme } from "@/hooks/useTheme";
 import { cn, formatBytes, formatUptime, formatTime } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { InlineAlert, PageTemplate, RefreshButton, UsageBar } from "@/components/ued";
 
@@ -162,6 +164,63 @@ export function Settings() {
     queryFn: () => api.get("/api/agent/status"),
     staleTime: 5000,
     refetchInterval: 15000,
+  });
+
+  // ---- 面板防护（IP 名单 + 登录防爆破） ----
+  const [panelForm, setPanelForm] = useState({
+    ip_whitelist: "",
+    ip_blacklist: "",
+    login_max_fails: 5,
+    login_window_sec: 600,
+    login_ban_sec: 900,
+  });
+  const { data: panelSettings } = useQuery({
+    queryKey: ["panel-settings"],
+    queryFn: panelSettingsApi.get,
+    staleTime: 10000,
+  });
+  useEffect(() => {
+    if (!panelSettings) return;
+    setPanelForm({
+      ip_whitelist: panelSettings.ip_whitelist || "",
+      ip_blacklist: panelSettings.ip_blacklist || "",
+      login_max_fails: panelSettings.login_max_fails || 5,
+      login_window_sec: panelSettings.login_window_sec || 600,
+      login_ban_sec: panelSettings.login_ban_sec || 900,
+    });
+  }, [panelSettings]);
+
+  const savePanelMut = useMutation({
+    mutationFn: () =>
+      panelSettingsApi.update({
+        ip_whitelist: panelForm.ip_whitelist,
+        ip_blacklist: panelForm.ip_blacklist,
+        login_max_fails: Number(panelForm.login_max_fails) || 5,
+        login_window_sec: Number(panelForm.login_window_sec) || 600,
+        login_ban_sec: Number(panelForm.login_ban_sec) || 900,
+      }),
+    onSuccess: () => {
+      toast.success("面板防护配置已保存并生效");
+      qc.invalidateQueries({ queryKey: ["panel-settings"] });
+      qc.invalidateQueries({ queryKey: ["auth-guard"] });
+    },
+    onError: (e) => toast.error(e.message || "保存失败"),
+  });
+
+  const { data: guardData, refetch: refetchGuard, isFetching: guardFetching } = useQuery({
+    queryKey: ["auth-guard"],
+    queryFn: authGuardApi.list,
+    refetchInterval: 10000,
+  });
+  const bans = guardData?.bans || [];
+  const failures = guardData?.failures || [];
+  const unbanMut = useMutation({
+    mutationFn: (ip) => authGuardApi.unban(ip),
+    onSuccess: () => {
+      toast.success("已解封");
+      qc.invalidateQueries({ queryKey: ["auth-guard"] });
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   // 用服务端状态填充表单(不覆盖正在编辑的 token)
@@ -772,6 +831,143 @@ export function Settings() {
               </div>
             </SettingsSection>
 
+            <SettingsSection
+              title="面板防护（IP 名单 + 登录防爆破）"
+              action={
+                <RefreshButton
+                  label=""
+                  className="h-8 w-8 px-0"
+                  onClick={refetchGuard}
+                  loading={guardFetching}
+                />
+              }
+            >
+              <SettingsFormRow
+                label="IP 白名单"
+                hint="非空时仅允许列表内 IP 访问面板（含登录页）。保存时会校验当前访问 IP 必须包含在新白名单内，防止误锁；机器间 Agent 流量不受影响。"
+              >
+                <Textarea
+                  rows={3}
+                  className="font-mono text-xs"
+                  placeholder={"留空=不限制\n每行一个 IP 或 CIDR"}
+                  value={panelForm.ip_whitelist}
+                  onChange={(e) =>
+                    setPanelForm((f) => ({ ...f, ip_whitelist: e.target.value }))
+                  }
+                />
+              </SettingsFormRow>
+              <SettingsFormRow
+                label="IP 黑名单"
+                hint="黑名单 IP 一律拒绝访问面板（含登录页）；优先于白名单。"
+              >
+                <Textarea
+                  rows={3}
+                  className="font-mono text-xs"
+                  placeholder={"例: 1.2.3.4\n203.0.113.0/24"}
+                  value={panelForm.ip_blacklist}
+                  onChange={(e) =>
+                    setPanelForm((f) => ({ ...f, ip_blacklist: e.target.value }))
+                  }
+                />
+              </SettingsFormRow>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <SettingsFormRow label="失败阈值" hint="窗口内连续登录失败次数达到该值即触发封禁（1-1000）。">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={1000}
+                    className="font-mono"
+                    value={panelForm.login_max_fails}
+                    onChange={(e) =>
+                      setPanelForm((f) => ({
+                        ...f,
+                        login_max_fails: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </SettingsFormRow>
+                <SettingsFormRow label="计窗秒数" hint="失败计数的时间窗口（秒），窗口外失败重新计数。">
+                  <Input
+                    type="number"
+                    min={60}
+                    max={604800}
+                    className="font-mono"
+                    value={panelForm.login_window_sec}
+                    onChange={(e) =>
+                      setPanelForm((f) => ({
+                        ...f,
+                        login_window_sec: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </SettingsFormRow>
+                <SettingsFormRow label="封禁秒数" hint="触发封禁后该 IP 被拒绝访问的时长（秒）。">
+                  <Input
+                    type="number"
+                    min={60}
+                    max={604800}
+                    className="font-mono"
+                    value={panelForm.login_ban_sec}
+                    onChange={(e) =>
+                      setPanelForm((f) => ({ ...f, login_ban_sec: Number(e.target.value) }))
+                    }
+                  />
+                </SettingsFormRow>
+              </div>
+              <div className="mt-6 flex items-center gap-2 border-t border-border1 pt-4">
+                <Button onClick={() => savePanelMut.mutate()} disabled={savePanelMut.isPending}>
+                  {savePanelMut.isPending ? (
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="mr-1.5 h-4 w-4" />
+                  )}
+                  保存面板防护配置
+                </Button>
+                <span className="text-[11px] text-text3">
+                  封禁/统计为内存态，进程重启后自动清零（防误封自愈）。
+                </span>
+              </div>
+
+              <div className="mt-6 rounded-sm border border-border1 bg-bg5 p-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-text3">
+                    当前封禁列表（{bans.length}）
+                  </span>
+                  <Badge variant="outline" className="text-[10px]">
+                    失败计数 {failures.length} 个 IP
+                  </Badge>
+                </div>
+                {bans.length === 0 ? (
+                  <div className="text-xs text-text3">暂无被封禁的 IP。</div>
+                ) : (
+                  <div className="space-y-2">
+                    {bans.map((b) => (
+                      <div
+                        key={b.ip}
+                        className="flex items-center justify-between gap-3 rounded-sm border border-border1 bg-bg2 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <span className="font-mono text-xs font-medium">{b.ip}</span>
+                          <span className="ml-2 text-[11px] text-text3">
+                            解封时间 {new Date(b.ban_until).toLocaleString()}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 shrink-0 text-xs"
+                          disabled={unbanMut.isPending}
+                          onClick={() => unbanMut.mutate(b.ip)}
+                        >
+                          <ShieldOff className="mr-1 h-3 w-3" /> 解封
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </SettingsSection>
+
             <SettingsSection title="环境变量配置参考（生产推荐）">
               <div className="space-y-2.5">
                 <EnvSnippet
@@ -794,6 +990,27 @@ export function Settings() {
                   desc="显式关闭管理密码校验"
                   onCopy={() => copyToClipboard("ALUKA_ALLOW_NO_AUTH=true", "env_noauth")}
                   copied={copiedKey === "env_noauth"}
+                />
+                <EnvSnippet
+                  label="面板访问 IP 白名单（启动兜底）"
+                  cmd="ALUKA_PANEL_IP_WHITELIST=192.168.1.0/24,10.0.0.0/8"
+                  desc="进程启动即生效，可在本页热改并覆盖；误设白名单时重启进程可逃生"
+                  onCopy={() => copyToClipboard("ALUKA_PANEL_IP_WHITELIST=192.168.1.0/24,10.0.0.0/8", "env_panel_wl")}
+                  copied={copiedKey === "env_panel_wl"}
+                />
+                <EnvSnippet
+                  label="面板访问 IP 黑名单（启动兜底）"
+                  cmd="ALUKA_PANEL_IP_BLACKLIST=1.2.3.4,203.0.113.0/24"
+                  desc="黑名单 IP 一律拒绝访问面板（含登录页）"
+                  onCopy={() => copyToClipboard("ALUKA_PANEL_IP_BLACKLIST=1.2.3.4,203.0.113.0/24", "env_panel_bl")}
+                  copied={copiedKey === "env_panel_bl"}
+                />
+                <EnvSnippet
+                  label="登录防爆破参数（启动兜底）"
+                  cmd="ALUKA_LOGIN_MAX_FAILS=5 ALUKA_LOGIN_WINDOW_SEC=600 ALUKA_LOGIN_BAN_SEC=900"
+                  desc="窗口内失败 5 次即封禁该 IP 900 秒；可在本页热改并覆盖"
+                  onCopy={() => copyToClipboard("ALUKA_LOGIN_MAX_FAILS=5 ALUKA_LOGIN_WINDOW_SEC=600 ALUKA_LOGIN_BAN_SEC=900", "env_login_guard")}
+                  copied={copiedKey === "env_login_guard"}
                 />
               </div>
             </SettingsSection>

@@ -1,6 +1,6 @@
 # 防火墙功能设计（面板自防护 + 网关访问控制增强）
 
-> 状态：设计稿（仅文档，未实施）
+> 状态：**已实施**（F1/F2/F3 全部落地，2026-08）｜设计稿编号 v1
 > 范围：**面板自防护** + **网关访问控制增强**；不含主机系统防火墙（Windows netsh / Linux iptables 等，见 §7 未来扩展）
 > 关联里程碑：F1 → F2 → F3
 
@@ -304,3 +304,11 @@ store.Login(body.Password)
 ## 附：一句话总结
 
 在既有"站点级 IP 黑白名单"成品之上：网关侧补齐**限流（每 IP 令牌桶 429）**、**规则级 IP 名单**与**拦截统计/一键拉黑**；面板侧补齐**IP 黑/白名单中间件**与**登录防爆破（失败封禁全站）**，全部内存态、零新增业务表、复用现有热重载/审计/Setting 机制。
+
+## 附二：实施记录（2026-08）
+
+- **F1 网关限流 + 规则级名单**：`GatewayPort` 新增 `rate_limit_per_min/rate_limit_burst`，`PortProxyRule` 与旧 `GatewayRule` 新增 `ip_whitelist/ip_blacklist`；新增 `internal/pkg/gateway/ratelimit.go`（令牌桶）与 `manager.go serve()` ②/④a 两处插入；校验与热重载走既有 `compilePortConfigs` 链。
+- **F2 拦截统计**：新增 `internal/pkg/gateway/metrics.go`；`GET /api/gateway/stats/blocks`、`POST /api/gateway/stats/blocks/reset`；站点详情新增「拦截统计」Tab + 一键拉黑。
+- **F3 面板自防护**：新增 `internal/pkg/guard`（PanelConfig + Guard 状态机）与 `internal/middleware/ipguard.go`（挂 Auth 之后）；登录接口挂钩失败计数/封禁；`GET /api/settings`、`PUT /api/settings/panel`（防自锁校验）、`GET /api/auth/guard`、`DELETE /api/auth/guard/bans/:ip`；新增 5 个 env 配置（`ALUKA_PANEL_IP_WHITELIST/BLACKLIST`、`ALUKA_LOGIN_MAX_FAILS/WINDOW_SEC/BAN_SEC`，均有对应命令行参数）。
+- **实现追加**：启动时加载 `Setting` 表已持久化的面板配置（Setting 优先于 env 兜底），保证重启后白名单/阈值仍生效；XFF 防护经冒烟验证（未配置 `ALUKA_TRUSTED_PROXIES` 时面板与网关一致只认 TCP 对端）。
+- **测试**：`ratelimit_test.go` / `metrics_test.go` / `guard_test.go` / `ipguard_test.go` / `settings_service_test.go` 全绿；`go build ./...` / `go vet ./...` / `go test ./...` 通过。

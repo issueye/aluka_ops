@@ -15,6 +15,7 @@ var (
 	ErrConflict        = errors.New("操作冲突,请刷新后重试")
 	ErrAlreadyCurrent  = errors.New("该制品已是当前版本,无需切换")
 	ErrNoConsole       = errors.New("进程未运行或控制台不可用,请先在本实例启动服务")
+	ErrPanelInvalid    = errors.New("面板防护参数无效")
 )
 
 // IsNotFound 判断是否为"未找到"类错误。
@@ -32,7 +33,8 @@ func IsClientErr(err error) bool {
 		errors.Is(err, ErrAlreadyRunning),
 		errors.Is(err, ErrNotRunning),
 		errors.Is(err, ErrAlreadyCurrent),
-		errors.Is(err, ErrNoConsole):
+		errors.Is(err, ErrNoConsole),
+		errors.Is(err, ErrPanelInvalid):
 		return true
 	}
 	return false

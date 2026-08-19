@@ -6,6 +6,7 @@ package router
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"aluka_ops/internal/pkg/auth"
 	"aluka_ops/internal/pkg/files"
 	"aluka_ops/internal/pkg/gateway"
+	"aluka_ops/internal/pkg/guard"
 	"aluka_ops/internal/pkg/healthcheck"
 	"aluka_ops/internal/pkg/hostinfo"
 	"aluka_ops/internal/pkg/logstream"
@@ -123,14 +125,57 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	gatewayCtl := controller.NewGatewayController(gatewaySvc)
 	// 鉴权:ALUKA_PASSWORD 非空时启用
 	authStore := auth.NewStore(cfg.AuthPassword, cfg.AuthTokenTTLHours)
-	authCtl := controller.NewAuthController(authStore)
+	// 面板自防护:IP 名单 + 登录防爆破(env 启动兜底,Setting 热更新)
+	trustedProxies, err := gateway.ParseIPList(cfg.TrustedProxies)
+	if err != nil {
+		panic("解析可信代理配置失败: " + err.Error())
+	}
+	panelConf := guard.NewPanelConfig(cfg.PanelIPWhitelist, cfg.PanelIPBlacklist,
+		cfg.LoginMaxFails, time.Duration(cfg.LoginWindowSec)*time.Second, time.Duration(cfg.LoginBanSec)*time.Second)
+	if err := panelConf.Apply(cfg.PanelIPWhitelist, cfg.PanelIPBlacklist,
+		cfg.LoginMaxFails, time.Duration(cfg.LoginWindowSec)*time.Second, time.Duration(cfg.LoginBanSec)*time.Second); err != nil {
+		panic("解析面板 IP 名单失败: " + err.Error())
+	}
+	panelGuard := guard.NewGuard(panelConf)
+	settingRepo := repository.NewSettingRepository(db)
+	// 启动时加载已持久化的面板防护配置(Setting 优先于 env 兜底),保证重启后配置仍生效
+	if kv := settingRepo.GetMany(service.PanelSettingKeys); len(kv) > 0 {
+		wl, bl := cfg.PanelIPWhitelist, cfg.PanelIPBlacklist
+		maxFails, windowSec, banSec := cfg.LoginMaxFails, cfg.LoginWindowSec, cfg.LoginBanSec
+		if v, ok := kv[service.SettingPanelIPWhitelist]; ok {
+			wl = v
+		}
+		if v, ok := kv[service.SettingPanelIPBlacklist]; ok {
+			bl = v
+		}
+		if v, ok := kv[service.SettingPanelMaxFails]; ok {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				maxFails = n
+			}
+		}
+		if v, ok := kv[service.SettingPanelWindowSec]; ok {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				windowSec = n
+			}
+		}
+		if v, ok := kv[service.SettingPanelBanSec]; ok {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				banSec = n
+			}
+		}
+		if err := panelConf.Apply(wl, bl, maxFails, time.Duration(windowSec)*time.Second, time.Duration(banSec)*time.Second); err != nil {
+			panic("解析持久化的面板 IP 名单失败: " + err.Error())
+		}
+	}
+	panelSvc := service.NewPanelSettingsService(settingRepo, panelConf)
+	settingsCtl := controller.NewSettingsController(panelSvc, trustedProxies)
+	authCtl := controller.NewAuthController(authStore, panelGuard, trustedProxies)
 
 	// 服务器级 Web 控制台(Windows 默认 PowerShell)
 	shellMgr := shell.NewManager(cfg.DataDir, 4)
 	shellCtl := controller.NewShellController(shellMgr, cfg.AllowOrigin)
 
 	// 集群角色/连接(可前端改 mode 并主动连中心)
-	settingRepo := repository.NewSettingRepository(db)
 	hb := agent.NewHeartbeatLoop(cfg, agentSvc)
 	clusterSvc := service.NewClusterService(cfg, settingRepo, hb, tunnelHub)
 	clusterSvc.SetOnBecomeHub(func() {
@@ -149,6 +194,8 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 	api := r.Group("/api")
 	// 鉴权(未配置密码时自动放行;Agent Token 动态读取 cfg,前端改配置立即生效)
 	api.Use(middleware.AuthRequiredFn(authStore, func() string { return cfg.AgentToken }))
+	// 面板自防护:封禁/IP 名单(须在 Auth 之后,agent 机器流量放行)
+	api.Use(middleware.IPGuard(panelConf, panelGuard, trustedProxies))
 	// 写操作审计(成功后落库)
 	api.Use(middleware.AuditWrite(auditSvc))
 	{
@@ -233,6 +280,10 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			gw.GET("/rules/:id", gatewayCtl.Get)
 			gw.PUT("/rules/:id", gatewayCtl.Update)
 			gw.DELETE("/rules/:id", gatewayCtl.Delete)
+
+			// 拦截统计(端口×IP×原因;写操作自动进审计)
+			gw.GET("/stats/blocks", appCtl.BlockStats)
+			gw.POST("/stats/blocks/reset", appCtl.ResetBlockStats)
 		}
 
 		// 认证
@@ -241,6 +292,17 @@ func New(db *gorm.DB, cfg *config.Config, procs *process.Manager) (*gin.Engine, 
 			authG.GET("/status", authCtl.Status)
 			authG.POST("/login", authCtl.Login)
 			authG.POST("/logout", authCtl.Logout)
+			// 登录防爆破管理(封禁列表/解封;写操作自动进审计)
+			authG.GET("/guard", authCtl.GuardList)
+			authG.DELETE("/guard/bans/:ip", authCtl.Unban)
+		}
+
+		// 面板防护设置(/api/settings 随 scope() 流转,可管理所选 Agent 节点)
+		st := api.Group("/settings")
+		{
+			st.GET("", settingsCtl.Get)
+			st.GET("/", settingsCtl.Get)
+			st.PUT("/panel", settingsCtl.UpdatePanel)
 		}
 
 		// 运行环境

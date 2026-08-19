@@ -43,6 +43,13 @@ type Config struct {
 	// AuthTokenTTLHours Token 有效期(小时),默认 24。
 	AuthTokenTTLHours int
 
+	// 面板自防护(IP 名单 + 登录防爆破;Setting 可在运行期覆盖,此处为启动兜底)
+	PanelIPWhitelist string
+	PanelIPBlacklist string
+	LoginMaxFails    int // 窗口内失败次数阈值,默认 5
+	LoginWindowSec   int // 失败计数窗口秒,默认 600
+	LoginBanSec      int // 封禁时长秒,默认 900
+
 	// Agent 相关(mode=agent 时向中心 Controller 上报心跳)
 	AgentID       string // 本 Agent 唯一标识,默认主机名
 	ControllerURL string // 中心 Controller 根地址,如 http://ctrl:19090
@@ -73,6 +80,11 @@ func Default() *Config {
 		AuthPassword:         envOr("ALUKA_PASSWORD", ""),
 		AllowNoAuth:          envBoolOr("ALUKA_ALLOW_NO_AUTH", false),
 		AuthTokenTTLHours:    envIntOr("ALUKA_TOKEN_TTL_HOURS", 24),
+		PanelIPWhitelist:     envOr("ALUKA_PANEL_IP_WHITELIST", ""),
+		PanelIPBlacklist:     envOr("ALUKA_PANEL_IP_BLACKLIST", ""),
+		LoginMaxFails:        envIntOr("ALUKA_LOGIN_MAX_FAILS", 5),
+		LoginWindowSec:       envIntOr("ALUKA_LOGIN_WINDOW_SEC", 600),
+		LoginBanSec:          envIntOr("ALUKA_LOGIN_BAN_SEC", 900),
 		AgentID:              envOr("ALUKA_AGENT_ID", host),
 		ControllerURL:        strings.TrimRight(envOr("ALUKA_CONTROLLER_URL", ""), "/"),
 		AgentToken:           envOr("ALUKA_AGENT_TOKEN", ""),
@@ -190,7 +202,8 @@ func applyFlags(c *Config, args []string) error {
 		fmt.Fprintf(os.Stderr, "选项:\n")
 		fs.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n环境变量(命令行优先):\n")
-		fmt.Fprintf(os.Stderr, "  ALUKA_PORT ALUKA_DATA_DIR ALUKA_MODE ALUKA_PASSWORD ALUKA_ALLOW_NO_AUTH ...\n")
+		fmt.Fprintf(os.Stderr, "  ALUKA_PORT ALUKA_DATA_DIR ALUKA_MODE ALUKA_PASSWORD ALUKA_ALLOW_NO_AUTH\n")
+		fmt.Fprintf(os.Stderr, "  ALUKA_PANEL_IP_WHITELIST ALUKA_PANEL_IP_BLACKLIST ALUKA_LOGIN_MAX_FAILS ...\n")
 		fmt.Fprintf(os.Stderr, "\n示例:\n")
 		fmt.Fprintf(os.Stderr, "  %s -port 8080\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "  %s -p 19090 -data-dir D:\\aluka_data\n", os.Args[0])
@@ -203,6 +216,11 @@ func applyFlags(c *Config, args []string) error {
 	password := fs.String("password", "", "管理密码;生产运行必须配置")
 	allowNoAuth := fs.Bool("allow-no-auth", c.AllowNoAuth, "显式允许空管理密码(仅本地开发/受控测试)")
 	allowOrigin := fs.String("allow-origin", "", "CORS 允许来源(默认 *)")
+	panelIPWhitelist := fs.String("panel-ip-whitelist", "", "面板访问 IP 白名单(启动兜底,可被设置页覆盖)")
+	panelIPBlacklist := fs.String("panel-ip-blacklist", "", "面板访问 IP 黑名单(启动兜底)")
+	loginMaxFails := fs.Int("login-max-fails", 0, "登录失败次数阈值(默认 5,窗口内触发封禁)")
+	loginWindowSec := fs.Int("login-window-sec", 0, "登录失败计数窗口秒(默认 600)")
+	loginBanSec := fs.Int("login-ban-sec", 0, "登录封禁时长秒(默认 900)")
 	controllerURL := fs.String("controller-url", "", "Agent 模式:中心 Controller 根地址")
 	agentID := fs.String("agent-id", "", "Agent 唯一标识")
 	agentToken := fs.String("agent-token", "", "Agent/Controller 共享密钥")
@@ -233,6 +251,21 @@ func applyFlags(c *Config, args []string) error {
 	c.AllowNoAuth = *allowNoAuth
 	if o := strings.TrimSpace(*allowOrigin); o != "" {
 		c.AllowOrigin = o
+	}
+	if wl := strings.TrimSpace(*panelIPWhitelist); wl != "" {
+		c.PanelIPWhitelist = wl
+	}
+	if bl := strings.TrimSpace(*panelIPBlacklist); bl != "" {
+		c.PanelIPBlacklist = bl
+	}
+	if *loginMaxFails > 0 {
+		c.LoginMaxFails = *loginMaxFails
+	}
+	if *loginWindowSec > 0 {
+		c.LoginWindowSec = *loginWindowSec
+	}
+	if *loginBanSec > 0 {
+		c.LoginBanSec = *loginBanSec
 	}
 	if u := strings.TrimSpace(*controllerURL); u != "" {
 		c.ControllerURL = strings.TrimRight(u, "/")

@@ -220,6 +220,28 @@ export const gatewayApi = {
   // 内置脚本模板
   listScriptTemplates: () => api.get("/api/gateway/script-templates"),
   getScriptTemplate: (id) => api.get(`/api/gateway/script-templates/${id}`),
+  // 拦截统计(端口×IP×原因;port_id 为站点 DB 主键)
+  listBlocks: (portId) =>
+    api.get(
+      portId ? `/api/gateway/stats/blocks?port_id=${portId}` : "/api/gateway/stats/blocks"
+    ),
+  resetBlocks: (portId) =>
+    api.post(
+      "/api/gateway/stats/blocks/reset",
+      portId ? { port_id: portId } : {}
+    ),
+};
+
+// 登录防爆破 / 面板自防护(控制面 /api/auth/*,不随网关作用域改写)
+export const authGuardApi = {
+  list: () => api.get("/api/auth/guard"),
+  unban: (ip) => api.del(`/api/auth/guard/bans/${encodeURIComponent(ip)}`),
+};
+
+// 面板防护设置(/api/settings 随 scope() 流转:本地=本机,选中 Agent=该节点)
+export const panelSettingsApi = {
+  get: () => api.get("/api/settings"),
+  update: (body) => api.put("/api/settings/panel", body),
 };
 
 // 流量隧道(反向 TCP:中心端口 → Agent 本机服务)

@@ -347,6 +347,11 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | `ALUKA_PASSWORD` | (空) | 管理密码;生产运行必须配置(仅空白字符视为空) |
 | `ALUKA_ALLOW_NO_AUTH` | `false` | 显式允许空管理密码,仅用于本地开发/受控测试 |
 | `ALUKA_TOKEN_TTL_HOURS` | `24` | Token 有效期(小时) |
+| `ALUKA_PANEL_IP_WHITELIST` | (空) | 面板访问 IP 白名单(启动兜底,可在设置页热改并覆盖;含防误自锁校验) |
+| `ALUKA_PANEL_IP_BLACKLIST` | (空) | 面板访问 IP 黑名单(启动兜底;黑名单 IP 一律拒绝访问面板) |
+| `ALUKA_LOGIN_MAX_FAILS` | `5` | 登录失败次数阈值,窗口内达阈值即封禁该 IP 全部 API(1-1000) |
+| `ALUKA_LOGIN_WINDOW_SEC` | `600` | 登录失败计数窗口秒(60-604800) |
+| `ALUKA_LOGIN_BAN_SEC` | `900` | 登录触发封禁的时长秒(60-604800) |
 | `ALUKA_AGENT_ID` | 主机名 | Agent 唯一标识 |
 | `ALUKA_CONTROLLER_URL` | (空) | 中心 Controller 地址(启用心跳) |
 | `ALUKA_AGENT_TOKEN` | (空) | Agent 共享密钥(上报与 /api/agent);`agent`/`controller` 模式生产运行必须配置,跨源浏览器请求需允许 `X-Agent-Token` |
@@ -388,6 +393,7 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | GET | `/api/operations` `/api/operations/:id` | 全局操作历史(含服务名) / 单条详情 |
 | GET | `/api/dashboard/stats` | 仪表盘统计(服务状态/环境/异常/最近操作) |
 | GET | `/api/audit-logs` `/api/audit-logs/:id` | **审计日志**列表/详情 |
+| DELETE | `/api/auth/guard/bans/:ip` | 人工解封指定 IP(写操作自动进审计) |
 | GET | `/api/runtimes/detect` | **本机 JDK 探测** |
 | GET/POST | `/api/templates` | 服务模板列表 / 创建 |
 | GET/PUT/DELETE | `/api/templates/:id` | 模板详情 / 更新 / 删除 |
@@ -405,6 +411,9 @@ go build -o bin/aluka_ops.exe ./cmd/server
 | GET | `/api/gateway/script-templates` | **内置脚本模板**列表 |
 | GET | `/api/gateway/script-templates/:id` | 模板详情 |
 | GET/POST | `/api/gateway/status` `/reload` | 运行时监听状态 / 重载 |
+| GET/POST | `/api/gateway/stats/blocks` `/stats/blocks/reset` | **拦截统计**(端口×IP×原因) / 清零(失败自动拉黑入口) |
+| GET/PUT | `/api/settings` `/api/settings/panel` | **面板防护**配置(IP 名单/登录防爆破;保存带防自锁校验) |
+| GET | `/api/auth/guard` | 登录失败计数与封禁列表 |
 
 统一响应:`{ "code": 0, "message": "ok", "data": ... }`,`code=0` 为成功。
 
