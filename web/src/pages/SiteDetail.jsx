@@ -80,6 +80,8 @@ const EMPTY_PROXY = {
   pass_host: false,
   enable_websocket: true,
   description: "",
+  ip_whitelist: "",
+  ip_blacklist: "",
 };
 
 const DEFAULT_SCRIPT = `[
@@ -252,6 +254,40 @@ export function SiteDetail() {
     onError: (e) => toast.error(e.message),
   });
 
+  // ----- 拦截统计 -----
+  const { data: blocksData, isLoading: blocksLoading } = useQuery({
+    queryKey: ["gateway-blocks", siteId],
+    queryFn: () => gatewayApi.listBlocks(siteId),
+    enabled: !!siteId,
+    refetchInterval: 15000,
+  });
+  const blocks = blocksData?.items || [];
+  const blockTotal = useMemo(
+    () => blocks.reduce((sum, b) => sum + b.count403 + b.count429, 0),
+    [blocks]
+  );
+  const blockIPMut = useMutation({
+    mutationFn: (ip) => {
+      const cur = (site.ip_blacklist || "").trim();
+      const lines = cur ? cur.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean) : [];
+      if (lines.includes(ip)) throw new Error("该 IP 已在站点黑名单中");
+      return gatewayApi.updatePort(siteId, { ip_blacklist: lines.concat(ip).join("\n") });
+    },
+    onSuccess: () => {
+      toast.success("已加入站点黑名单，即刻生效");
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message || "加入黑名单失败"),
+  });
+  const resetBlocksMut = useMutation({
+    mutationFn: () => gatewayApi.resetBlocks(siteId),
+    onSuccess: () => {
+      toast.success("拦截统计已清零");
+      qc.invalidateQueries({ queryKey: ["gateway-blocks", siteId] });
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const openCreateApp = () => {
     setEditingApp(null);
     setAppForm({
@@ -302,6 +338,8 @@ export function SiteDetail() {
       pass_host: !!row.pass_host,
       enable_websocket: row.enable_websocket !== false,
       description: row.description || "",
+      ip_whitelist: row.ip_whitelist || "",
+      ip_blacklist: row.ip_blacklist || "",
     });
     setProxyOpen(true);
   };
@@ -456,6 +494,7 @@ export function SiteDetail() {
           { value: "apps", label: `APP (${apps.length})`, icon: FolderTree },
           { value: "proxies", label: `反代 (${proxies.length})`, icon: ArrowRightLeft },
           { value: "scripts", label: `路由脚本 (${scripts.length})`, icon: ScrollText },
+          { value: "blocks", label: `拦截统计 (${blockTotal})`, icon: Shield },
         ]}
       >
 
@@ -638,6 +677,16 @@ export function SiteDetail() {
                         <Badge variant={px.enabled ? "success" : "secondary"}>
                           {px.enabled ? "启用" : "停用"}
                         </Badge>
+                        {px.ip_whitelist?.trim() && (
+                          <Badge variant="outline" className="ml-1 text-[10px]">
+                            白名单
+                          </Badge>
+                        )}
+                        {px.ip_blacklist?.trim() && (
+                          <Badge variant="outline" className="ml-1 text-[10px] text-danger">
+                            黑名单
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <RowActions>
@@ -774,6 +823,80 @@ export function SiteDetail() {
                               onClick={() => setDeletingScript(sc)}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </IconTooltip>
+                        </RowActions>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </DataTableCard>
+        </TabsContent>
+
+        {/* ===== 拦截统计 Tab ===== */}
+        <TabsContent value="blocks" className="mt-4 space-y-5">
+          <DataTableCard
+            title="拦截统计"
+            description="按 端口×IP×原因 记录被站点拒绝/限流的请求（内存态，重启清零）。"
+            actions={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={resetBlocksMut.isPending || blocks.length === 0}
+                onClick={() => resetBlocksMut.mutate()}
+              >
+                清空统计
+              </Button>
+            }
+          >
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>来源 IP</TableHead>
+                  <TableHead>403 拒绝</TableHead>
+                  <TableHead>429 限流</TableHead>
+                  <TableHead>最近原因</TableHead>
+                  <TableHead>首次 / 最近</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {blocks.length === 0 ? (
+                  <TableStateRow colSpan={6}>
+                    {blocksLoading
+                      ? "加载中…"
+                      : "暂无拦截记录。站点级 IP 名单、限流或路由脚本 deny 触发后，此处会实时计数。"}
+                  </TableStateRow>
+                ) : (
+                  blocks.map((b) => (
+                    <TableRow key={b.ip}>
+                      <TableCell className="font-mono text-xs">{b.ip}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.count403}</TableCell>
+                      <TableCell className="font-mono text-xs">{b.count429}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {b.last_reason}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-[11px] text-text3">
+                        {new Date(b.first_seen).toLocaleString()}
+                        <br />
+                        {new Date(b.last_seen).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RowActions>
+                          <IconTooltip label="加入站点黑名单">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-danger"
+                              aria-label="加入黑名单"
+                              disabled={blockIPMut.isPending}
+                              onClick={() => blockIPMut.mutate(b.ip)}
+                            >
+                              <Shield className="h-3.5 w-3.5" />
                             </Button>
                           </IconTooltip>
                         </RowActions>
@@ -945,6 +1068,29 @@ export function SiteDetail() {
               }
             />
           </FormGrid>
+          <div className="mt-3 space-y-3">
+            <FormField
+              label="IP 白名单"
+              hint="非空时仅允许列表内 IP 访问该反代规则；格式与站点级相同（IP/CIDR，换行或逗号分隔）。"
+            >
+              <Textarea
+                rows={2}
+                className="font-mono text-xs"
+                placeholder={"10.0.0.0/8\n192.168.1.1"}
+                value={proxyForm.ip_whitelist}
+                onChange={(e) => setProxyForm((f) => ({ ...f, ip_whitelist: e.target.value }))}
+              />
+            </FormField>
+            <FormField label="IP 黑名单">
+              <Textarea
+                rows={2}
+                className="font-mono text-xs"
+                placeholder={"1.2.3.4\n203.0.113.0/24"}
+                value={proxyForm.ip_blacklist}
+                onChange={(e) => setProxyForm((f) => ({ ...f, ip_blacklist: e.target.value }))}
+              />
+            </FormField>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setProxyOpen(false)}>
               取消
@@ -967,6 +1113,8 @@ export function SiteDetail() {
                   pass_host: proxyForm.pass_host,
                   enable_websocket: proxyForm.enable_websocket,
                   description: proxyForm.description,
+                  ip_whitelist: proxyForm.ip_whitelist,
+                  ip_blacklist: proxyForm.ip_blacklist,
                 };
                 if (!editingProxy) body.code = proxyForm.code;
                 saveProxyMut.mutate(body);

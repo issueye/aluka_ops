@@ -85,12 +85,14 @@ func (s *AppGatewayService) RuntimeStatus() []map[string]any {
 // ===== Port CRUD =====
 
 type PortCreateInput struct {
-	Port        int    `json:"port"`
-	Name        string `json:"name"`
-	Enabled     *bool  `json:"enabled"`
-	Description string `json:"description"`
-	IPWhitelist string `json:"ip_whitelist"`
-	IPBlacklist string `json:"ip_blacklist"`
+	Port            int    `json:"port"`
+	Name            string `json:"name"`
+	Enabled         *bool  `json:"enabled"`
+	Description     string `json:"description"`
+	IPWhitelist     string `json:"ip_whitelist"`
+	IPBlacklist     string `json:"ip_blacklist"`
+	RateLimitPerMin int    `json:"rate_limit_per_min"`
+	RateLimitBurst  int    `json:"rate_limit_burst"`
 }
 
 func (s *AppGatewayService) ListPorts() ([]model.GatewayPort, error) {
@@ -132,13 +134,18 @@ func (s *AppGatewayService) CreatePort(in PortCreateInput) (*model.GatewayPort, 
 	if _, err := gateway.NewIPFilter(in.IPWhitelist, in.IPBlacklist); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrAppInvalid, err)
 	}
+	if in.RateLimitPerMin < 0 || in.RateLimitBurst < 0 {
+		return nil, fmt.Errorf("%w: 限流参数不能为负", ErrAppInvalid)
+	}
 	m := &model.GatewayPort{
-		Port:        in.Port,
-		Name:        name,
-		Enabled:     en,
-		Description: in.Description,
-		IPWhitelist: strings.TrimSpace(in.IPWhitelist),
-		IPBlacklist: strings.TrimSpace(in.IPBlacklist),
+		Port:            in.Port,
+		Name:            name,
+		Enabled:         en,
+		Description:     in.Description,
+		IPWhitelist:     strings.TrimSpace(in.IPWhitelist),
+		IPBlacklist:     strings.TrimSpace(in.IPBlacklist),
+		RateLimitPerMin: in.RateLimitPerMin,
+		RateLimitBurst:  in.RateLimitBurst,
 	}
 	if err := s.ports.Create(m); err != nil {
 		return nil, err
@@ -148,11 +155,13 @@ func (s *AppGatewayService) CreatePort(in PortCreateInput) (*model.GatewayPort, 
 }
 
 type PortUpdateInput struct {
-	Name        *string `json:"name"`
-	Enabled     *bool   `json:"enabled"`
-	Description *string `json:"description"`
-	IPWhitelist *string `json:"ip_whitelist"`
-	IPBlacklist *string `json:"ip_blacklist"`
+	Name            *string `json:"name"`
+	Enabled         *bool   `json:"enabled"`
+	Description     *string `json:"description"`
+	IPWhitelist     *string `json:"ip_whitelist"`
+	IPBlacklist     *string `json:"ip_blacklist"`
+	RateLimitPerMin *int    `json:"rate_limit_per_min"`
+	RateLimitBurst  *int    `json:"rate_limit_burst"`
 	// Port 不允许改端口号(避免混乱);需删建
 }
 
@@ -186,6 +195,18 @@ func (s *AppGatewayService) UpdatePort(id uint, in PortUpdateInput) (*model.Gate
 	}
 	m.IPWhitelist = wl
 	m.IPBlacklist = bl
+	if in.RateLimitPerMin != nil {
+		if *in.RateLimitPerMin < 0 {
+			return nil, fmt.Errorf("%w: 限流参数不能为负", ErrAppInvalid)
+		}
+		m.RateLimitPerMin = *in.RateLimitPerMin
+	}
+	if in.RateLimitBurst != nil {
+		if *in.RateLimitBurst < 0 {
+			return nil, fmt.Errorf("%w: 限流参数不能为负", ErrAppInvalid)
+		}
+		m.RateLimitBurst = *in.RateLimitBurst
+	}
 	if err := s.ports.Update(m); err != nil {
 		return nil, err
 	}
@@ -389,6 +410,8 @@ type ProxyCreateInput struct {
 	ExtraHeaders             any    `json:"extra_headers"`
 	Sort                     int    `json:"sort"`
 	Description              string `json:"description"`
+	IPWhitelist              string `json:"ip_whitelist"`
+	IPBlacklist              string `json:"ip_blacklist"`
 }
 
 func (s *AppGatewayService) ListProxies() ([]model.PortProxyRule, error) {
@@ -448,6 +471,9 @@ func (s *AppGatewayService) CreateProxy(in ProxyCreateInput) (*model.PortProxyRu
 	if rhto <= 0 {
 		rhto = 60
 	}
+	if _, err := gateway.NewIPFilter(in.IPWhitelist, in.IPBlacklist); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrAppInvalid, err)
+	}
 	extra := marshalExtra(in.ExtraHeaders)
 	m := &model.PortProxyRule{
 		PortID:                   in.PortID,
@@ -466,6 +492,8 @@ func (s *AppGatewayService) CreateProxy(in ProxyCreateInput) (*model.PortProxyRu
 		ExtraHeaders:             extra,
 		Sort:                     in.Sort,
 		Description:              in.Description,
+		IPWhitelist:              strings.TrimSpace(in.IPWhitelist),
+		IPBlacklist:              strings.TrimSpace(in.IPBlacklist),
 	}
 	if err := s.proxies.Create(m); err != nil {
 		return nil, err
@@ -492,6 +520,8 @@ type ProxyUpdateInput struct {
 	ExtraHeaders             any     `json:"extra_headers"`
 	Sort                     *int    `json:"sort"`
 	Description              *string `json:"description"`
+	IPWhitelist              *string `json:"ip_whitelist"`
+	IPBlacklist              *string `json:"ip_blacklist"`
 }
 
 func (s *AppGatewayService) UpdateProxy(id uint, in ProxyUpdateInput) (*model.PortProxyRule, error) {
@@ -554,6 +584,20 @@ func (s *AppGatewayService) UpdateProxy(id uint, in ProxyUpdateInput) (*model.Po
 	}
 	if in.Description != nil {
 		m.Description = *in.Description
+	}
+	if in.IPWhitelist != nil || in.IPBlacklist != nil {
+		wl, bl := m.IPWhitelist, m.IPBlacklist
+		if in.IPWhitelist != nil {
+			wl = strings.TrimSpace(*in.IPWhitelist)
+		}
+		if in.IPBlacklist != nil {
+			bl = strings.TrimSpace(*in.IPBlacklist)
+		}
+		if _, err := gateway.NewIPFilter(wl, bl); err != nil {
+			return nil, fmt.Errorf("%w: %v", ErrAppInvalid, err)
+		}
+		m.IPWhitelist = wl
+		m.IPBlacklist = bl
 	}
 	if err := s.proxies.Update(m); err != nil {
 		return nil, err
@@ -757,25 +801,27 @@ func compilePortConfigs(ports []model.GatewayPort, dataDir string) ([]gateway.Po
 			if !pr.Enabled {
 				continue
 			}
-			rules = append(rules, model.GatewayRule{
-				Base:                     model.Base{ID: pr.ID + 1000000},
-				Name:                     pr.Name,
-				Code:                     "px_" + pr.Code,
-				Type:                     model.GatewayTypeProxy,
-				Enabled:                  true,
-				ListenPort:               p.Port,
-				PathPrefix:               pr.PathPrefix,
-				StripPrefix:              pr.StripPrefix,
-				Upstream:                 pr.Upstream,
-				ConnectTimeoutSec:        pr.ConnectTimeoutSec,
-				ResponseHeaderTimeoutSec: pr.ResponseHeaderTimeoutSec,
-				IOTimeoutSec:             pr.IOTimeoutSec,
-				MaxBodyBytes:             pr.MaxBodyBytes,
-				PassHost:                 pr.PassHost,
-				ExtraHeaders:             pr.ExtraHeaders,
-				EnableWebSocket:          pr.EnableWebSocket,
-				Sort:                     pr.Sort,
-			})
+rules = append(rules, model.GatewayRule{
+					Base:                     model.Base{ID: pr.ID + 1000000},
+					Name:                     pr.Name,
+					Code:                     "px_" + pr.Code,
+					Type:                     model.GatewayTypeProxy,
+					Enabled:                  true,
+					ListenPort:               p.Port,
+					PathPrefix:               pr.PathPrefix,
+					StripPrefix:              pr.StripPrefix,
+					Upstream:                 pr.Upstream,
+					ConnectTimeoutSec:        pr.ConnectTimeoutSec,
+					ResponseHeaderTimeoutSec: pr.ResponseHeaderTimeoutSec,
+					IOTimeoutSec:             pr.IOTimeoutSec,
+					MaxBodyBytes:             pr.MaxBodyBytes,
+					PassHost:                 pr.PassHost,
+					ExtraHeaders:             pr.ExtraHeaders,
+					EnableWebSocket:          pr.EnableWebSocket,
+					Sort:                     pr.Sort,
+					IPWhitelist:              pr.IPWhitelist,
+					IPBlacklist:              pr.IPBlacklist,
+				})
 		}
 		for _, app := range p.Apps {
 			if !app.Enabled {
@@ -823,6 +869,8 @@ func compilePortConfigs(ports []model.GatewayPort, dataDir string) ([]gateway.Po
 		} else {
 			cfg.IPFilter = ipf
 		}
+		// 站点级限流(每 IP 令牌桶;rate=0 → 不限流)
+		cfg.RateLimiter = gateway.NewRateLimiter(p.RateLimitPerMin, p.RateLimitBurst)
 
 		if len(cfg.Rules) > 0 || len(cfg.Scripts) > 0 {
 			out = append(out, cfg)
@@ -881,4 +929,37 @@ func marshalExtra(v any) string {
 		}
 		return string(b)
 	}
+}
+
+// ===== 拦截统计 =====
+
+// BlockStats 指定端口的拦截统计(port_id 为 DB 主键,内部换算为 TCP 端口)。
+func (s *AppGatewayService) BlockStats(portID uint) (map[string]any, error) {
+	p, err := s.GetPort(portID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"port":  p.Port,
+		"items": s.mgr.BlockStats(p.Port),
+	}, nil
+}
+
+// AllBlockStats 全端口拦截统计聚合。
+func (s *AppGatewayService) AllBlockStats() []gateway.BlockEntryView {
+	return s.mgr.AllBlockStats()
+}
+
+// ResetBlocks 清零拦截统计;portID=0 表示全部。
+func (s *AppGatewayService) ResetBlocks(portID uint) error {
+	port := 0
+	if portID > 0 {
+		p, err := s.GetPort(portID)
+		if err != nil {
+			return err
+		}
+		port = p.Port
+	}
+	s.mgr.ResetBlocks(port)
+	return nil
 }

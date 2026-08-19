@@ -51,4 +51,8 @@ type GatewayRule struct {
 	Description string `gorm:"type:text" json:"description"`
 	// Sort 同端口内匹配顺序,数值越小越先;实际用最长前缀优先,Sort 作并列时次序
 	Sort int `gorm:"default:0" json:"sort"`
+
+	// 规则级 IP 访问控制(格式与站点级一致;空则不限制)
+	IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
+	IPBlacklist string `gorm:"type:text" json:"ip_blacklist"`
 }

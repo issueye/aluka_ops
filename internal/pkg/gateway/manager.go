@@ -47,6 +47,8 @@ type Rule struct {
 	ExtraHeaders             map[string]string
 	EnableWebSocket          bool
 	Sort                     int
+	// IPFilter 规则级 IP 名单(可空)
+	IPFilter *IPFilter
 }
 
 // PortConfig 单个监听端口的运行时配置。
@@ -56,6 +58,8 @@ type PortConfig struct {
 	Scripts []CompiledScript
 	// IP 过滤(可空)
 	IPFilter *IPFilter
+	// 站点级限流(可空;nil/未启用表示不限流)
+	RateLimiter *RateLimiter
 }
 
 // Manager 管理多端口 HTTP 服务。
@@ -65,16 +69,19 @@ type Manager struct {
 	dataDir        string              // data 根目录
 	onChange       func()              // 可选回调
 	trustedProxies []*net.IPNet
+	// 拦截统计(独立于配置快照,reload 不清零)
+	stats *BlockStats
 }
 
 type portServer struct {
 	port     int
 	server   *http.Server
 	listener net.Listener
-	// rules / scripts / ip 快照
+	// rules / scripts / ip / 限流 快照
 	rules          []Rule
 	scripts        []CompiledScript
 	ipFilter       *IPFilter
+	rateLimiter    *RateLimiter
 	trustedProxies []*net.IPNet
 	cancel         context.CancelFunc
 }
@@ -84,6 +91,7 @@ func NewManager(dataDir string) *Manager {
 	return &Manager{
 		ports:   make(map[int]*portServer),
 		dataDir: dataDir,
+		stats:   NewBlockStats(),
 	}
 }
 
@@ -150,10 +158,11 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 			continue
 		}
 		byPort[c.Port] = PortConfig{
-			Port:     c.Port,
-			Rules:    rules,
-			Scripts:  scripts,
-			IPFilter: c.IPFilter,
+			Port:        c.Port,
+			Rules:       rules,
+			Scripts:     scripts,
+			IPFilter:    c.IPFilter,
+			RateLimiter: c.RateLimiter,
 		}
 	}
 
@@ -164,6 +173,7 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 		if _, ok := byPort[port]; !ok {
 			m.stopPortLocked(ps)
 			delete(m.ports, port)
+			m.stats.Reset(port) // 端口关闭时清除其统计
 			log.Printf("[gateway] stop listen :%d", port)
 		}
 	}
@@ -174,10 +184,11 @@ func (m *Manager) ApplyPorts(cfgs []PortConfig) error {
 			ps.rules = cfg.Rules
 			ps.scripts = cfg.Scripts
 			ps.ipFilter = cfg.IPFilter
+			ps.rateLimiter = cfg.RateLimiter
 			ps.trustedProxies = append([]*net.IPNet(nil), m.trustedProxies...)
 			continue
 		}
-		ps, err := m.startPortLocked(port, cfg.Rules, cfg.Scripts, cfg.IPFilter)
+		ps, err := m.startPortLocked(port, cfg.Rules, cfg.Scripts, cfg.IPFilter, cfg.RateLimiter)
 		if err != nil {
 			log.Printf("[gateway] listen :%d failed: %v", port, err)
 			if firstErr == nil {
@@ -227,6 +238,31 @@ func (m *Manager) Close() {
 		m.stopPortLocked(ps)
 		delete(m.ports, p)
 	}
+	m.stats.Reset(0)
+}
+
+// BlockStats 指定端口拦截统计。
+func (m *Manager) BlockStats(port int) []BlockEntryView {
+	if m == nil || m.stats == nil {
+		return nil
+	}
+	return m.stats.Snapshot(port)
+}
+
+// AllBlockStats 全端口拦截统计。
+func (m *Manager) AllBlockStats() []BlockEntryView {
+	if m == nil || m.stats == nil {
+		return nil
+	}
+	return m.stats.SnapshotAll()
+}
+
+// ResetBlocks 清零拦截统计;port<=0 清空全部。
+func (m *Manager) ResetBlocks(port int) {
+	if m == nil || m.stats == nil {
+		return
+	}
+	m.stats.Reset(port)
 }
 
 func (m *Manager) stopPortLocked(ps *portServer) {
@@ -243,19 +279,20 @@ func (m *Manager) stopPortLocked(ps *portServer) {
 	}
 }
 
-func (m *Manager) startPortLocked(port int, rules []Rule, scripts []CompiledScript, ipf *IPFilter) (*portServer, error) {
+func (m *Manager) startPortLocked(port int, rules []Rule, scripts []CompiledScript, ipf *IPFilter, limiter *RateLimiter) (*portServer, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	ps := &portServer{
-		port:     port,
-		listener: ln,
-		rules:    rules,
-		scripts:  scripts,
-		ipFilter: ipf,
-		cancel:   cancel,
+		port:        port,
+		listener:    ln,
+		rules:       rules,
+		scripts:     scripts,
+		ipFilter:    ipf,
+		rateLimiter: limiter,
+		cancel:      cancel,
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m.serve(ps, w, r)
@@ -286,15 +323,28 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 	rules := ps.rules
 	scripts := ps.scripts
 	ipf := ps.ipFilter
+	limiter := ps.rateLimiter
 	trustedProxies := ps.trustedProxies
 	m.mu.RUnlock()
 
-	// IP 黑白名单(站点级)
+	// 客户端 IP 全程只解析一次:名单、限流、统计按同一真实来源判定
+	cip := ClientIP(r, trustedProxies)
+
+	// ① 站点级 IP 黑白名单
 	if ipf != nil {
-		cip := ClientIP(r, trustedProxies)
 		if !ipf.Allowed(cip) {
+			m.stats.Record(ps.port, cip, BlockReasonSiteACL)
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 			http.Error(w, "403 forbidden: ip not allowed", http.StatusForbidden)
+			return
+		}
+	}
+	// ② 站点级限流(每 IP 令牌桶,超限 429 + Retry-After)
+	if limiter != nil && limiter.Enabled() && cip != nil {
+		if ok, wait := limiter.Allowed(cip.String()); !ok {
+			m.stats.Record(ps.port, cip, BlockReasonRateLimit)
+			w.Header().Set("Retry-After", fmt.Sprintf("%d", wait))
+			http.Error(w, "429 rate limit exceeded", http.StatusTooManyRequests)
 			return
 		}
 	}
@@ -317,6 +367,7 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 		r2.URL.Path = path
 		switch act.Kind {
 		case "deny":
+			m.stats.Record(ps.port, cip, BlockReasonScriptDeny)
 			for k, v := range act.Headers {
 				w.Header().Set(k, v)
 			}
@@ -386,6 +437,12 @@ func (m *Manager) serve(ps *portServer, w http.ResponseWriter, r *http.Request) 
 	rule := matchRule(rules, path)
 	if rule == nil {
 		http.Error(w, "no gateway rule matched", http.StatusNotFound)
+		return
+	}
+	// ④a 规则级 IP 名单
+	if rule.IPFilter != nil && !rule.IPFilter.Allowed(cip) {
+		m.stats.Record(ps.port, cip, BlockReasonRuleACL)
+		http.Error(w, "403 forbidden: ip not allowed", http.StatusForbidden)
 		return
 	}
 	switch rule.Type {
@@ -472,6 +529,14 @@ func toRuntime(r model.GatewayRule, dataDir string) (Rule, error) {
 	}
 	if out.ExtraHeaders == nil {
 		out.ExtraHeaders = map[string]string{}
+	}
+	// 规则级 IP 名单(空则不限制;解析失败按无效规则跳过并记录)
+	if strings.TrimSpace(r.IPWhitelist) != "" || strings.TrimSpace(r.IPBlacklist) != "" {
+		f, err := NewIPFilter(r.IPWhitelist, r.IPBlacklist)
+		if err != nil {
+			return out, fmt.Errorf("IP 名单无效: %w", err)
+		}
+		out.IPFilter = f
 	}
 	switch r.Type {
 	case model.GatewayTypeStatic:

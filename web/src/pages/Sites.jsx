@@ -46,6 +46,8 @@ const EMPTY = {
   description: "",
   ip_whitelist: "",
   ip_blacklist: "",
+  rate_limit_per_min: 0,
+  rate_limit_burst: 0,
 };
 
 const PAGE_SIZE = 10;
@@ -143,6 +145,8 @@ export function Sites() {
       description: s.description || "",
       ip_whitelist: s.ip_whitelist || "",
       ip_blacklist: s.ip_blacklist || "",
+      rate_limit_per_min: s.rate_limit_per_min || 0,
+      rate_limit_burst: s.rate_limit_burst || 0,
     });
     setOpen(true);
   };
@@ -313,6 +317,11 @@ export function Sites() {
                     黑名单
                   </Badge>
                 )}
+                {s.rate_limit_per_min > 0 && (
+                  <Badge variant="outline" className="text-[10px]">
+                    限流 {s.rate_limit_per_min}/分
+                  </Badge>
+                )}
               </div>
             ),
           },
@@ -407,6 +416,39 @@ export function Sites() {
                 onChange={(e) => setForm((f) => ({ ...f, ip_blacklist: e.target.value }))}
               />
             </FormField>
+            <FormField
+              label="请求限流"
+              hint="按客户端 IP 计数的令牌桶：每分钟每 IP 请求上限，0=不限。突发容量为桶大小，0=取上限值。超限返回 429。"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  className="font-mono"
+                  placeholder="每分钟/IP"
+                  value={form.rate_limit_per_min}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      rate_limit_per_min: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  className="font-mono"
+                  placeholder="突发容量"
+                  value={form.rate_limit_burst}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      rate_limit_burst: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+            </FormField>
             <FormField label="备注">
               <Textarea
                 rows={2}
@@ -430,6 +472,8 @@ export function Sites() {
                     description: form.description,
                     ip_whitelist: form.ip_whitelist,
                     ip_blacklist: form.ip_blacklist,
+                    rate_limit_per_min: form.rate_limit_per_min,
+                    rate_limit_burst: form.rate_limit_burst,
                   });
                 } else {
                   saveMut.mutate({
@@ -439,6 +483,8 @@ export function Sites() {
                     description: form.description,
                     ip_whitelist: form.ip_whitelist,
                     ip_blacklist: form.ip_blacklist,
+                    rate_limit_per_min: form.rate_limit_per_min,
+                    rate_limit_burst: form.rate_limit_burst,
                   });
                 }
               }}

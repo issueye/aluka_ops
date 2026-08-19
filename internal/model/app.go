@@ -15,6 +15,10 @@ type GatewayPort struct {
 	IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
 	IPBlacklist string `gorm:"type:text" json:"ip_blacklist"`
 
+	// 站点级限流(每客户端 IP 令牌桶):RateLimitPerMin>0 时启用,超限返回 429
+	RateLimitPerMin int `gorm:"not null;default:0" json:"rate_limit_per_min"`
+	RateLimitBurst  int `gorm:"not null;default:0" json:"rate_limit_burst"`
+
 	// 关联(查询时 Preload)
 	Apps    []App             `gorm:"foreignKey:PortID" json:"apps,omitempty"`
 	Proxies []PortProxyRule   `gorm:"foreignKey:PortID" json:"proxies,omitempty"`
@@ -67,6 +71,10 @@ type PortProxyRule struct {
 		ExtraHeaders    string `gorm:"type:text" json:"extra_headers"`
 		Sort            int    `gorm:"default:0" json:"sort"`
 		Description     string `gorm:"type:text" json:"description"`
+
+		// 规则级 IP 访问控制(格式与站点级一致;空则不限制)
+		IPWhitelist string `gorm:"type:text" json:"ip_whitelist"`
+		IPBlacklist string `gorm:"type:text" json:"ip_blacklist"`
 
 		Port *GatewayPort `gorm:"foreignKey:PortID" json:"port,omitempty"`
 	}

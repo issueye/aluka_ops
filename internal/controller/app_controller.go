@@ -349,6 +349,42 @@ func (h *AppController) DeleteScript(c *gin.Context) {
 	OKMsg(c, "已删除")
 }
 
+// ----- 拦截统计 -----
+
+// BlockStats GET /api/gateway/stats/blocks?port_id=X
+// 不带 port_id 返回全端口聚合。port_id 为站点 DB 主键(内部换算为 TCP 端口)。
+func (h *AppController) BlockStats(c *gin.Context) {
+	if pid := c.Query("port_id"); pid != "" {
+		id, err := strconv.ParseUint(pid, 10, 64)
+		if err != nil {
+			Fail(c, 400, CodeErrBad, "port_id 无效")
+			return
+		}
+		out, err := h.svc.BlockStats(uint(id))
+		if err != nil {
+			h.mapErr(c, err)
+			return
+		}
+		OK(c, out)
+		return
+	}
+	OK(c, gin.H{"items": h.svc.AllBlockStats()})
+}
+
+// ResetBlockStats POST /api/gateway/stats/blocks/reset
+// body 可选 {"port_id": X};不传或 0 清空全部。
+func (h *AppController) ResetBlockStats(c *gin.Context) {
+	var body struct {
+		PortID uint `json:"port_id"`
+	}
+	_ = c.ShouldBindJSON(&body)
+	if err := h.svc.ResetBlocks(body.PortID); err != nil {
+		h.mapErr(c, err)
+		return
+	}
+	OKMsg(c, "拦截统计已清零")
+}
+
 func parseUID(c *gin.Context) (uint, bool) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
