@@ -1,0 +1,693 @@
+{
+  "project": {
+    "resolvedLane": "library_bound",
+    "deviceType": "desktop",
+    "projectName": "Aluka Ops 服务治理面板",
+    "pageIds": [
+      "page-dashboard",
+      "page-services",
+      "page-service-detail",
+      "page-runtimes",
+      "page-sites",
+      "page-settings"
+    ],
+    "generationTree": "generation-tree.json",
+    "validationHistory": [
+      {
+        "reportPath": "validation-report.json",
+        "reportHash": "716a6961caf50de596bf432f9d716d9acd18e47b230cae334fe56d6766c1b1f3",
+        "checkedAt": "2026-08-15T11:08:22.977Z",
+        "success": false,
+        "exitCode": 1,
+        "renderBlockingErrorCount": 8,
+        "repairPlanHints": [
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body",
+          "hardcoded-color-in-body"
+        ],
+        "errorSignatures": [
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] dashboard.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "dd285df148b2959807b5cd957414c893e70441ec8c708f19c417278bcc918610"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] services.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "69e477924d4e004f40b9280deb9e5f9db1187f3ca78fdf7b64deed33b301d94b"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] service-detail.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "f684e0c56b85ce31e8f4588795697593b8f0db739fbda9c0ff76dc377cd154c4"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] runtimes.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "13a26c762773c5247be303b970db365cd56f12d2b5916cdd20776980599d8565"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] sites.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "91cb8f0ec90c963a7483662fd2068700e5cfab1c58dcb3512a719be0b827ad23"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] settings.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "cc70b3a584712bd83fcaf494ead44f8a4787b2a70bda919a1ffddff7e4d3a395"
+          },
+          {
+            "errorClass": "head-infrastructure",
+            "normalized": "[html-quality] login.html: hardcoded colors are forbidden outside <style id=\"theme-vars\">. Use brand CSS variables from the token reference.",
+            "signature": "0e1303f025566b044b28ab30a21908d2f2ed900612c667fe2da8d56548d443d9"
+          },
+          {
+            "errorClass": "artifact-readiness",
+            "normalized": "[assets-coverage] Image file \"assets/logo.svg\" exists on disk but is not registered as a type:\"image\" node in any .design file. Every image asset must have a corresponding image node so it surfaces on the canvas. Fix: append an image node to .design (see intent-workflows/intent-project-complex-build/01-graphic-asset-preparation.md or intent-workflows/intent-project-mutation/edit-existing-project.md Step 2b').",
+            "signature": "3a94d521bdb672c18ea621ff26a51e36d97fe333e0bd4fa1a68f185565910609"
+          }
+        ],
+        "terminalState": null
+      }
+    ],
+    "validationRepairLedger": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "716a6961caf50de596bf432f9d716d9acd18e47b230cae334fe56d6766c1b1f3",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-15T11:09:01.259Z",
+        "repairEntryStatus": "started-awaiting-owner-batch-repair",
+        "ownerTriage": [
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "dashboard.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "services.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "service-detail.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "runtimes.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "sites.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "settings.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          },
+          {
+            "owner": "sub-agent",
+            "errorClass": "hardcoded-color-in-body",
+            "affectedFiles": [
+              "login.html"
+            ],
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once"
+          }
+        ],
+        "repairPlanHints": [
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "dashboard.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "services.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "service-detail.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "runtimes.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "sites.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "settings.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          },
+          {
+            "errorClass": "hardcoded-color-in-body",
+            "owner": "sub-agent",
+            "repairScope": "targeted-token-replace",
+            "strategy": "targeted_token_replace_once",
+            "affectedFiles": [
+              "login.html"
+            ],
+            "repairReportPath": null,
+            "repairAlreadyAttempted": false,
+            "allowSourceRead": "no-full-html-read",
+            "maxValidationRuns": 2
+          }
+        ],
+        "repairActions": [],
+        "revalidationReportPath": null,
+        "revalidationReportHash": null,
+        "revalidationSuccess": null,
+        "blockedReason": null
+      }
+    ],
+    "repairEntryEvidence": [
+      {
+        "failedReportPath": "validation-report.json",
+        "failedReportHash": "716a6961caf50de596bf432f9d716d9acd18e47b230cae334fe56d6766c1b1f3",
+        "repairWorkflowReadPath": "intent-workflows/intent-project-mutation/main-agent-repair-workflow.md",
+        "repairStartedAt": "2026-08-15T11:09:01.259Z",
+        "ledgerIndex": 0,
+        "ownerTriageCount": 7,
+        "repairActionCount": 0,
+        "revalidationReportPath": null,
+        "revalidationReportHash": null,
+        "revalidationSuccess": null
+      }
+    ]
+  },
+  "designSource": {
+    "operatingMode": "library-bound",
+    "libraryIdentity": {
+      "name": "源力",
+      "id": "dl_builtin_volcengine",
+      "version": null,
+      "scope": "built-in-global",
+      "path": "c:\\Users\\issue\\.trae-cn\\design_libraries\\dl_builtin_volcengine",
+      "versionSource": "metadata.json"
+    },
+    "brandPrefix": "",
+    "cssPath": "e:\\codes\\ai_agent\\aluka_ops\\aluka-ops-ui\\colors_and_type.css",
+    "tokenFidelity": "strict",
+    "designDecisionSummary": "源力设计系统 - 企业级B2B管理后台规范。主色#1664FF源力蓝，4px栅格基准，32px操作高度，48px导航高度。纯CSS/HTML组件体系，32个组件。固定三级骨架布局：TopNav(48px)+Sidebar(200px)+Content(flex:1)。禁用Tailwind/Lucide，使用自定义class体系和内联SVG图标。",
+    "componentIndexSummary": [
+      "button",
+      "input",
+      "select",
+      "table",
+      "form",
+      "tabs",
+      "pagination",
+      "badge",
+      "status-tag",
+      "alert",
+      "modal",
+      "drawer",
+      "dropdown",
+      "breadcrumb",
+      "sidenav",
+      "topnav",
+      "page-header",
+      "switch",
+      "checkbox",
+      "progress",
+      "avatar",
+      "tooltip",
+      "descriptions",
+      "steps",
+      "anchor",
+      "cascader",
+      "segmented-picker",
+      "slider",
+      "timepicker",
+      "message",
+      "popconfirm",
+      "icon"
+    ],
+    "uiKitSummary": "data-dashboard(数据看板), list-page(列表页), detail-tab-page(详情页带tab), detail-basic-page(基础详情页), detail-with-sidebar(带右侧信息模块详情页), config-page(配置页), list-page-no-tabs(无tab列表页)",
+    "iconAssets": {
+      "source": "assets/icons/sidenav-icon",
+      "projectIconDir": "assets/icons",
+      "libraryKey": "dl_builtin_volcengine",
+      "renderMethod": "css-mask",
+      "pathTemplate": "../assets/icons/{name}.svg",
+      "availableNames": [
+        "AgentKit",
+        "API-gateway-p",
+        "AI-experience-creativity-p",
+        "AI-open-platform-p",
+        "auto-scaling-p",
+        "artifacts",
+        "bio-os-p",
+        "BMQ-p",
+        "cloud-network-p",
+        "cloud-native-monitor-p",
+        "Cloud-Data-Transfer",
+        "Cloud-Connector",
+        "cloud-communication-p",
+        "CDN-p",
+        "container-registry",
+        "config-center-p",
+        "code-pipeline-p",
+        "Cloud_bastion",
+        "cloud-security-p",
+        "content-security-risk-control-p",
+        "content-insights-platform-p",
+        "container-service-p",
+        "custom-interception-response-grey",
+        "CRB-p",
+        "data-express-service",
+        "Kafka-p",
+        "IPv6-Gateway",
+        "intelligent-video-service-p",
+        "intelligent-content-p",
+        "intelligent-application-p",
+        "ICE-p",
+        "hybrid-cloud-p",
+        "hacker-grey",
+        "growth-marketing-p",
+        "geographic-location-access-grey",
+        "flink-p",
+        "file-NAS-p",
+        "Endpoint",
+        "encryption-of-permissions-grey",
+        "elastic-scaling-p",
+        "elastic-computing-p",
+        "edge-networking-p",
+        "ECS-p",
+        "DTS-p",
+        "domain-web-p",
+        "DMS-p",
+        "DCP",
+        "dc",
+        "database",
+        "database-workbench",
+        "database-management",
+        "data-security",
+        "data-platform"
+      ],
+      "totalCount": 53,
+      "coloringRule": "currentColor by default; override with Library token when needed"
+    },
+    "forbiddenInventedComponents": [
+      "layout",
+      "space"
+    ],
+    "allowedComponents": "unrestricted",
+    "contextRequirementsLoaded": [
+      "intent-workflows/intent-page-library-bound/INTENT_WORKFLOW.md",
+      "intent-workflows/intent-page-library-bound/start-library-bound-project.md",
+      "intent-workflows/intent-page-library-bound/dispatch-contract.md",
+      "intent-workflows/intent-page-library-bound/library-bound-page-runtime.md",
+      "intent-workflows/intent-page-library-bound/design-library-ingestion.md",
+      "intent-workflows/intent-page-library-bound/component-conformance-rules.md",
+      "shared-runtime/design-artifact-formats/design-project-file-format.md",
+      "delivery-quality/page-rendering-quality-gate.md"
+    ]
+  },
+  "pages": [
+    {
+      "nodeId": "page-dashboard",
+      "htmlSrc": "pages/dashboard.html",
+      "title": "仪表盘",
+      "uiKitPath": "ui_kits/data-dashboard/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "card",
+          "previewFile": "preview/component-descriptions.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "progress",
+          "previewFile": "preview/component-progress.html"
+        },
+        {
+          "slug": "table",
+          "previewFile": "preview/component-table.html"
+        },
+        {
+          "slug": "breadcrumb",
+          "previewFile": "preview/component-breadcrumb.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    },
+    {
+      "nodeId": "page-services",
+      "htmlSrc": "pages/services.html",
+      "title": "服务管理",
+      "uiKitPath": "ui_kits/list-page/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "table",
+          "previewFile": "preview/component-table.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "pagination",
+          "previewFile": "preview/component-pagination.html"
+        },
+        {
+          "slug": "button",
+          "previewFile": "preview/component-button.html"
+        },
+        {
+          "slug": "input",
+          "previewFile": "preview/component-input.html"
+        },
+        {
+          "slug": "tabs",
+          "previewFile": "preview/component-tabs.html"
+        },
+        {
+          "slug": "dropdown",
+          "previewFile": "preview/component-dropdown.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    },
+    {
+      "nodeId": "page-service-detail",
+      "htmlSrc": "pages/service-detail.html",
+      "title": "服务详情",
+      "uiKitPath": "ui_kits/detail-tab-page/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "breadcrumb",
+          "previewFile": "preview/component-breadcrumb.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "tabs",
+          "previewFile": "preview/component-tabs.html"
+        },
+        {
+          "slug": "descriptions",
+          "previewFile": "preview/component-descriptions.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "table",
+          "previewFile": "preview/component-table.html"
+        },
+        {
+          "slug": "button",
+          "previewFile": "preview/component-button.html"
+        },
+        {
+          "slug": "progress",
+          "previewFile": "preview/component-progress.html"
+        },
+        {
+          "slug": "form",
+          "previewFile": "preview/component-form.html"
+        },
+        {
+          "slug": "input",
+          "previewFile": "preview/component-input.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    },
+    {
+      "nodeId": "page-runtimes",
+      "htmlSrc": "pages/runtimes.html",
+      "title": "环境管理",
+      "uiKitPath": "ui_kits/list-page/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "table",
+          "previewFile": "preview/component-table.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "pagination",
+          "previewFile": "preview/component-pagination.html"
+        },
+        {
+          "slug": "button",
+          "previewFile": "preview/component-button.html"
+        },
+        {
+          "slug": "badge",
+          "previewFile": "preview/component-badge.html"
+        },
+        {
+          "slug": "dropdown",
+          "previewFile": "preview/component-dropdown.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    },
+    {
+      "nodeId": "page-sites",
+      "htmlSrc": "pages/sites.html",
+      "title": "站点管理",
+      "uiKitPath": "ui_kits/list-page/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "table",
+          "previewFile": "preview/component-table.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "pagination",
+          "previewFile": "preview/component-pagination.html"
+        },
+        {
+          "slug": "button",
+          "previewFile": "preview/component-button.html"
+        },
+        {
+          "slug": "switch",
+          "previewFile": "preview/component-switch.html"
+        },
+        {
+          "slug": "input",
+          "previewFile": "preview/component-input.html"
+        },
+        {
+          "slug": "dropdown",
+          "previewFile": "preview/component-dropdown.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    },
+    {
+      "nodeId": "page-settings",
+      "htmlSrc": "pages/settings.html",
+      "title": "设置",
+      "uiKitPath": "ui_kits/config-page/index.html",
+      "componentPlan": [
+        {
+          "slug": "topnav",
+          "previewFile": "preview/component-topnav.html"
+        },
+        {
+          "slug": "sidenav",
+          "previewFile": "preview/component-sidenav.html"
+        },
+        {
+          "slug": "page-header",
+          "previewFile": "preview/component-page-header.html"
+        },
+        {
+          "slug": "form",
+          "previewFile": "preview/component-form.html"
+        },
+        {
+          "slug": "input",
+          "previewFile": "preview/component-input.html"
+        },
+        {
+          "slug": "button",
+          "previewFile": "preview/component-button.html"
+        },
+        {
+          "slug": "switch",
+          "previewFile": "preview/component-switch.html"
+        },
+        {
+          "slug": "descriptions",
+          "previewFile": "preview/component-descriptions.html"
+        },
+        {
+          "slug": "progress",
+          "previewFile": "preview/component-progress.html"
+        },
+        {
+          "slug": "status-tag",
+          "previewFile": "preview/component-status-tag.html"
+        },
+        {
+          "slug": "alert",
+          "previewFile": "preview/component-alert.html"
+        },
+        {
+          "slug": "tabs",
+          "previewFile": "preview/component-tabs.html"
+        }
+      ],
+      "tokenFidelity": "strict"
+    }
+  ]
+}

@@ -1,0 +1,328 @@
+{
+  "data": [
+    {
+      "id": "page-dashboard",
+      "title": "仪表盘",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 480,
+        "y": 0,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-ef87d8c1",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/dashboard.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-services",
+      "title": "服务管理",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 0,
+        "y": 373,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-29e4cef7",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/services.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          },
+          {
+            "domId": "goto-service-detail",
+            "targetPageId": "page-service-detail",
+            "transitionLabel": "查看服务详情"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-service-detail",
+      "title": "服务详情",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 0,
+        "y": 1865,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-3c5bba23",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/service-detail.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          },
+          {
+            "domId": "back-to-services",
+            "targetPageId": "page-services",
+            "hideEdge": true,
+            "transitionLabel": "返回服务列表"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-runtimes",
+      "title": "环境管理",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 0,
+        "y": 746,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-02685fd8",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/runtimes.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-sites",
+      "title": "站点管理",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 0,
+        "y": 1119,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-902374ff",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/sites.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-login",
+      "title": "登录",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786791700000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/login.html",
+        "interactions": [
+          {
+            "domId": "login-submit",
+            "targetPageId": "page-dashboard",
+            "transitionLabel": "登录进入系统"
+          }
+        ]
+      }
+    },
+    {
+      "id": "page-settings",
+      "title": "设置",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1786787200000,
+      "canvasData": {
+        "x": 0,
+        "y": 1492,
+        "group": 0,
+        "layoutSnapshot": {
+          "version": 1,
+          "contentHeight": 900,
+          "viewportWidth": 1440,
+          "sourceHash": "fnv1a-3d562556",
+          "measuredAt": 1786789618730
+        }
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/settings.html",
+        "interactions": [
+          {
+            "domId": "nav-dashboard",
+            "targetPageId": "page-dashboard"
+          },
+          {
+            "domId": "nav-services",
+            "targetPageId": "page-services"
+          },
+          {
+            "domId": "nav-runtimes",
+            "targetPageId": "page-runtimes"
+          },
+          {
+            "domId": "nav-sites",
+            "targetPageId": "page-sites"
+          },
+          {
+            "domId": "nav-settings",
+            "targetPageId": "page-settings"
+          }
+        ]
+      }
+    },
+    {
+      "id": "image-001",
+      "title": "Aluka Ops Logo",
+      "type": "image",
+      "version": 1,
+      "createdAt": 1786791700000,
+      "canvasData": {
+        "x": 0,
+        "y": 2238
+      },
+      "devMetadata": {
+        "imageSrc": "assets/logo.svg"
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "Aluka Ops 服务治理面板",
+    "designLibrary": {
+      "name": "源力",
+      "id": "dl_builtin_volcengine",
+      "version": null,
+      "scope": "built-in-global",
+      "path": "c:\\Users\\issue\\.trae-cn\\design_libraries\\dl_builtin_volcengine",
+      "versionSource": "metadata.json"
+    }
+  }
+}

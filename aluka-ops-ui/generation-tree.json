@@ -1,0 +1,49 @@
+{
+  "projectName": "Aluka Ops 服务治理面板",
+  "deviceType": "desktop",
+  "sharedFragments": [],
+  "leafPages": [
+    {
+      "nodeId": "page-dashboard",
+      "htmlSrc": "pages/dashboard.html",
+      "title": "仪表盘",
+      "uiKitTemplate": "data-dashboard",
+      "dependencies": []
+    },
+    {
+      "nodeId": "page-services",
+      "htmlSrc": "pages/services.html",
+      "title": "服务管理",
+      "uiKitTemplate": "list-page",
+      "dependencies": []
+    },
+    {
+      "nodeId": "page-service-detail",
+      "htmlSrc": "pages/service-detail.html",
+      "title": "服务详情",
+      "uiKitTemplate": "detail-tab-page",
+      "dependencies": []
+    },
+    {
+      "nodeId": "page-runtimes",
+      "htmlSrc": "pages/runtimes.html",
+      "title": "环境管理",
+      "uiKitTemplate": "list-page",
+      "dependencies": []
+    },
+    {
+      "nodeId": "page-sites",
+      "htmlSrc": "pages/sites.html",
+      "title": "站点管理",
+      "uiKitTemplate": "list-page",
+      "dependencies": []
+    },
+    {
+      "nodeId": "page-settings",
+      "htmlSrc": "pages/settings.html",
+      "title": "设置",
+      "uiKitTemplate": "config-page",
+      "dependencies": []
+    }
+  ]
+}
