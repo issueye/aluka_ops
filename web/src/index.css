@@ -177,6 +177,15 @@
     --row-hover: #23262d;
     --row-stripe: #1a1d23;
 
+    --primary-1: #1a2744;
+    --primary-2: #1e3358;
+    --primary-3: #2a4a7d;
+    --primary-4: #2d5db0;
+    --primary-5: #387bff;
+    --primary-6: #4d8aff;
+    --primary-7: #6e9fff;
+    --primary-8: #97bcff;
+
     --log-bg: #16181d;
     --log-text: #7ccd94;
   }
@@ -249,6 +258,15 @@
     @apply text-primary;
   }
 }
+
+
+  /* 页面切换动效辅助 */
+  .animate-page-in > * {
+    animation: fade-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-page-in > *:nth-child(2) { animation-delay: 0.04s; }
+  .animate-page-in > *:nth-child(3) { animation-delay: 0.08s; }
+  .animate-page-in > *:nth-child(4) { animation-delay: 0.12s; }
 
 @layer utilities {
   .hover-lift {

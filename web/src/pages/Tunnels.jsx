@@ -15,18 +15,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ued/FormDialog";
 import {
   ConfirmDialog,
   FormField,
-  FormGrid,
   PageTemplate,
   RowActions,
   ActionButton,
@@ -329,15 +321,16 @@ export function Tunnels() {
           ]}
         />
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "编辑隧道规则" : "新建隧道规则"}</DialogTitle>
-            <DialogDescription>
-              中心在 listen_port 监听，流量经已连接的 Agent 转发到 remote_host:remote_port。
-            </DialogDescription>
-          </DialogHeader>
-          <FormGrid cols={2} className="gap-3">
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={editing ? "编辑隧道规则" : "新建隧道规则"}
+        description="中心在 listen_port 监听，流量经已连接的 Agent 转发到 remote_host:remote_port"
+        width="max-w-lg"
+        onSubmit={onSave}
+        loading={saveMut.isPending}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
             {!editing && (
               <FormField label="编码 code" className="sm:col-span-2">
                 <Input
@@ -442,17 +435,9 @@ export function Tunnels() {
                 rows={2}
               />
             </FormField>
-          </FormGrid>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={onSave} disabled={saveMut.isPending}>
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+
+      </FormDialog>
 
       <ConfirmDialog
         open={!!deleting}

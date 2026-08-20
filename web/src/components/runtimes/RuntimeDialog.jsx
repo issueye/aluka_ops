@@ -2,18 +2,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { runtimeApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ued/FormDialog";
 import { SelectField, LabeledSwitch } from "@/components/ued";
 
 const DEFAULT_ENV_TEMPLATE =
@@ -91,16 +83,16 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>{editing ? "编辑运行环境" : "新增运行环境"}</DialogTitle>
-          <DialogDescription>
-            配置服务启动时注入的环境变量(如 JAVA_HOME、PATH)。
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={editing ? "编辑运行环境" : "新增运行环境"}
+      description="配置服务启动时注入的环境变量（如 JAVA_HOME、PATH）"
+      width="max-w-xl"
+      onSubmit={handleSubmit}
+      loading={mutation.isPending}
+    >
+      <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="rt-name">名称 *</Label>
@@ -185,22 +177,7 @@ export function RuntimeDialog({ open, onOpenChange, editing }) {
             checked={form.is_default}
             onCheckedChange={(v) => set("is_default", v)}
           />
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={mutation.isPending}
-            >
-              取消
-            </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "保存中..." : "保存"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </FormDialog>
   );
 }

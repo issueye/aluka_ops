@@ -171,7 +171,7 @@ export function Login() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    className="h-10 flex-1 border-none bg-transparent px-0 pr-3 text-[13px] shadow-none focus-visible:ring-0 focus-visible:border-transparent"
+                    className="h-10 flex-1 !border-0 !border-transparent bg-transparent px-0 pr-3 text-[13px] shadow-none !outline-none !ring-0 focus-visible:border-transparent focus-visible:ring-0 focus:border-transparent focus:ring-0"
                     value={password}
                     onChange={(e) => {
                       setPassword(e.target.value);

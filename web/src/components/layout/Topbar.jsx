@@ -42,7 +42,7 @@ export function Topbar(props) {
   };
 
   return (
-    <header className="relative z-[100] flex h-12 shrink-0 items-center justify-between bg-bg1 px-4 shadow-[0_2px_6px_0_rgba(0,0,0,0.05)] lg:px-6">
+    <header className="relative z-[100] flex h-12 shrink-0 items-center justify-between border-b border-border1 bg-bg1 px-4 shadow-[0_1px_2px_0_rgba(0,0,0,0.08)] lg:px-6">
       <div className="flex min-w-0 items-center gap-2">
         <Button
           variant="ghost"

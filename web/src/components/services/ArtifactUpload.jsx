@@ -3,17 +3,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { UploadCloud, FileArchive } from "lucide-react";
 import { artifactApi } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ued/FormDialog";
 import { FormField, FileDropzone } from "@/components/ued";
 import { formatBytes } from "@/lib/utils";
 
@@ -60,16 +52,15 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>上传制品</DialogTitle>
-          <DialogDescription>
-            支持单文件(jar/exe/bat/ps1)与 zip 压缩包。zip 安装时会解压并自动探测主入口。
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="上传制品"
+      description="支持单文件（jar/exe/bat/ps1）与 zip 压缩包，zip 会解压并自动探测主入口"
+      onSubmit={handleSubmit}
+      loading={uploadMut.isPending}
+      submitText="上传"
+    >
           <FormField label="版本号" htmlFor="a-version" required error={errors.version}>
             <Input
               id="a-version"
@@ -113,16 +104,6 @@ export function ArtifactUpload({ open, onOpenChange, serviceId }) {
             />
           </FormField>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={uploadMut.isPending}>
-              取消
-            </Button>
-            <Button type="submit" disabled={uploadMut.isPending}>
-              {uploadMut.isPending ? "上传中..." : "上传"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

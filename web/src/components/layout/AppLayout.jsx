@@ -35,7 +35,7 @@ export function AppLayout() {
             </div>
           )}
           <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-bg1">
-            <div key={pathname} className="animate-fade-in min-h-full">
+            <div key={pathname} className="animate-page-in min-h-full will-change-transform">
               <Outlet />
             </div>
           </main>

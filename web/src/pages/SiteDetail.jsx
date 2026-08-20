@@ -29,17 +29,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ConfirmDialog,
   DataTableCard,
   DetailHeader,
+  FormDialog,
   FormField,
   FormGrid,
   IconTooltip,
@@ -914,14 +907,29 @@ export function SiteDetail() {
         </TabsContent>
       </TabBar>
 
-      {/* ===== APP Dialog ===== */}
-      <Dialog open={appOpen} onOpenChange={setAppOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editingApp ? "编辑 APP" : "新建 APP"}</DialogTitle>
-            <DialogDescription>静态前端：路径 + 目录（相对 data）</DialogDescription>
-          </DialogHeader>
-          <FormGrid cols={2} className="gap-3">
+      <FormDialog
+        open={appOpen}
+        onOpenChange={setAppOpen}
+        title={editingApp ? "编辑 APP" : "新建 APP"}
+        description="静态前端：路径 + 目录（相对 data）"
+        width="max-w-lg"
+        onSubmit={() => {
+          const body = {
+            name: appForm.name,
+            description: appForm.description,
+            enabled: appForm.enabled,
+            port_id: siteId,
+            path_prefix: appForm.path_prefix,
+            strip_prefix: appForm.strip_prefix,
+            root_dir: appForm.root_dir,
+            spa_fallback: appForm.spa_fallback,
+          };
+          if (!editingApp) body.code = appForm.code;
+          saveAppMut.mutate(body);
+        }}
+        loading={saveAppMut.isPending}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
             <FormField label="名称">
               <Input
                 value={appForm.name}
@@ -970,41 +978,39 @@ export function SiteDetail() {
               checked={appForm.enabled}
               onCheckedChange={(v) => setAppForm((f) => ({ ...f, enabled: v }))}
             />
-          </FormGrid>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAppOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={saveAppMut.isPending}
-              onClick={() => {
-                const body = {
-                  name: appForm.name,
-                  description: appForm.description,
-                  enabled: appForm.enabled,
-                  port_id: siteId,
-                  path_prefix: appForm.path_prefix,
-                  strip_prefix: appForm.strip_prefix,
-                  root_dir: appForm.root_dir,
-                  spa_fallback: appForm.spa_fallback,
-                };
-                if (!editingApp) body.code = appForm.code;
-                saveAppMut.mutate(body);
-              }}
-            >
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </FormDialog>
 
-      {/* ===== Proxy Dialog ===== */}
-      <Dialog open={proxyOpen} onOpenChange={setProxyOpen}>
-        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingProxy ? "编辑反代" : "添加反代"}</DialogTitle>
-          </DialogHeader>
-          <FormGrid cols={2} className="gap-3">
+      <FormDialog
+        open={proxyOpen}
+        onOpenChange={setProxyOpen}
+        title={editingProxy ? "编辑反代" : "添加反代"}
+        description="配置反向代理转发规则"
+        width="max-w-lg"
+        onSubmit={() => {
+          const body = {
+            port_id: siteId,
+            name: proxyForm.name,
+            enabled: proxyForm.enabled,
+            path_prefix: proxyForm.path_prefix,
+            strip_prefix: proxyForm.strip_prefix,
+            upstream: proxyForm.upstream,
+            connect_timeout_sec: Number(proxyForm.connect_timeout_sec) || 10,
+            response_header_timeout_sec: Number(proxyForm.response_header_timeout_sec) || 60,
+            io_timeout_sec: Number(proxyForm.io_timeout_sec) || 0,
+            max_body_bytes: Number(proxyForm.max_body_bytes) || 0,
+            pass_host: proxyForm.pass_host,
+            enable_websocket: proxyForm.enable_websocket,
+            description: proxyForm.description,
+            ip_whitelist: proxyForm.ip_whitelist,
+            ip_blacklist: proxyForm.ip_blacklist,
+          };
+          if (!editingProxy) body.code = proxyForm.code;
+          saveProxyMut.mutate(body);
+        }}
+        loading={saveProxyMut.isPending}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
             <FormField label="编码">
               <Input
                 className="font-mono"
@@ -1071,7 +1077,7 @@ export function SiteDetail() {
                 setProxyForm((f) => ({ ...f, enable_websocket: v }))
               }
             />
-          </FormGrid>
+        </div>
           <div className="mt-3 space-y-3">
             <FormField
               label="IP 白名单"
@@ -1095,49 +1101,37 @@ export function SiteDetail() {
               />
             </FormField>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setProxyOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={saveProxyMut.isPending}
-              onClick={() => {
-                const body = {
-                  port_id: siteId,
-                  name: proxyForm.name,
-                  enabled: proxyForm.enabled,
-                  path_prefix: proxyForm.path_prefix,
-                  strip_prefix: proxyForm.strip_prefix,
-                  upstream: proxyForm.upstream,
-                  connect_timeout_sec: Number(proxyForm.connect_timeout_sec) || 10,
-                  response_header_timeout_sec:
-                    Number(proxyForm.response_header_timeout_sec) || 60,
-                  io_timeout_sec: Number(proxyForm.io_timeout_sec) || 0,
-                  max_body_bytes: Number(proxyForm.max_body_bytes) || 0,
-                  pass_host: proxyForm.pass_host,
-                  enable_websocket: proxyForm.enable_websocket,
-                  description: proxyForm.description,
-                  ip_whitelist: proxyForm.ip_whitelist,
-                  ip_blacklist: proxyForm.ip_blacklist,
-                };
-                if (!editingProxy) body.code = proxyForm.code;
-                saveProxyMut.mutate(body);
-              }}
-            >
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormDialog>
 
       {/* ===== Script Dialog ===== */}
-      <Dialog open={scriptOpen} onOpenChange={setScriptOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingScript ? "编辑路由脚本" : "添加路由脚本"}</DialogTitle>
-            <DialogDescription>JSON 规则数组；priority 越小越先执行。</DialogDescription>
-          </DialogHeader>
-          <FormGrid cols={2} className="gap-3">
+      <FormDialog
+        open={scriptOpen}
+        onOpenChange={setScriptOpen}
+        title={editingScript ? "编辑路由脚本" : "添加路由脚本"}
+        description="JSON 规则数组，priority 越小越先执行"
+        width="max-w-2xl"
+        onSubmit={() => {
+          try {
+            JSON.parse(scriptForm.script);
+          } catch {
+            toast.error("Script 不是合法 JSON");
+            return;
+          }
+          const body = {
+            port_id: siteId,
+            name: scriptForm.name,
+            enabled: scriptForm.enabled,
+            path_prefix: scriptForm.path_prefix,
+            priority: Number(scriptForm.priority) || 100,
+            script: scriptForm.script,
+            description: scriptForm.description,
+          };
+          if (!editingScript) body.code = scriptForm.code;
+          saveScriptMut.mutate(body);
+        }}
+        loading={saveScriptMut.isPending}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
             {!editingScript && templates.length > 0 && (
               <FormField label="套用模板" className="sm:col-span-2">
                 <SelectField
@@ -1223,38 +1217,8 @@ export function SiteDetail() {
                 spellCheck={false}
               />
             </FormField>
-          </FormGrid>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setScriptOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={saveScriptMut.isPending}
-              onClick={() => {
-                try {
-                  JSON.parse(scriptForm.script);
-                } catch {
-                  toast.error("Script 不是合法 JSON");
-                  return;
-                }
-                const body = {
-                  port_id: siteId,
-                  name: scriptForm.name,
-                  enabled: scriptForm.enabled,
-                  path_prefix: scriptForm.path_prefix,
-                  priority: Number(scriptForm.priority) || 100,
-                  script: scriptForm.script,
-                  description: scriptForm.description,
-                };
-                if (!editingScript) body.code = scriptForm.code;
-                saveScriptMut.mutate(body);
-              }}
-            >
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </FormDialog>
 
       {/* Deletes */}
       <ConfirmDialog
@@ -1285,15 +1249,14 @@ export function SiteDetail() {
         onConfirm={() => delScriptMut.mutate(deletingScript.id)}
       />
 
-      <Dialog open={accessOpen} onOpenChange={setAccessOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>IP 访问控制 · :{site.port}</DialogTitle>
-            <DialogDescription>
-              黑名单优先拒绝；白名单非空时仅允许列表内 IP。支持单 IP 与 CIDR，换行/逗号分隔。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
+      <FormDialog
+        open={accessOpen}
+        onOpenChange={setAccessOpen}
+        title={`IP 访问控制 · :${site.port}`}
+        description="黑名单优先拒绝；白名单非空时仅允许列表内 IP，支持单 IP 与 CIDR"
+        onSubmit={() => saveAccessMut.mutate({ ip_whitelist: accessForm.ip_whitelist, ip_blacklist: accessForm.ip_blacklist })}
+        loading={saveAccessMut.isPending}
+      >
             <FormField label="白名单">
               <Textarea
                 rows={4}
@@ -1316,25 +1279,7 @@ export function SiteDetail() {
                 }
               />
             </FormField>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAccessOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={saveAccessMut.isPending}
-              onClick={() =>
-                saveAccessMut.mutate({
-                  ip_whitelist: accessForm.ip_whitelist,
-                  ip_blacklist: accessForm.ip_blacklist,
-                })
-              }
-            >
-              保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormDialog>
     </PageShell>
   );
 }

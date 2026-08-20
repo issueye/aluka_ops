@@ -88,12 +88,12 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
     <aside
       className={cn(
         "flex h-full shrink-0 flex-col border-r border-border1 bg-bg4 transition-all duration-200",
-        collapsed ? "w-[56px] min-w-[56px]" : "w-[200px] min-w-[200px]"
+        collapsed ? "w-[60px] min-w-[60px]" : "w-[200px] min-w-[200px]"
       )}
     >
       <div
         className={cn(
-          "flex h-10 shrink-0 items-center border-b border-border1/60 px-2",
+          "flex h-10 shrink-0 items-center border-b border-border1/50 px-2",
           collapsed ? "justify-center" : "justify-end"
         )}
       >
@@ -101,7 +101,7 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-text3 hover:text-text1"
+            className="h-7 w-7 rounded-md text-text3 hover:bg-bg5 hover:text-text1"
             aria-label={collapsed ? "展开菜单" : "收起菜单"}
             aria-expanded={!collapsed}
             onClick={handleToggle}
@@ -110,14 +110,15 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
           </Button>
         </IconTooltip>
       </div>
-      <nav className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", collapsed ? "px-1.5 py-2" : "px-3")}>
+      <nav className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", collapsed ? "px-2 py-3" : "px-3")}>
         {navGroups.map((group, groupIndex) => (
-          <div key={group.label} className={collapsed ? "py-1" : "menu-group-block"}>
+          <div key={group.label} className={collapsed ? "space-y-1 py-1" : "menu-group-block"}>
             {groupIndex > 0 && (
-              <div className={cn(collapsed ? "mx-2 my-1 border-t border-border1/40" : "mx-2 mb-1.5 border-t border-border1/40")} />
+              <div className={cn(collapsed ? "mx-2 my-2 border-t border-border1/50" : "mx-2 mb-1.5 border-t border-border1/40")} />
             )}
             <div className={cn(collapsed ? "sr-only" : "group-title")}>{group.label}</div>
-            <div className="flex flex-col gap-[2px]">
+            {/* 收起态用更松的纵向节奏，避免 11 个图标挤成一列 */}
+            <div className={cn("flex flex-col", collapsed ? "items-center gap-1.5" : "gap-[2px]")}>
               {group.items.map((item) => {
                 const link = (
                   <NavLink
@@ -128,14 +129,19 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
                     onClick={() => onNavigate?.()}
                     className={({ isActive }) =>
                       cn(
-                        "menu-item",
-                        collapsed && "justify-center px-2",
-                        isActive ? "menu-item-active" : "text-text1 hover:bg-bg5"
+                        collapsed
+                          ? cn(
+                              "flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150",
+                              isActive
+                                ? "bg-primary text-primary-foreground shadow-sm"
+                                : "text-text2 hover:bg-bg5 hover:text-text1"
+                            )
+                          : cn("menu-item", isActive ? "menu-item-active" : "text-text1 hover:bg-bg5")
                       )
                     }
                   >
-                    <span className="menu-icon">
-                      <Icon icon={item.icon} size="md" />
+                    <span className={cn(collapsed ? "flex h-5 w-5 items-center justify-center" : "menu-icon")}>
+                      <Icon icon={item.icon} size={collapsed ? "sm" : "md"} />
                     </span>
                     {!collapsed && <span className="menu-text">{item.label}</span>}
                   </NavLink>
@@ -143,7 +149,7 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
                 if (!collapsed) return link;
                 return (
                   <IconTooltip key={item.to} label={item.label} side="right">
-                    {link}
+                    <div className="flex w-full justify-center">{link}</div>
                   </IconTooltip>
                 );
               })}
@@ -152,8 +158,14 @@ export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onN
         ))}
       </nav>
 
-      <div className={cn("shrink-0 border-t border-border1 py-3 text-xs text-text3", collapsed ? "px-2 text-center" : "px-5")}>
-        <span className="font-mono">{collapsed ? (version ? `v${version.split(".")[0]}` : "v-") : version ? `v${version}` : "v-"}</span>
+      <div
+        className={cn(
+          "shrink-0 border-t border-border1 py-3 text-xs text-text3",
+          collapsed ? "flex flex-col items-center gap-1 px-2 text-center" : "px-5"
+        )}
+      >
+        {collapsed && <span className="h-1 w-6 rounded-full bg-border1" aria-hidden />}
+        <span className="font-mono leading-none">{collapsed ? (version ? `v${version.split(".")[0]}` : "v-") : version ? `v${version}` : "v-"}</span>
       </div>
     </aside>
   );

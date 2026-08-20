@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormDialog } from "@/components/ued/FormDialog";
 import { SelectField } from "@/components/ued";
 
 // 服务类型说明
@@ -101,16 +94,16 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>新建服务</DialogTitle>
-          <DialogDescription>
-            创建后服务处于"待启动"状态,可随时启动/停止/重启。
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <FormDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title="新建服务"
+      description="创建后服务处于“待启动”状态，可随时启动/停止/重启"
+      width="max-w-2xl"
+      onSubmit={handleSubmit}
+      loading={createMut.isPending}
+      submitText="创建"
+    >
           {/* 基本信息 */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -252,16 +245,6 @@ export function ServiceDialog({ open, onOpenChange, onCreated }) {
             />
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={createMut.isPending}>
-              取消
-            </Button>
-            <Button type="submit" disabled={createMut.isPending}>
-              {createMut.isPending ? "创建中..." : "创建"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 }

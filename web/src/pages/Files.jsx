@@ -33,13 +33,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ContextMenu,
   ContextMenuItem,
   ContextMenuLabel,
@@ -49,6 +42,7 @@ import { formatTime, formatBytes } from "@/lib/utils";
 import { usePagination } from "@/hooks/usePagination";
 import {
   ConfirmDialog,
+  FormDialog,
   FormField,
   IconTooltip,
   PageTemplate,
@@ -360,59 +354,6 @@ export function Files() {
           : null
       }
     >
-        {/* 工具条：面包屑 + 上级目录 + 上传进度 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
-          <div className="flex flex-wrap items-center gap-1 text-sm">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-text3 hover:bg-bg5 hover:text-text1"
-              onClick={() => go("")}
-            >
-              <Home className="h-3.5 w-3.5" />
-              data
-            </button>
-            {crumbs.map((c) => (
-              <span key={c.path} className="inline-flex items-center gap-1">
-                <ChevronRight className="h-3.5 w-3.5 text-text3" />
-                <button
-                  type="button"
-                  className="rounded px-1.5 py-0.5 font-mono text-xs hover:bg-bg5"
-                  onClick={() => go(c.path)}
-                >
-                  {c.name}
-                </button>
-              </span>
-            ))}
-          </div>
-          {path !== "" && (
-            <Button variant="ghost" size="sm" onClick={() => go(data?.parent ?? "")}>
-              <ArrowUp /> 上级目录
-            </Button>
-          )}
-          {uploadProgress && (
-            <div className="ml-auto min-w-[200px] max-w-xs flex-1 rounded-md border border-primary/30 bg-primary-1 px-3 py-1.5 text-xs">
-              上传中 {uploadProgress.done}/{uploadProgress.total}
-              {uploadProgress.current ? (
-                <span className="ml-2 truncate font-mono text-text3">
-                  {uploadProgress.current}
-                </span>
-              ) : null}
-              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-bg4">
-                <div
-                  className="h-full rounded-full bg-primary transition-all"
-                  style={{
-                    width: `${
-                      uploadProgress.total
-                        ? Math.round((uploadProgress.done / uploadProgress.total) * 100)
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
         <div
             onContextMenu={(e) => {
               // 空白区域右键：新建/上传/刷新
@@ -708,99 +649,71 @@ export function Files() {
       </ContextMenu>
 
       {/* 新建目录 */}
-      <Dialog open={mkdirOpen} onOpenChange={setMkdirOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>新建目录</DialogTitle>
-          </DialogHeader>
-          <FormField label="目录名">
-            <Input
-              value={mkdirName}
-              onChange={(e) => setMkdirName(e.target.value)}
-              placeholder="logs 或 nested/dir"
-              className="font-mono"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && mkdirName.trim()) {
-                  mkdirMut.mutate(mkdirName.trim());
-                }
-              }}
-            />
-          </FormField>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMkdirOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={!mkdirName.trim() || mkdirMut.isPending}
-              onClick={() => mkdirMut.mutate(mkdirName.trim())}
-            >
-              创建
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FormDialog
+        open={mkdirOpen}
+        onOpenChange={setMkdirOpen}
+        title="新建目录"
+        description="输入目录名，支持嵌套路径如 logs 或 nested/dir"
+        onSubmit={() => mkdirName.trim() && mkdirMut.mutate(mkdirName.trim())}
+        loading={mkdirMut.isPending}
+        submitText="创建"
+        submitDisabled={!mkdirName.trim()}
+      >
+        <FormField label="目录名">
+          <Input
+            value={mkdirName}
+            onChange={(e) => setMkdirName(e.target.value)}
+            placeholder="logs 或 nested/dir"
+            className="font-mono"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && mkdirName.trim()) {
+                mkdirMut.mutate(mkdirName.trim());
+              }
+            }}
+          />
+        </FormField>
+      </FormDialog>
 
       {/* 新建文件 */}
-      <Dialog open={newFileOpen} onOpenChange={setNewFileOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>新建文件</DialogTitle>
-          </DialogHeader>
-          <FormField label="文件名">
-            <Input
-              value={newFileName}
-              onChange={(e) => setNewFileName(e.target.value)}
-              placeholder="readme.txt"
-              className="font-mono"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && newFileName.trim()) {
-                  newFileMut.mutate(newFileName.trim());
-                }
-              }}
-            />
-          </FormField>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewFileOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={!newFileName.trim() || newFileMut.isPending}
-              onClick={() => newFileMut.mutate(newFileName.trim())}
-            >
-              创建并编辑
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FormDialog
+        open={newFileOpen}
+        onOpenChange={setNewFileOpen}
+        title="新建文件"
+        description="输入文件名后将自动创建空文件并打开编辑器"
+        onSubmit={() => newFileName.trim() && newFileMut.mutate(newFileName.trim())}
+        loading={newFileMut.isPending}
+        submitText="创建并编辑"
+        submitDisabled={!newFileName.trim()}
+      >
+        <FormField label="文件名">
+          <Input
+            value={newFileName}
+            onChange={(e) => setNewFileName(e.target.value)}
+            placeholder="readme.txt"
+            className="font-mono"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newFileName.trim()) {
+                newFileMut.mutate(newFileName.trim());
+              }
+            }}
+          />
+        </FormField>
+      </FormDialog>
 
       {/* 重命名 */}
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>重命名</DialogTitle>
-          </DialogHeader>
-          <FormField label="新名称">
-            <Input
-              value={renameName}
-              onChange={(e) => setRenameName(e.target.value)}
-              className="font-mono"
-            />
-          </FormField>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameOpen(false)}>
-              取消
-            </Button>
-            <Button
-              disabled={!renameName.trim() || !selected || renameMut.isPending}
-              onClick={() =>
-                renameMut.mutate({ from: selected.path, new_name: renameName.trim() })
-              }
-            >
-              确定
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FormDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="重命名"
+        description="输入新的文件或目录名称"
+        onSubmit={() => renameMut.mutate({ from: selected.path, new_name: renameName.trim() })}
+        loading={renameMut.isPending}
+        submitDisabled={!renameName.trim() || !selected}
+      >
+        <FormField label="新名称">
+          <Input value={renameName} onChange={(e) => setRenameName(e.target.value)} className="font-mono" />
+        </FormField>
+      </FormDialog>
 
       {/* 删除确认 */}
       <ConfirmDialog
@@ -824,38 +737,24 @@ export function Files() {
       />
 
       {/* 文本编辑器 */}
-      <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-2 pr-6">
-              <span className="truncate font-mono text-sm">{editorPath}</span>
-            </DialogTitle>
-          </DialogHeader>
-          {editorLoading ? (
-            <p className="text-sm text-text3">加载中…</p>
-          ) : (
-            <Textarea
-              value={editorContent}
-              onChange={(e) => setEditorContent(e.target.value)}
-              className="min-h-[360px] font-mono text-xs"
-              spellCheck={false}
-            />
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditorOpen(false)}>
-              <X /> 关闭
-            </Button>
-            <Button
-              disabled={editorLoading || writeMut.isPending}
-              onClick={() =>
-                writeMut.mutate({ p: editorPath, content: editorContent })
-              }
-            >
-              <Save /> 保存
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FormDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        title={editorPath || "文本编辑"}
+        description="编辑文件内容，保存后即时写入磁盘"
+        width="max-w-3xl"
+        onSubmit={() => writeMut.mutate({ p: editorPath, content: editorContent })}
+        loading={writeMut.isPending}
+        submitText="保存"
+        submitDisabled={editorLoading}
+        cancelText="关闭"
+      >
+        {editorLoading ? (
+          <p className="text-sm text-text3">加载中…</p>
+        ) : (
+          <Textarea value={editorContent} onChange={(e) => setEditorContent(e.target.value)} className="min-h-[360px] font-mono text-xs" spellCheck={false} />
+        )}
+      </FormDialog>
     </PageTemplate>
   );
 }

@@ -18,15 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   ConfirmDialog,
+  FormDialog,
   FormField,
   PageTemplate,
   RowActions,
@@ -349,15 +342,37 @@ export function Sites() {
         ]}
       />
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editing ? "编辑站点" : "新建站点"}</DialogTitle>
-            <DialogDescription>
-              站点绑定一个监听端口；创建后进入站点配置 APP 与反代。端口号创建后不可改。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={editing ? "编辑站点" : "新建站点"}
+        description="站点绑定一个监听端口；创建后进入站点配置 APP 与反代。端口号创建后不可改。"
+        onSubmit={() => {
+          if (editing) {
+            saveMut.mutate({
+              name: form.name,
+              enabled: form.enabled,
+              description: form.description,
+              ip_whitelist: form.ip_whitelist,
+              ip_blacklist: form.ip_blacklist,
+              rate_limit_per_min: form.rate_limit_per_min,
+              rate_limit_burst: form.rate_limit_burst,
+            });
+          } else {
+            saveMut.mutate({
+              port: Number(form.port),
+              name: form.name,
+              enabled: form.enabled,
+              description: form.description,
+              ip_whitelist: form.ip_whitelist,
+              ip_blacklist: form.ip_blacklist,
+              rate_limit_per_min: form.rate_limit_per_min,
+              rate_limit_burst: form.rate_limit_burst,
+            });
+          }
+        }}
+        loading={saveMut.isPending}
+      >
             <FormField label="监听端口">
               <Input
                 type="number"
@@ -441,44 +456,7 @@ export function Sites() {
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               />
             </FormField>
-          </div>
-          <DialogFooter>
-            <ActionButton variant="outline" size="default" onClick={() => setOpen(false)}>
-              取消
-            </ActionButton>
-            <ActionButton
-              size="default"
-              disabled={saveMut.isPending}
-              onClick={() => {
-                if (editing) {
-                  saveMut.mutate({
-                    name: form.name,
-                    enabled: form.enabled,
-                    description: form.description,
-                    ip_whitelist: form.ip_whitelist,
-                    ip_blacklist: form.ip_blacklist,
-                    rate_limit_per_min: form.rate_limit_per_min,
-                    rate_limit_burst: form.rate_limit_burst,
-                  });
-                } else {
-                  saveMut.mutate({
-                    port: Number(form.port),
-                    name: form.name,
-                    enabled: form.enabled,
-                    description: form.description,
-                    ip_whitelist: form.ip_whitelist,
-                    ip_blacklist: form.ip_blacklist,
-                    rate_limit_per_min: form.rate_limit_per_min,
-                    rate_limit_burst: form.rate_limit_burst,
-                  });
-                }
-              }}
-            >
-              保存
-            </ActionButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormDialog>
 
       <ConfirmDialog
         open={!!deleting}

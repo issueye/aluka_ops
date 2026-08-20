@@ -52,6 +52,7 @@ export function PageTemplate({
   className,
   contentClassName,
   maxWidth,
+  stickyHeader = true,
   children,
   ...props
 }) {
@@ -106,13 +107,13 @@ export function PageTemplate({
 
       {list ? (
         <>
-          {pageTitle}
-          {filters ? (
-            <div className="flex flex-wrap items-center gap-3">{filters}</div>
-          ) : null}
+          <div className="sticky top-0 z-10 -mx-6 -mt-5 border-b border-border1 bg-bg1 px-6 py-3 sm:-mx-8 sm:px-8">
+            {pageTitle}
+          </div>
+          {filters ? <div className="mt-4 flex flex-wrap items-center gap-3">{filters}</div> : null}
           <div
             className={cn(
-              "overflow-hidden rounded-md border border-border1 bg-bg1",
+              "mt-4 overflow-hidden rounded-md border border-border1 bg-bg1",
               contentClassName
             )}
           >
@@ -123,7 +124,9 @@ export function PageTemplate({
         </>
       ) : (
         <>
-          {hasPageHeader && !card && pageTitle}
+          {hasPageHeader && !card && (
+            <div className="sticky top-0 z-10 -mx-6 -mt-5 border-b border-border1 bg-bg1 px-6 py-3 sm:-mx-8 sm:px-8">{pageTitle}</div>
+          )}
 
           {card ? (
             <Card className={contentClassName}>

@@ -31,3 +31,4 @@ export { IconTooltip } from "./IconTooltip";
 export { InfoHint } from "./InfoHint";
 export { SegmentedPicker } from "./SegmentedPicker";
 export { TextActionButton, TextActionLink } from "./TextActionButton";
+export { FormDialog } from "./FormDialog";
