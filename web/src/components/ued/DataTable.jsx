@@ -52,14 +52,22 @@ export function DataTable({
   };
 
   return (
-    <Table className={className}>
+    <Table className={cn("table-fixed", className)}>
+      <colgroup>
+        {columns.map((col) => (
+          <col
+            key={col.key}
+            className={widthClass(col.width)}
+            style={widthStyle(col.width)}
+          />
+        ))}
+      </colgroup>
       <TableHeader>
         <TableRow>
           {columns.map((col) => (
             <TableHead
               key={col.key}
-              className={cn(widthClass(col.width), alignClass(col.align), col.headerClassName)}
-              style={widthStyle(col.width)}
+              className={cn(alignClass(col.align), col.headerClassName)}
             >
               {col.title}
             </TableHead>

@@ -175,13 +175,21 @@ export function ArtifactList({ service }) {
         </CardHeader>
         <CardContent>
           <Table>
+            <colgroup>
+              <col style={{ width: 60 }} />
+              <col />
+              <col style={{ width: "28%" }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 150 }} />
+              <col />
+            </colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[60px]">当前</TableHead>
+                <TableHead>当前</TableHead>
                 <TableHead>版本</TableHead>
                 <TableHead>文件名</TableHead>
-                <TableHead className="w-[90px]">大小</TableHead>
-                <TableHead className="w-[150px]">上传时间</TableHead>
+                <TableHead>大小</TableHead>
+                <TableHead>上传时间</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>

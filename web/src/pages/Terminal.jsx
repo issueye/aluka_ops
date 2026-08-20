@@ -347,7 +347,10 @@ export function TerminalPage() {
             {backend || info?.backend || "local"} · xterm.js
           </span>
         </div>
-        <div ref={hostRef} className="min-h-0 w-full flex-1 p-2" />
+        {/* 外层 p-2 提供留白;xterm 宿主自身不带 padding,避免 FitAddon 度量含 padding 导致屏幕高度溢出 */}
+        <div className="min-h-0 w-full flex-1 p-2">
+          <div ref={hostRef} className="h-full w-full" />
+        </div>
       </div>
     </PageShell>
   );

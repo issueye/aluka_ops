@@ -1,50 +1,69 @@
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  Box,
+  Boxes,
+  Folder,
+  Globe,
+  History,
+  LayoutGrid,
+  Network,
+  PanelLeftClose,
+  PanelLeftOpen,
+  ScrollText,
+  Settings,
+  Terminal,
+  Waypoints,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { healthApi } from "@/lib/api";
-import { Logo } from "./Logo";
+import { Icon } from "@/components/ued";
+import { IconTooltip } from "@/components/ued/IconTooltip";
+import { Button } from "@/components/ui/button";
+
+const SIDEBAR_COLLAPSED_KEY = "aluka_sidebar_collapsed";
 
 const navGroups = [
   {
     label: "总览",
-    items: [{ to: "/", label: "仪表盘", end: true }],
+    items: [{ to: "/", label: "仪表盘", icon: LayoutGrid, end: true }],
   },
   {
     label: "服务资源",
     items: [
-      { to: "/services", label: "服务管理" },
-      { to: "/runtimes", label: "环境管理" },
-      { to: "/files", label: "文件管理" },
+      { to: "/services", label: "服务管理", icon: Boxes },
+      { to: "/runtimes", label: "环境管理", icon: Box },
+      { to: "/files", label: "文件管理", icon: Folder },
     ],
   },
   {
     label: "网络接入",
     items: [
-      { to: "/sites", label: "站点管理" },
-      { to: "/tunnels", label: "流量隧道" },
+      { to: "/sites", label: "站点管理", icon: Globe },
+      { to: "/tunnels", label: "流量隧道", icon: Waypoints },
     ],
   },
   {
     label: "节点运维",
     items: [
-      { to: "/agents", label: "多节点" },
-      { to: "/terminal", label: "服务器控制台" },
+      { to: "/agents", label: "多节点", icon: Network },
+      { to: "/terminal", label: "服务器控制台", icon: Terminal },
     ],
   },
   {
     label: "记录审计",
     items: [
-      { to: "/operations", label: "操作记录" },
-      { to: "/audit-logs", label: "审计日志" },
+      { to: "/operations", label: "操作记录", icon: History },
+      { to: "/audit-logs", label: "审计日志", icon: ScrollText },
     ],
   },
   {
     label: "系统",
-    items: [{ to: "/settings", label: "设置" }],
+    items: [{ to: "/settings", label: "设置", icon: Settings }],
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ collapsed: controlledCollapsed, onCollapsedChange, onNavigate }) {
   const { data: health } = useQuery({
     queryKey: ["health"],
     queryFn: healthApi.check,
@@ -53,42 +72,91 @@ export function Sidebar() {
     refetchOnWindowFocus: false,
   });
   const version = health?.version || "";
+  const collapsed = Boolean(controlledCollapsed);
+
+  const handleToggle = () => {
+    const next = !collapsed;
+    onCollapsedChange?.(next);
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
-    <aside className="flex h-full w-[200px] min-w-[200px] shrink-0 flex-col bg-bg4">
-      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3">
+    <aside
+      className={cn(
+        "flex h-full shrink-0 flex-col border-r border-border1 bg-bg4 transition-all duration-200",
+        collapsed ? "w-[56px] min-w-[56px]" : "w-[200px] min-w-[200px]"
+      )}
+    >
+      <div
+        className={cn(
+          "flex h-10 shrink-0 items-center border-b border-border1/60 px-2",
+          collapsed ? "justify-center" : "justify-end"
+        )}
+      >
+        <IconTooltip label={collapsed ? "展开菜单" : "收起菜单"} side="right">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-text3 hover:text-text1"
+            aria-label={collapsed ? "展开菜单" : "收起菜单"}
+            aria-expanded={!collapsed}
+            onClick={handleToggle}
+          >
+            <Icon icon={collapsed ? PanelLeftOpen : PanelLeftClose} size="sm" />
+          </Button>
+        </IconTooltip>
+      </div>
+      <nav className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", collapsed ? "px-1.5 py-2" : "px-3")}>
         {navGroups.map((group, groupIndex) => (
-          <div key={group.label} className="menu-group-block">
-            {groupIndex > 0 && <div className="mx-2 mb-1.5 border-t border-border1/40" />}
-            <div className="group-title">{group.label}</div>
+          <div key={group.label} className={collapsed ? "py-1" : "menu-group-block"}>
+            {groupIndex > 0 && (
+              <div className={cn(collapsed ? "mx-2 my-1 border-t border-border1/40" : "mx-2 mb-1.5 border-t border-border1/40")} />
+            )}
+            <div className={cn(collapsed ? "sr-only" : "group-title")}>{group.label}</div>
             <div className="flex flex-col gap-[2px]">
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  title={item.label}
-                  aria-label={item.label}
-                  className={({ isActive }) =>
-                    cn(
-                      "menu-item",
-                      isActive
-                        ? "menu-item-active"
-                        : "text-text1 hover:bg-bg5"
-                    )
-                  }
-                >
-                  <span className="menu-text">{item.label}</span>
-                </NavLink>
-              ))}
+              {group.items.map((item) => {
+                const link = (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    aria-label={item.label}
+                    onClick={() => onNavigate?.()}
+                    className={({ isActive }) =>
+                      cn(
+                        "menu-item",
+                        collapsed && "justify-center px-2",
+                        isActive ? "menu-item-active" : "text-text1 hover:bg-bg5"
+                      )
+                    }
+                  >
+                    <span className="menu-icon">
+                      <Icon icon={item.icon} size="md" />
+                    </span>
+                    {!collapsed && <span className="menu-text">{item.label}</span>}
+                  </NavLink>
+                );
+                if (!collapsed) return link;
+                return (
+                  <IconTooltip key={item.to} label={item.label} side="right">
+                    {link}
+                  </IconTooltip>
+                );
+              })}
             </div>
           </div>
         ))}
       </nav>
 
-      <div className="shrink-0 border-t border-border1 px-5 py-3 text-xs text-text3">
-        <span className="font-mono">{version ? `v${version}` : "v-"}</span>
+      <div className={cn("shrink-0 border-t border-border1 py-3 text-xs text-text3", collapsed ? "px-2 text-center" : "px-5")}>
+        <span className="font-mono">{collapsed ? (version ? `v${version.split(".")[0]}` : "v-") : version ? `v${version}` : "v-"}</span>
       </div>
     </aside>
   );
 }
+
+export { SIDEBAR_COLLAPSED_KEY };

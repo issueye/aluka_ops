@@ -1,25 +1,14 @@
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-const PRESET = {
-  muted: "bg-bg4 text-text2",
-  jdk: "bg-warning-2 text-warning-7",
-  node: "bg-success-2 text-success-7",
-  python: "bg-primary-2 text-primary-7",
-  go: "bg-teal-2 text-teal-7",
-  primary: "bg-primary-2 text-primary",
-};
-
-/** 类型小标签（源力设计：集中管理色板） */
-export function TypeChip({ tone = "muted", className, children }) {
+/**
+ * @deprecated 请直接使用 Badge variant="jdk|node|python|go|primary|muted"
+ * 保留仅为向后兼容，内部已收口至统一 Badge 体系。
+ */
+export function TypeChip({ tone = "muted", className, children, ...props }) {
+  const variant = tone || "muted";
   return (
-    <span
-      className={cn(
-        "inline-flex items-center rounded-sm px-1.5 py-0.5 text-xs font-medium",
-        PRESET[tone] || PRESET.muted,
-        className
-      )}
-    >
+    <Badge variant={variant} className={className} {...props}>
       {children}
-    </span>
+    </Badge>
   );
 }

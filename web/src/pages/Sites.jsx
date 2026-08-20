@@ -172,7 +172,7 @@ export function Sites() {
       actions={
         <>
           <ActionButton
-            variant="outline"
+            variant="secondary"
             onClick={() =>
               gatewayApi
                 .reload()

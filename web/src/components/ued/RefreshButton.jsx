@@ -7,17 +7,26 @@ export function RefreshButton({
   onClick,
   loading = false,
   label = "刷新",
+  iconOnly = false,
   className,
   ...props
 }) {
+  const showLabel = !iconOnly && Boolean(label);
   return (
     <Button
       type="button"
-      variant="outline"
-      size="sm"
+      variant="ghost"
+      size={showLabel ? "sm" : "icon"}
       onClick={onClick}
       disabled={loading || props.disabled}
-      className={cn("group transition-all duration-150 active:scale-95", className)}
+      aria-label={label || "刷新"}
+      title={label || "刷新"}
+      className={cn(
+        "shrink-0 text-text3 hover:text-text1 hover:bg-bg4 active:scale-95",
+        showLabel ? "gap-1.5 px-2.5" : "h-8 w-8",
+        "group",
+        className
+      )}
       {...props}
     >
       <Icon
@@ -28,7 +37,7 @@ export function RefreshButton({
           loading && "animate-spin"
         )}
       />
-      {label}
+      {showLabel ? label : null}
     </Button>
   );
 }

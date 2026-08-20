@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Icon } from "./Icon";
+import { InfoHint } from "./InfoHint";
 
 /**
  * 页面 / 区块标题（源力设计）：返回 + 图标 + 标题 + 徽章 + 描述 | 右侧操作
@@ -55,17 +56,14 @@ export function Title({
               </Heading>
             ) : null}
             {badge}
+            {description ? (
+              <InfoHint
+                label={description}
+                tooltipProps={{ side: "bottom" }}
+                contentClassName="max-w-md"
+              />
+            ) : null}
           </div>
-          {description ? (
-            <p
-              className={cn(
-                "mt-1 text-text3",
-                level === "page" ? "text-[13px] leading-5" : "text-xs leading-5"
-              )}
-            >
-              {description}
-            </p>
-          ) : null}
         </div>
       </div>
       {actions ? (

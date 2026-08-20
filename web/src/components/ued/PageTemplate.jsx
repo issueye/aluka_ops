@@ -58,12 +58,15 @@ export function PageTemplate({
   const hasPageHeader = Boolean(title || description || icon || backTo || actions || showRefresh || onRefresh);
 
   const headerActions = (
-    <>
+    <div className="flex items-center gap-1.5">
       {(showRefresh || onRefresh) && (
-        <RefreshButton onClick={onRefresh} loading={isRefreshing} />
+        <>
+          <RefreshButton onClick={onRefresh} loading={isRefreshing} iconOnly />
+          {actions ? <span className="mx-1 h-4 w-px shrink-0 bg-border1" aria-hidden /> : null}
+        </>
       )}
       {actions}
-    </>
+    </div>
   );
 
   const renderPagination = () =>
@@ -133,7 +136,7 @@ export function PageTemplate({
                   actions={
                     <>
                       {(showRefresh || onRefresh) && (
-                        <RefreshButton onClick={onRefresh} loading={isRefreshing} />
+                        <RefreshButton onClick={onRefresh} loading={isRefreshing} iconOnly />
                       )}
                       {cardActions || actions}
                     </>

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 import { toast } from "sonner";
 import { healthApi, authApi } from "@/lib/api";
 import { clearToken, getToken } from "@/lib/auth";
@@ -10,7 +10,7 @@ import { AgentSwitcher } from "@/components/layout/AgentSwitcher";
 import { IconTooltip, StatusBadge } from "@/components/ued";
 import { Logo } from "./Logo";
 
-export function Topbar() {
+export function Topbar(props) {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["health"],
@@ -43,25 +43,34 @@ export function Topbar() {
 
   return (
     <header className="relative z-[100] flex h-12 shrink-0 items-center justify-between bg-bg1 px-4 shadow-[0_2px_6px_0_rgba(0,0,0,0.05)] lg:px-6">
-      <div className="flex min-w-0 items-center">
+      <div className="flex min-w-0 items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-text3 hover:text-text1 lg:hidden"
+          aria-label="打开菜单"
+          onClick={() => props.onOpenMobile?.()}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden h-8 w-8 shrink-0 text-text3 hover:text-text1 lg:inline-flex"
+          aria-label={props.collapsed ? "展开侧边栏" : "收起侧边栏"}
+          onClick={() => props.onToggleSidebar?.()}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
         <Logo className="text-text1" markClassName="h-6 w-6" />
       </div>
       <div className="flex items-center gap-2 sm:gap-3">
         <AgentSwitcher />
         <ThemeToggle />
-        <StatusBadge
-          tone={status.tone}
-          label={status.text}
-          pulse={status.tone === "success"}
-        />
+        <StatusBadge tone={status.tone} label={status.text} pulse={status.tone === "success"} />
         {authStatus?.auth_enabled && getToken() && (
           <IconTooltip label="退出登录">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              aria-label="退出登录"
-            >
+            <Button variant="ghost" size="sm" onClick={handleLogout} aria-label="退出登录">
               <LogOut className="h-4 w-4" />
               退出
             </Button>

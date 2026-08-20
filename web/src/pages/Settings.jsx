@@ -38,7 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { InlineAlert, PageTemplate, RefreshButton, UsageBar } from "@/components/ued";
+import { InlineAlert, PageTemplate, RefreshButton, TabBar, TabsContent, UsageBar } from "@/components/ued";
 
 const MODE_META = {
   standalone: {
@@ -83,7 +83,7 @@ function SettingsSection({ title, action, children }) {
   );
 }
 
-/** 设置表单行（源力设计：120px 右对齐标签 + 控件 + hint） */
+/** 设置页专用表单行：FormField 的水平变体（120px 右对齐标签），与通用 FormField 垂直布局互补。 */
 function SettingsFormRow({ label, hint, children }) {
   return (
     <div className="mb-5 flex items-start gap-3 last:mb-0">
@@ -320,39 +320,17 @@ export function Settings() {
 
   return (
     <PageTemplate title="设置" description="系统配置管理">
-      {/* 页签（源力设计：底部指示线式页签） */}
-      <div className="flex flex-wrap border-b border-border1">
-        {SETTINGS_SECTIONS.map((section) => {
-          const active = activeSection === section.id;
-          return (
-            <button
-              key={section.id}
-              type="button"
-              aria-current={active ? "page" : undefined}
-              onClick={() =>
-                setSearchParams({ section: section.id }, { replace: true })
-              }
-              className={cn(
-                "-mb-px whitespace-nowrap border-b-2 px-5 py-3 text-[13px] leading-[22px] transition-colors duration-150",
-                active
-                  ? "border-primary font-medium text-primary"
-                  : "border-transparent text-text2 hover:text-primary"
-              )}
-            >
-              {section.label}
-            </button>
-          );
-        })}
-      </div>
+      <TabBar
+        value={activeSection}
+        onValueChange={(v) => setSearchParams({ section: v }, { replace: true })}
+        items={SETTINGS_SECTIONS.map((s) => ({ value: s.id, label: s.label }))}
+      >
+        <TabsContent value="system" className="space-y-8 pt-2">
 
-      {/* 页签内容 */}
-      <div className="space-y-8 pt-6">
         {/* =========================================================================
             1. 通用设置（系统信息）
            ========================================================================= */}
-        {activeSection === "system" && (
-          <>
-            <SettingsSection
+        <SettingsSection
               title="服务属性"
               action={
                 <RefreshButton
@@ -502,14 +480,8 @@ export function Settings() {
                 </div>
               </div>
             </SettingsSection>
-          </>
-        )}
-
-        {/* =========================================================================
-            2. 节点与集群
-           ========================================================================= */}
-        {activeSection === "cluster" && (
-          <>
+        </TabsContent>
+        <TabsContent value="cluster" className="space-y-8 pt-2">
             <SettingsSection
               title="运行角色"
               action={
@@ -668,7 +640,7 @@ export function Settings() {
                 {form.mode === "agent" && (
                   <>
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       disabled={connectMut.isPending}
                       onClick={() => {
                         if (
@@ -692,7 +664,7 @@ export function Settings() {
                     </Button>
 
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       disabled={disconnectMut.isPending}
                       onClick={() => disconnectMut.mutate()}
                     >
@@ -779,14 +751,8 @@ export function Settings() {
                 )}
               </div>
             </SettingsSection>
-          </>
-        )}
-
-        {/* =========================================================================
-            3. 安全设置
-           ========================================================================= */}
-        {activeSection === "security" && (
-          <>
+        </TabsContent>
+        <TabsContent value="security" className="space-y-8 pt-2">
             <SettingsSection title="认证配置">
               <div className="mb-4 flex items-center gap-2">
                 {authStatus?.auth_enabled ? (
@@ -953,7 +919,7 @@ export function Settings() {
                           </span>
                         </div>
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
                           className="h-7 shrink-0 text-xs"
                           disabled={unbanMut.isPending}
@@ -1027,14 +993,8 @@ export function Settings() {
                 </ul>
               </div>
             </SettingsSection>
-          </>
-        )}
-
-        {/* =========================================================================
-            4. 外观偏好
-           ========================================================================= */}
-        {activeSection === "appearance" && (
-          <>
+        </TabsContent>
+        <TabsContent value="appearance" className="space-y-8 pt-2">
             <SettingsSection title="界面主题模式">
               <div className="grid gap-4 sm:grid-cols-3">
                 <ThemeCard
@@ -1068,9 +1028,8 @@ export function Settings() {
                 </p>
               </div>
             </SettingsSection>
-          </>
-        )}
-      </div>
+        </TabsContent>
+      </TabBar>
     </PageTemplate>
   );
 }
@@ -1116,7 +1075,7 @@ function EnvSnippet({ label, cmd, desc, onCopy, copied }) {
         <div className="font-mono text-xs text-primary">{cmd}</div>
         {desc && <div className="text-[11px] text-text3">{desc}</div>}
       </div>
-      <Button variant="outline" size="sm" className="h-8 shrink-0 text-xs gap-1.5" onClick={onCopy}>
+      <Button variant="secondary" size="sm" className="h-8 shrink-0 text-xs gap-1.5" onClick={onCopy}>
         {copied ? (
           <>
             <Check className="h-3.5 w-3.5 text-success" /> 已复制

@@ -293,7 +293,7 @@ export function Files() {
       actions={
         <>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => {
               setMkdirName("");
@@ -303,7 +303,7 @@ export function Files() {
             <FolderPlus /> 新建目录
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => {
               setNewFileName("");
@@ -313,7 +313,7 @@ export function Files() {
             <FilePlus /> 新建文件
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
@@ -421,12 +421,18 @@ export function Files() {
             }}
           >
             <Table>
+              <colgroup>
+                <col style={{ width: "45%" }} />
+                <col style={{ width: "12%" }} />
+                <col style={{ width: "22%" }} />
+                <col style={{ width: "21%" }} />
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[45%]">名称</TableHead>
-                  <TableHead className="w-[12%]">大小</TableHead>
-                  <TableHead className="w-[22%]">修改时间</TableHead>
-                  <TableHead className="w-[21%] text-right">操作</TableHead>
+                  <TableHead>名称</TableHead>
+                  <TableHead>大小</TableHead>
+                  <TableHead>修改时间</TableHead>
+                  <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

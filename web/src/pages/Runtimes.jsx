@@ -136,7 +136,7 @@ export function Runtimes() {
       actions={
         <>
           <ActionButton
-            variant="outline"
+            variant="secondary"
             icon={Search}
             onClick={() => detectMutation.mutate()}
             loading={detectMutation.isPending}

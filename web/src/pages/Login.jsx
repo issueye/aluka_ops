@@ -141,7 +141,7 @@ export function Login() {
                 error={fieldError}
                 hint={capsOn && !fieldError ? "当前已开启 Caps Lock" : undefined}
               >
-                <div className="flex h-10 items-center overflow-hidden rounded-sm border border-border2 bg-bg1 transition-all duration-150 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(22,100,255,0.3)]">
+                <div className="flex h-10 items-center overflow-hidden rounded-sm border border-border2 bg-bg1 transition-all duration-150 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(22,100,255,0.3)]"> {/* 登录品牌强调：h-10 特例，区别于全站 h-8 输入 */}
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center text-text3">
                     <Lock className="h-4 w-4" />
                   </span>

@@ -223,7 +223,7 @@
 }
 
 @layer components {
-  /* 侧边栏菜单（源力设计 · 纯文字） */
+  /* 侧边栏菜单（源力设计） */
   .menu-group-block {
     @apply flex flex-col gap-[2px] py-1;
   }
@@ -231,13 +231,22 @@
     @apply px-3 py-[3px] text-xs leading-5 text-text3;
   }
   .menu-item {
-    @apply flex h-8 items-center rounded px-3 text-[13px] leading-[22px] transition-colors duration-150;
+    @apply flex h-8 items-center gap-2 rounded px-3 text-[13px] leading-[22px] transition-colors duration-150;
+  }
+  .menu-icon {
+    @apply flex h-5 w-5 shrink-0 items-center justify-center text-text2 transition-colors duration-150;
+  }
+  .menu-icon svg {
+    @apply h-4 w-4;
   }
   .menu-text {
     @apply flex-1 truncate;
   }
   .menu-item-active {
     @apply bg-primary-muted font-medium text-primary;
+  }
+  .menu-item-active .menu-icon {
+    @apply text-primary;
   }
 }
 

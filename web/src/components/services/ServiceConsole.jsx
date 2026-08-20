@@ -279,12 +279,13 @@ export function ServiceConsole({ serviceId, active, running }) {
         </div>
       </div>
 
-      {/* xterm 容器 */}
+      {/* xterm 容器:外层 p-2 留白;宿主自身不带 padding,保证 FitAddon 度量精确 */}
       <div
-        ref={hostRef}
         className="min-h-0 flex-1 p-2"
         onClick={() => termRef.current?.focus()}
-      />
+      >
+        <div ref={hostRef} className="h-full w-full" />
+      </div>
     </div>
   );
 }
