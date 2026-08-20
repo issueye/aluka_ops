@@ -224,21 +224,6 @@ export function Sites() {
           : null
       }
     >
-      {runtime.length === 0 ? (
-        <div className="border-b border-border1 px-4 py-3 text-xs text-text3">
-          当前无 LISTEN（启用站点并添加 APP/反代/脚本后生效）
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-2 border-b border-border1 px-4 py-3">
-          {runtime.map((r) => (
-            <Badge key={r.port} variant="secondary" className="font-mono">
-              :{r.port} · {r.rule_count || 0} 规则
-              {r.script_count ? ` · ${r.script_count} 脚本` : ""}
-            </Badge>
-          ))}
-        </div>
-      )}
-
       <DataTable
         loading={isLoading}
         data={pg.pageItems}

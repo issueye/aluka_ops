@@ -234,28 +234,6 @@ export function Tunnels() {
           : null
       }
     >
-        {/* 在线会话 */}
-        <div className="border-b border-border1 px-5 py-3">
-          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-text3">
-            <Icon icon={Network} size="sm" />
-            隧道会话（Agent 已连接）
-          </div>
-          {sessions.length === 0 ? (
-            <p className="text-xs text-text3">
-              暂无会话。请用 agent 模式启动节点并配置 ALUKA_CONTROLLER_URL / ALUKA_AGENT_TOKEN。
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {sessions.map((s) => (
-                <Badge key={s.agent_id} variant="success" className="font-mono">
-                  {s.agent_id}
-                  <span className="ml-1 opacity-70">streams {s.active_streams ?? 0}</span>
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-
         <DataTable
           loading={isLoading}
           data={pg.pageItems}

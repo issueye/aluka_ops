@@ -361,7 +361,7 @@ export function Files() {
       }
     >
         {/* 工具条：面包屑 + 上级目录 + 上传进度 */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border1 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
           <div className="flex flex-wrap items-center gap-1 text-sm">
             <button
               type="button"
